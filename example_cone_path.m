@@ -2,7 +2,7 @@
 % Implements the system and constraints described in the attached figure.
 clear; clc;
 addpath ../SCvxStar/src/
-% addpath(genpath("../utils"))
+addpath(genpath("../utils"))
 figure_settings
 
 % Problem parameters
