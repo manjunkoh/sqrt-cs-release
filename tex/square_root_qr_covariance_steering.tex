@@ -15,9 +15,8 @@
 \usepackage{subcaption}
 
 %  define custom commands
-\newcommand{\E}[1]{\mathbb{E}\left[ #1 \right]}
-\newtheorem{theorem}{Theorem}
-\newtheorem{assumption}{Assumption}
+\input{commands.tex}
+
 % set path for figures
 \graphicspath{{../figures/}}
 
@@ -86,12 +85,14 @@ for some scalar \( \gamma > 0 \) and violation probability \( p_\gamma \). The s
 
 For convenience, we make the following assumption, which is reasonable in practical applications:
 \begin{assumption} \label{assump:positive_definite_state}
-	The state covariance remains positive definite throughout the horizon.
+	The state covariance remains strictly positive definite throughout the horizon.
 \end{assumption}
 
 \subsection{Relevant works}
 The covariance steering problem has been well studied in the literature, and dates back to the early works by Hotz and Skelton \cite{hotzCovarianceControlTheory1987}. Recent works mainly focus on converting the problem into a
-convex optimization problem. Skaf and Boyd \cite{skafDesignAffineControllers2010} considers a state-history feedback controller and formulates the problem as a semidefinite programming (SDP) problem. Okamoto et al. \cite{okamotoOptimalCovarianceControl2018} later adds chance constraints while maintaining convexity. However, these methods suffer from the poor computational complexity as the horizon length increases, due to the large linear matrix inequality (LMI) constraints involved \cite{rapakouliasDiscreteTimeOptimalCovariance2023a}. It is also important to note that the problem variables involve the ``square root'' of the covariance. A more recently proposed method Liu et al. \cite{liuOptimalCovarianceSteering2024} uses the covariance directly as the optimization variable; in combination with an elegant proof of so-called ``lossless convexification'', it converts the seemingly nonconvex problem into an equivalent convex problem. Compared to the block approach, this method scales much better with the growth in problem size. At the same time, we have observed several drawbacks of this method: first, the numerical stability is not ideal as we are working with units that square the system units. Second, when dealing with objective functions or constraints that involve the covariance square root (e.g., the chance constraints), iterative algorithms are required. Third, due to the requirement of a proof of lossless convexification, whenever the problem formulation changes slightly, theoretical work is required to ensure the convexity of the new formulation.
+convex optimization problem. Skaf and Boyd \cite{skafDesignAffineControllers2010} considers a state-history feedback controller and formulates the problem as a semidefinite programming (SDP) problem. Okamoto et al. \cite{okamotoOptimalCovarianceControl2018} later adds chance constraints while maintaining convexity. However, these methods suffer from the poor computational complexity as the horizon length increases, due to the large linear matrix inequality (LMI) constraints involved \cite{rapakouliasDiscreteTimeOptimalCovariance2023a}. It is also important to note that the problem variables involve the ``square root'' of the covariance. 
+
+A more recently proposed method by Liu et al. \cite{liuOptimalCovarianceSteering2024} uses the covariance directly as the optimization variable; in combination with an elegant proof of so-called ``lossless convexification'', it converts the seemingly nonconvex problem into an equivalent convex problem. Compared to the block approach, this method scales much better with the growth in problem size. At the same time, we have observed several drawbacks of this method: first, the numerical stability is not ideal as we are working with units that square the system units. Second, when dealing with objective functions or constraints that involve the covariance square root (e.g., the chance constraints), iterative algorithms are required. Third, due to the requirement of a proof of lossless convexification, whenever the problem formulation changes slightly, theoretical work is required to ensure the convexity of the new formulation.
 
 \subsection{Contributions}
 
@@ -146,21 +147,21 @@ where \( A \) is an antisymmetric (skew-symmetric) matrix such that
 \( \mathrm{tril}(A) \) replaces the upper triangular part of \( A \) with zeros.
 Organizing the above, we have:
 \begin{equation}
-	\dd R = \dd R(\dd X, Q, R) := Q^\top (\dd X) - \mathrm{tril}(Q^\top (\dd X) R^{-1}) R
+	\dd R = \dd R(\dd X, Q, R) := Q^\top (\dd X) - \mathrm{tril}(Q^\top (\dd X) R^{-1}) R.
 \end{equation}
-Which means that using the Taylor expansion, we can approximate the QR decomposition as a linear function of perturbations in \( X \), around some reference \( \bar{X} \):
+Thus, using the Taylor expansion, we can approximate the QR decomposition as a linear function of perturbations in \( X \), around some reference \( \bar{X} \):
 \begin{equation}
-	\mathrm{qr}(X) \approx \mathrm{qr}(\bar{X}) + \dd R(X - \bar{X}, Q(\bar{X}), R(\bar{X}))
+	\mathrm{qr}(X) \approx \mathrm{qr}(\bar{X}) + \dd R(X - \bar{X}, Q(\bar{X}), R(\bar{X})).
 \end{equation}
 Note that \( \mathrm{qr}(X)\) and \(R(X)\) are synonymous.
 
-\subsection{Application to Covariance Propagation}
+\subsection{Application to Covariance Steering}
 The application to covariance steering is straightforward.
 Now, since the state is controlled by a feedback controller of the form
 \begin{equation}
 	u_k = K_k x_k,
 \end{equation}
-The dynamics become
+The closed-loop dynamics become
 \begin{equation}
 	x_{k+1} = (A_k + B_k K_k) x_k + w_k
 \end{equation}
@@ -170,8 +171,7 @@ and the square root covariance propagation becomes
 \end{equation}
 Since both $P_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \).
 By defining $L_k = K_k S_k$, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists when the diagonals of $S_k$ are non-zero, which is by definition
-guaranteed since $S_k$ is the square root of a positive definite covariance matrix
-%  (\cref{assump:positive_definite_state}).
+guaranteed since $S_k$ is the square root of a positive definite covariance matrix (\(\because\) \cref{assump:positive_definite_state}).
 So we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
 	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k S_k + B_k L_k) & V_k \end{bmatrix}.
@@ -225,7 +225,7 @@ To summarize, \eqref{eq:problem_statement} is converted into a nonconvex optimiz
 \end{equation}
 
 \section{Algorithm Overview}
-In order to take advantage of the convex representation of the objective and constraints, we use sequential convex programming (SCP). In the implementation, the first order approximation of the covariance propagation \eqref{eq:square_root_covariance_propagation_linearized} is softly imposed in a vectorized form using a penalty method:
+In order to take advantage of the convex representation of the objective and constraints, we use sequential convex programming (SCP). In the implementation, the first order approximation of the covariance propagation \eqref{eq:square_root_covariance_propagation_linearized} is imposed in a vectorized form with penalization of violations:
 \begin{equation}
 	\mathrm{vectril} \left\{ S_{k+1} - (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top - \left( \dd R(X_{k+1} - \bar{X}_{k+1}, Q(\bar{X}_{k+1}), R(\bar{X}_{k+1})) \right)^\top \right\} = \chi_k
 \end{equation}
@@ -266,7 +266,7 @@ The cost function value match to 7 digits between the full covariance steering a
 \begin{figure}[h]
 	\centering
 	\includegraphics[width=0.6\textwidth]{sqrt_covariance_steering_convergence.png}
-	\caption{Convergence history of the square root QR covariance steering method}
+	\caption{Convergence history of the \textit{SCvx*} algorithm for the proposed method}
 	\label{fig:sqrt_qr_cov_convergence}
 \end{figure}
 
