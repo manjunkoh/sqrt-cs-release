@@ -39,7 +39,7 @@ Covariance steering is a control technique for steering the mean and covariance 
 \subsection{Notation}
 Let $\mathbb{L}_+^n$ denote the space of $n \times n$ lower triangular matrices with positive diagonal entries. 
 The square root of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique lower triangular matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \). Its uniqueness is easily shown. $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). The linear matrix inequality $A \succeq B$ means that $A - B $ is positive semidefinite.
-$a:b$ denotes the set of integers $a, a+1, \ldots, b$.
+$a\colon b$ denotes the set of integers $a, a+1, \ldots, b$.
 
 
 \subsection{Problem Formulation}
@@ -48,12 +48,12 @@ We address the finite-horizon discrete-time covariance steering problem for a li
 \label{eq:problem_statement}
 \begin{align}
 	\minimize_{\{v_k, K_k\}_{k=0}^{N-1}} \quad & J = \sum_{k=0}^{N-1} J_k (x_k, u_k) \\
-	\text{subject to} \quad & x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad k \in 0:(N-1) \\
-	& u_k = v_k + K_k (x_k - \E{x_k}), \quad k \in 0:(N-1) \\
+	\text{subject to} \quad & x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad {k \in 0\colon N{-}1} \\
+	& u_k = v_k + K_k (x_k - \E{x_k}), \quad {k \in 0\colon N{-}1} \\
 	& x_0 \sim \mathcal{N}(\mu_{\mathrm{init}}, P_{\mathrm{init}}) \\
 	& x_N \sim \mathcal{N}(\mu_{\mathrm{fin}}, P_{\mathrm{fin}}), \quad P_{\mathrm{fin}} \succeq P_N \\
-	& \mathbb{P}(x_k \in \mathcal{X}_k) \geq 1 - \epsilon_k, \quad k \in 0:N \\ 
-	& \mathbb{P}(u_k \in \mathcal{U}_k) \geq 1 - \delta_k, \quad k \in 0:(N-1)
+	& \mathbb{P}(x_k \in \mathcal{X}_k) \geq 1 - \epsilon_k, \quad {k \in 0\colon N} \\ 
+	& \mathbb{P}(u_k \in \mathcal{U}_k) \geq 1 - \delta_k, \quad {k \in 0\colon N{-}1}
 \end{align}
 \end{subequations}
 where \( x_k \in \mathbb{R}^n \) is the state vector, \( u_k \in \mathbb{R}^m \) is the control input, \( w_k \in \mathbb{R}^n \) is standard Gaussian process noise, \( v_k \in \mathbb{R}^m \) is the nominal control input, and \( K_k \in \mathbb{R}^{m \times n} \) is the state feedback gain to be designed. The state-affine feedback was shown to be optimal for the covariance steering problem without chance constraints \cite{liuOptimalCovarianceSteering2024}. The matrices \( A_k \), \( B_k \), and \( G_k \) define the system dynamics. We consider two types of cost functions:
@@ -170,27 +170,27 @@ The application to covariance steering is straightforward.
 \subsection{Propagation with feedback control}
 Now, since the state is controlled by a the affine feedback control law, the closed-loop dynamics become
 \begin{equation}
-	x_{k+1} = A_k x_k + B_k (v_k + K_k (x_k - \E{x_k})) + G_k w_k \quad k \in 0:(N-1).
+	x_{k+1} = A_k x_k + B_k (v_k + K_k (x_k - \E{x_k})) + G_k w_k \quad {k \in 0\colon N{-}1}.
 \end{equation}
 The mean dynamics are given by
 \begin{equation}
-	\mu_{k+1} = A_k \mu_k + B_k v_k \quad k \in 0:(N-1).
+	\mu_{k+1} = A_k \mu_k + B_k v_k, \quad {k \in 0\colon N{-}1}.
 \end{equation}
 where $\mu_k := \E{x_k}$.
 The square root covariance dynamics are given by:
 \begin{equation}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix} \quad k \in 0:(N-1).
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix} \quad {k \in 0\colon N{-}1}.
 \end{equation}
 Note that due to the affine feedback control law, the Gaussianity of the state distribution is preserved, and the control input is also Gaussian.
 Since both $P_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \).
 Here, we introduce a new variable $L_k = K_k S_k \in \mathbb{R}^{m \times n}$, so that the bilinear term is replaced with a linear term. $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists when the diagonals of $S_k$ are non-zero (source?), which is by definition guaranteed since $S_k$ is the square root of a positive definite covariance matrix (\(\because\) \cref{assump:positive_definite_state}).
 So we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix} \quad k \in 0:(N-1).
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix} \quad {k \in 0\colon N{-}1}.
 \end{equation}
 with its first-order approximation given by:
 \begin{equation} \label{eq:square_root_covariance_propagation_linearized}
-	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1} - \bar{X}_{k+1}, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \quad k \in 0:(N-1).
+	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1} - \bar{X}_{k+1}, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \quad {k \in 0\colon N{-}1}.
 \end{equation}
 where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference variables, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\).
 
@@ -215,18 +215,18 @@ The terminal distributional constraint is imposed by \cite{okamotoOptimalCovaria
 where \( \norm{\cdot}_2 \) denotes the spectral norm.
 To ensure uniqueness of the square root, we impose:
 \begin{equation} \label{eq:S_diagonals_positive}
-	\mathrm{diag}(S_k) \geq 0, \quad k \in 0:N
+	\mathrm{diag}(S_k) \geq 0, \quad {k \in 0\colon N}
 \end{equation}
 
 Since we are working with the square root form, chance constraints can also be imposed in a convex manner.
 For the linear constraint form \eqref{eq:linear_chance_constraint}, the chance constraint can be exactly expressed as:
 \begin{equation} \label{eq:linear_chance_constraint_deterministic}
-	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0 \quad k \in 0:N
+	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0 \quad {k \in 0\colon N}
 \end{equation}
 where \( \mathcal{Q}_{\mathcal{N}}(p_j) \) is the inverse of the standard normal cumulative distribution function.
 For the norm constraint form \eqref{eq:norm_chance_constraint}, the chance constraint can be conservatively approximated as:
 \begin{equation} \label{eq:norm_chance_constraint_deterministic}
-	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0 \quad k \in 0:N
+	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0 \quad {k \in 0\colon N}
 \end{equation}
 The control chance constraints can be imposed by replacing \( \mu_k \) with \( v_k \) and \( S_k \) with \( L_k \).
 
