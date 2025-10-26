@@ -36,41 +36,34 @@ This document provides an overview and technical documentation for the Square Ro
 
 Covariance steering is a control technique for steering the mean and covariance of a stochastic system to desired terminal values. The proposed square root QR approach improves numerical stability and efficiency, at the expense of an iterative algorithm.
 
-\subsection{Notation and Preliminaries}
+\subsection{Notation}
 Let $\mathbb{L}_+^n$ denote the space of $n \times n$ lower triangular matrices with positive diagonal entries. 
-The square root of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique lower triangular matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \). Its uniqueness is easily shown. $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). 
+The square root of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique lower triangular matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \). Its uniqueness is easily shown. $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). The linear matrix inequality $A \succeq B$ means that $A - B $ is positive semidefinite.
+$a:b$ denotes the set of integers $a, a+1, \ldots, b$.
 
-
-\begin{theorem}[Existence and Uniqueness of QR decomposition, Thm 3.3.3 in (cite)]
-	Let \( M \in \mathbb{R}^{m \times n} \), \(m > n\). Then there exist \(Q \in \mathbb{R}^{m \times m}\) and \(\tilde{R} \in \mathbb{R}^{m \times n}\) such that \(Q\) is orthogonal, \( \tilde{R} = \begin{bmatrix}
-	R \\ 0_{(m-n) \times n}
-	\end{bmatrix}\), where \( R \in \mathbb{R}^{n \times n} \) is upper triangular, and
-	\(M = QR\).
-	Furthermore, if \(M\) has full rank, i.e. \(\mathrm{rank}(M) = n\), then the matrices \(Q\) and \(R\) are unique.
-\end{theorem}
- If we require the diagonal entries of \( R \) to be positive, then $Q$ and $R$ are unique \cite{klosterHowUniqueQR}.
 
 \subsection{Problem Formulation}
 We address the finite-horizon discrete-time covariance steering problem for a linear time-varying system with additive Gaussian noise. The goal is to find a state feedback controller that steers the state covariance from an initial value to a desired terminal value while minimizing a cost function, and under chance constraints. Mathematically, the problem is formulated as follows.
 \begin{subequations}
 \label{eq:problem_statement}
 \begin{align}
-	\min_{\{K_k\}_{k=0}^{N-1}} \quad & J = \sum_{k=0}^{N-1} \mathbb{E} \left[ J_k (x_k, u_k)\right] \\
-	\text{subject to} \quad & x_{k+1} = A_k x_k + B_k u_k + w_k, \quad k = 0, \ldots, N-1 \\
-	& u_k = K_k x_k, \quad k = 0, \ldots, N-1 \\
-	& x_0 \sim \mathcal{N}(\mu_0, P_{\mathrm{init}}) \\
-	& P_N \leq P_f \\
-	& \mathbb{P}(x_k \in \mathcal{X}_k) \geq 1 - \epsilon_k, \quad k = 0, \ldots, N \\ 
-	& \mathbb{P}(u_k \in \mathcal{U}_k) \geq 1 - \delta_k, \quad k = 0, \ldots, N-1
+	\minimize_{\{v_k, K_k\}_{k=0}^{N-1}} \quad & J = \sum_{k=0}^{N-1} J_k (x_k, u_k) \\
+	\text{subject to} \quad & x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad k \in 0:(N-1) \\
+	& u_k = v_k + K_k (x_k - \E{x_k}), \quad k \in 0:(N-1) \\
+	& x_0 \sim \mathcal{N}(\mu_{\mathrm{init}}, P_{\mathrm{init}}) \\
+	& x_N \sim \mathcal{N}(\mu_{\mathrm{fin}}, P_{\mathrm{fin}}), \quad P_{\mathrm{fin}} \succeq P_N \\
+	& \mathbb{P}(x_k \in \mathcal{X}_k) \geq 1 - \epsilon_k, \quad k \in 0:N \\ 
+	& \mathbb{P}(u_k \in \mathcal{U}_k) \geq 1 - \delta_k, \quad k \in 0:(N-1)
 \end{align}
 \end{subequations}
-where \( x_k \in \mathbb{R}^n \) is the state vector, \( u_k \in \mathbb{R}^m \) is the control input, \( w_k \in \mathbb{R}^n \) is zero-mean Gaussian process noise with covariance \( Q_k \), and \( K_k \in \mathbb{R}^{m \times n} \) is the state feedback gain to be designed. The matrices \( A_k \) and \( B_k \) define the system dynamics. We consider two types of cost functions:
+where \( x_k \in \mathbb{R}^n \) is the state vector, \( u_k \in \mathbb{R}^m \) is the control input, \( w_k \in \mathbb{R}^n \) is standard Gaussian process noise, \( v_k \in \mathbb{R}^m \) is the nominal control input, and \( K_k \in \mathbb{R}^{m \times n} \) is the state feedback gain to be designed. The state-affine feedback was shown to be optimal for the covariance steering problem without chance constraints \cite{liuOptimalCovarianceSteering2024}. The matrices \( A_k \), \( B_k \), and \( G_k \) define the system dynamics. We consider two types of cost functions:
 \begin{equation}
 	J_k (x_k, u_k) = \begin{cases}
-		x_k^\top Q_k x_k + u_k^\top R_k u_k, \quad Q_k \geq 0, R_k > 0 & \text{(quadratic cost)} \\
-		\norm{u_k}_2 & \text{(2-norm cost)}
+	\E{x_k^\top Q_k x_k + u_k^\top R_k u_k}, \quad Q_k \geq 0, R_k > 0 & \text{(quadratic cost)} \\
+	\mathcal{Q}_{\norm{u_k}_2}(p_J) & \text{(quantile 2-norm cost)}
 	\end{cases}
 \end{equation}
+where \( \mathcal{Q}_{\norm{u_k}_2}(p_J) \) is $p_J$-quantile of the 2-norm of the control input $u_k$.
 
 The sets \( \mathcal{X}_k \) and \( \mathcal{U}_k \) represent state and control constraints, respectively, with associated violation probabilities \( \epsilon_k \) and \( \delta_k \). We assume that the feasible region defined by the chance constraints is given in one of two forms: a linear constraint or a norm constraint. For the linear constraint form, the chance constraint can be expressed as:
 \begin{equation} \label{eq:linear_chance_constraint}
@@ -97,42 +90,58 @@ A more recently proposed method by Liu et al. \cite{liuOptimalCovarianceSteering
 \subsection{Contributions}
 
 
+\section{Preliminaries}
 
-\section{Square root covariance propagation}
+\subsection{QR decomposition}
+% \begin{lemma}[Existence of Full-size QR decomposition, Thm 3.3.3 in (cite)]
+% 	Let \( M \in \mathbb{R}^{m \times n} \), \(m > n\). Then there exist \(Q \in \mathbb{R}^{m \times m}\) and \(\tilde{R} \in \mathbb{R}^{m \times n}\) such that \(Q\) is orthogonal, \( \tilde{R} = \begin{bmatrix}
+% 	R \\ 0_{(m-n) \times n}
+% 	\end{bmatrix}\), where \( R \in \mathbb{R}^{n \times n} \) is upper triangular, and \( M = QR \).
+% \end{lemma}
+
+\begin{lemma}[Existence and uniqueness of economy-size QR decomposition, p.75 of \cite{ipsenNumericalMatrixAnalysis2009}]\label{lemma:existence_and_uniqueness_of_economy_size_qr_decomposition}
+	Let \( M \in \mathbb{R}^{m \times n} \), \(m > n\). 
+	\begin{itemize}
+		\item (Existence) There exist \(Q \in \mathbb{R}^{m \times n}\) and \(R \in \mathbb{R}^{n \times n}\) such that \(Q Q^\top = I\) and \(R\) is upper triangular, and \(M = QR\).
+		\item (Uniqueness) If \(M\) has full rank, i.e. \(\mathrm{rank}(M) = n\), then the matrices \(Q\) and \(R\) are unique up to a sign change of the diagonal entries of \(R\).
+	\end{itemize}
+\end{lemma}
+
+\subsection{Square root covariance propagation}
 
 First, we provide a brief review of square root covariance propagation, mainly used for Kalman filtering \cite{tapleyStatisticalOrbitDetermination2004}. 
 % In the 1960s, 
 Let the system dynamics be given by:
 \begin{equation}
-	x_{k+1} = \Phi_k x_k + w_k
+	x_{k+1} = \Phi_k x_k + G_k w_k
 \end{equation}
-with state \( x_k \in \mathbb{R}^n \), where \( w_k \in \mathbb{R}^m \) is zero-mean Gaussian noise with covariance \( Q_k \).
+with state \( x_k \in \mathbb{R}^n \), where \( w_k \in \mathbb{R}^m \) is standard Gaussian noise.
 By defining $P_k := \E{(x_k - \E{x_k})(x_k - \E{x_k})^\top}$, the covariance propagation equation is given by:
 \begin{equation}
-	P_{k+1} = \Phi_k P_k \Phi_k^T + Q_k
+	P_{k+1} = \Phi_k P_k \Phi_k^T + G_k G_k^\top
 \end{equation}
-If we define \( S_k \in \mathbb{L}_+^n \) as \( S_k = P_k^{1/2} \) and \( V_k \in \mathbb{L}_+^m \) as \( V_k = Q_k^{1/2} \), the covariance propagation can be expressed as:
+If we define \( S_k \in \mathbb{L}_+^n \) as \( S_k = P_k^{1/2} \), the covariance propagation can be expressed as:
 \begin{equation}
-	S_{k+1} S_{k+1}^T = \Phi_k S_k S_k^T \Phi_k^T + V_k V_k^T = X_{k+1} X_{k+1}^T
+	S_{k+1} S_{k+1}^T = \Phi_k S_k S_k^T \Phi_k^T + G_k G_k^\top = X_{k+1} X_{k+1}^T
 \end{equation}
-where we define
+where $S_{k+1} \in \mathbb{L}_+^n$ is the next step square root covariance, and we define
 \begin{equation}
-	X_{k+1} := \begin{bmatrix} \Phi_k S_k & V_k \end{bmatrix} \in \mathbb{R}^{n \times (n+m)}
+	X_{k+1} := \begin{bmatrix} \Phi_k S_k & G_k \end{bmatrix} \in \mathbb{R}^{n \times (n+m)}
 \end{equation}
 Note that the dimensions of $S_{k+1}$ and $X_{k+1}$ are different, so we cannot directly equate them.
-To numerically obtain $S_{k+1}$ from $X_{k+1}$, we perform a QR decomposition
-\textcolor{red}{Is this unique?}
-:
-\begin{equation}
-	X_{k+1} Q_{k+1} = \begin{bmatrix} 0_{n \times m} & S_{k+1}^\top \end{bmatrix} 
+For a matrix $Q_{k} \in \R^{(n+m) \times n}$ such that $Q_{k} Q_{k}^\top = I$, (\textcolor{red}{is this iff?})
+\begin{equation} \label{eq:Q_S_X_relation}
+	Q_{k} S_{k+1}^\top = X_{k+1}^\top
+	\implies
+	X_{k+1} X_{k+1}^\top = S_{k+1} Q_{k}^\top Q_{k} S_{k+1}^\top = S_{k+1} S_{k+1}^\top.
 \end{equation}
-where \( Q_{k+1} \in \) is an orthogonal matrix.
-In other words, the square root covariance propagation can be expressed as a nonlinear operation involving the QR decomposition:
+Since $S_{k+1} \in \mathbb{L}_+^n$, its transpose is upper triangular, so the first equality in \cref{eq:Q_S_X_relation} is an economy-size QR decomposition of $X_{k+1}^\top$. By \cref{lemma:existence_and_uniqueness_of_economy_size_qr_decomposition}, if $X_{k+1}^\top$ is full rank (\textcolor{red}{TODO: prove this}), there exists a unique set of matrices $Q_{k}$ and $S_{k+1}$ that satisfy the equation.
+In other words, the square root covariance propagation can be expressed as a nonlinear operation:
 \begin{equation}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top = (\mathrm{qr}( \begin{bmatrix} \Phi_k S_k & V_k \end{bmatrix} ^\top))^\top
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top = (\mathrm{qr}( \begin{bmatrix} \Phi_k S_k & G_k \end{bmatrix} ^\top))^\top
 \end{equation}
-where \( \mathrm{qr}(\cdot) \) denotes the operation of extracting the upper triangular factor \( R \) from the QR decomposition. 
-In implementation, it is preferred to use the economy-size QR decomposition to avoid unnecessary computations. (This requires using $\mathrm{qr}(\cdot, \text{``econ"})$ in MATLAB.) In addition, to ensure uniqueness of the square root, if the function returns an \( R \) matrix with negative diagonal entries, we multiply the corresponding columns of \( Q \) and rows of \( R \) by -1 to ensure positive diagonals.
+where \( \mathrm{qr}(\cdot) \) denotes the operation of extracting the upper triangular factor \( R \) from the economy-size QR decomposition. 
+\footnote{For example, in MATLAB, this requires using $\mathrm{qr}(X_{k+1}^\top, \text{``econ"})$. In addition, to ensure uniqueness of the square root, if the function returns an \( R \) matrix with negative diagonal entries, we multiply the corresponding columns of \( Q \) and rows of \( R \) by -1 to ensure positive diagonals.}
 
 \subsection{QR decomposition derivative}
 In order to use this square root covariance propagation in an optimization framework, we require the derivative of the QR decomposition operation; this is documented in the literature \cite{deleeuwDifferentiatingQRDecomposition2023}, but for completeness, we provide a brief overview here.
@@ -149,98 +158,104 @@ Organizing the above, we have:
 \begin{equation}
 	\dd R = \dd R(\dd X, Q, R) := Q^\top (\dd X) - \mathrm{tril}(Q^\top (\dd X) R^{-1}) R.
 \end{equation}
-Thus, using the Taylor expansion, we can approximate the QR decomposition as a linear function of perturbations in \( X \), around some reference \( \bar{X} \):
+Thus, using the Taylor expansion, we can approximate the QR decomposition as a linear function of perturbations in \( X \), around some reference \( \bar{X} = \bar{Q} \bar{R} \):
 \begin{equation}
-	\mathrm{qr}(X) \approx \mathrm{qr}(\bar{X}) + \dd R(X - \bar{X}, Q(\bar{X}), R(\bar{X})).
+	\mathrm{qr}(X) \approx \mathrm{qr}(\bar{X}) + \dd R(X - \bar{X}, \bar{Q}, \bar{R}) = \mathrm{qr}(\bar{X}) + \dd R(X - \bar{X}, \bar{Q}, \bar{R}).
 \end{equation}
-Note that \( \mathrm{qr}(X)\) and \(R(X)\) are synonymous.
+Note that \( \mathrm{qr}(\bar{X})\) and \(\bar{R}\) are synonymous.
 
-\subsection{Application to Covariance Steering}
+\section{Application to Covariance Steering}
 The application to covariance steering is straightforward.
-Now, since the state is controlled by a feedback controller of the form
+
+\subsection{Propagation with feedback control}
+Now, since the state is controlled by a the affine feedback control law, the closed-loop dynamics become
 \begin{equation}
-	u_k = K_k x_k,
+	x_{k+1} = A_k x_k + B_k (v_k + K_k (x_k - \E{x_k})) + G_k w_k \quad k \in 0:(N-1).
 \end{equation}
-The closed-loop dynamics become
+The mean dynamics are given by
 \begin{equation}
-	x_{k+1} = (A_k + B_k K_k) x_k + w_k
+	\mu_{k+1} = A_k \mu_k + B_k v_k \quad k \in 0:(N-1).
 \end{equation}
-and the square root covariance propagation becomes
+where $\mu_k := \E{x_k}$.
+The square root covariance dynamics are given by:
 \begin{equation}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & V_k \end{bmatrix}.
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix} \quad k \in 0:(N-1).
 \end{equation}
+Note that due to the affine feedback control law, the Gaussianity of the state distribution is preserved, and the control input is also Gaussian.
 Since both $P_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \).
-By defining $L_k = K_k S_k$, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists when the diagonals of $S_k$ are non-zero, which is by definition
-guaranteed since $S_k$ is the square root of a positive definite covariance matrix (\(\because\) \cref{assump:positive_definite_state}).
+Here, we introduce a new variable $L_k = K_k S_k \in \mathbb{R}^{m \times n}$, so that the bilinear term is replaced with a linear term. $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists when the diagonals of $S_k$ are non-zero (source?), which is by definition guaranteed since $S_k$ is the square root of a positive definite covariance matrix (\(\because\) \cref{assump:positive_definite_state}).
 So we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k S_k + B_k L_k) & V_k \end{bmatrix}.
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix} \quad k \in 0:(N-1).
 \end{equation}
 with its first-order approximation given by:
 \begin{equation} \label{eq:square_root_covariance_propagation_linearized}
-	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1} - \bar{X}_{k+1}, Q(\bar{X}_{k+1}), R(\bar{X}_{k+1})) \right)^\top
+	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1} - \bar{X}_{k+1}, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \quad k \in 0:(N-1).
 \end{equation}
-where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & V_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference variables.
+where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference variables, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\).
 
 \subsection{Objective function}
 After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and some standard manipulations, the objective function can be expressed as deterministic convex functions of \( L_k \) and \( S_k \):
 \begin{equation} \label{eq:objective_deterministic}
 	J = \begin{cases}
-	\sum_{k=0}^{N-1} \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(quadratic cost)} \\
-	\sum_{k=0}^{N-1} \norm{L_k}_2 & \text{(2-norm cost)}.
+	\sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k + \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(quadratic cost)} \\
+	\sum_{k=0}^{N-1} \norm{v_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_m}(p_J)} \ \norm{L_k}_2 & \text{(quantile 2-norm cost)}.
 	\end{cases}
 \end{equation}
-
+where the 2-norm cost is conservative approximated [cite]. \( \mathcal{Q}_{\chi^2_m}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( m \) degrees of freedom.
 \subsection{Constraints}
-The initial covariance constraint $P_0 = P_{\mathrm{init}}$ is imposed by:
-\begin{equation} \label{eq:initial_covariance_deterministic}
-	S_0 = P_{\mathrm{init}}^{1/2}
+The initial distributional constraint is imposed by:
+\begin{equation} \label{eq:initial_distributional_constraint}
+	\mu_0 = \mu_{\mathrm{init}}, \quad S_0 = P_{\mathrm{init}}^{1/2}
 \end{equation}
-The terminal covariance constraint $P_N \leq P_f$ is imposed by:
-\begin{equation} \label{eq:terminal_covariance_deterministic}
-	\norm{P_f^{-1/2} S_N}_2 - 1 \leq 0
+The terminal distributional constraint is imposed by \cite{okamotoOptimalCovarianceControl2018}:
+\begin{equation} \label{eq:terminal_distributional_constraint}
+	\mu_N = \mu_{\mathrm{fin}}, \quad \norm{P_{\mathrm{fin}}^{-1/2} S_N}_2 - 1 \leq 0
 \end{equation}
 where \( \norm{\cdot}_2 \) denotes the spectral norm.
 To ensure uniqueness of the square root, we impose:
 \begin{equation} \label{eq:S_diagonals_positive}
-	\mathrm{diag}(S_k) \geq 0, \quad \text{k = 0, \ldots, N}
+	\mathrm{diag}(S_k) \geq 0, \quad k \in 0:N
 \end{equation}
 
 Since we are working with the square root form, chance constraints can also be imposed in a convex manner.
 For the linear constraint form \eqref{eq:linear_chance_constraint}, the chance constraint can be exactly expressed as:
 \begin{equation} \label{eq:linear_chance_constraint_deterministic}
-	\alpha_j^\top \mu_k + \Phi^{-1}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0
+	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0 \quad k \in 0:N
 \end{equation}
-where \( \Phi^{-1}(\cdot) \) is the inverse of the standard normal cumulative distribution function.
+where \( \mathcal{Q}_{\mathcal{N}}(p_j) \) is the inverse of the standard normal cumulative distribution function.
 For the norm constraint form \eqref{eq:norm_chance_constraint}, the chance constraint can be conservatively approximated as:
 \begin{equation} \label{eq:norm_chance_constraint_deterministic}
-	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \norm{S_k}_2 - \gamma \leq 0
+	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0 \quad k \in 0:N
 \end{equation}
-where \( Q_{\chi^2_n}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( n \) degrees of freedom.
 The control chance constraints can be imposed by replacing \( \mu_k \) with \( v_k \) and \( S_k \) with \( L_k \).
 
 To summarize, \eqref{eq:problem_statement} is converted into a nonconvex optimization problem as follows:
 \begin{equation}
-	\min_{L_{0:N-1}, S_{0:N}} \eqref{eq:objective_deterministic} \quad \text{subject to} \quad \eqref{eq:square_root_covariance_propagation}, \eqref{eq:initial_covariance_deterministic}, \eqref{eq:terminal_covariance_deterministic}, \eqref{eq:S_diagonals_positive}, \eqref{eq:linear_chance_constraint_deterministic}, \eqref{eq:norm_chance_constraint_deterministic}
+	\minimize_{\{v_k, L_k\}_{k=0}^{N-1}, \{\mu_k, S_k\}_{k=0}^{N}} \eqref{eq:objective_deterministic} \quad \text{subject to} \quad \eqref{eq:square_root_covariance_propagation}, \eqref{eq:initial_distributional_constraint}, \eqref{eq:terminal_distributional_constraint}, \eqref{eq:S_diagonals_positive}, \eqref{eq:linear_chance_constraint_deterministic}, \eqref{eq:norm_chance_constraint_deterministic}
 \end{equation}
 
 \section{Algorithm Overview}
-In order to take advantage of the convex representation of the objective and constraints, we use sequential convex programming (SCP). In the implementation, the first order approximation of the covariance propagation \eqref{eq:square_root_covariance_propagation_linearized} is imposed in a vectorized form with penalization of violations:
+In order to take advantage of the convex representation of the objective and constraints, we use sequential convex programming (SCP). At each iteration, \eqref{eq:square_root_covariance_propagation_linearized} is imposed in a vectorized form with penalization of violations:
 \begin{equation}
-	\mathrm{vectril} \left\{ S_{k+1} - (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top - \left( \dd R(X_{k+1} - \bar{X}_{k+1}, Q(\bar{X}_{k+1}), R(\bar{X}_{k+1})) \right)^\top \right\} = \chi_k
+	\mathrm{vectril} \left\{ S_{k+1} - (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top - \left( \dd R(X_{k+1} - \bar{X}_{k+1}, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \right\} = \chi_k
 \end{equation}
-where $\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix, and \( \chi_k \in \mathbb{R}^{\frac{n(n-1)}{2}}\) is a slack variable, penalized in the objective function via an Augmented Lagrangian method \cite{oguriSuccessiveConvexificationFeasibility2023a}. By using the specific SCP algorithm $\texttt{SCvx*}$, we can ensure that 1. the nonlinear dynamics are obeyed at convergence, and 2. the converged solution is locally optimal. As seen in our numerical experiments, the convergence is well-behaved, and compared to the globally optimal solution obtained from the full covariance steering method, the cost function values match to high precision.
+where $\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix, and \( \chi_k \in \mathbb{R}^{\frac{n(n-1)}{2}}\) is a slack variable, penalized in the objective function via an Augmented Lagrangian method \cite{oguriSuccessiveConvexificationFeasibility2023a}. By using the specific SCP algorithm $\texttt{SCvx*}$, we can ensure that 1. the nonlinear dynamics are obeyed at convergence, and 2. the converged solution is locally optimal. Readers are referred to \cite{oguriSuccessiveConvexificationFeasibility2023a} for more details of the $\texttt{SCvx*}$ algorithm.
+
+As seen in our numerical experiments, the convergence is well-behaved, and compared to the globally optimal solution obtained from the full covariance steering method, the cost function values match to high precision.
 
 \section{Numerical Examples}
-Use the same problem parameters as in Liu's paper. The convex optimization problems are solved in MATLAB using YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025}. We use the same SCP parameters as in \cite{oguriSuccessiveConvexificationFeasibility2023a}.
+The convex optimization problems are solved in MATLAB using YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} on a MacBook Pro with an M4 Max processor with 24GB of RAM. We use the same SCP parameters as in \cite{oguriSuccessiveConvexificationFeasibility2023a}.
 
 Some practical implementation tips:
 \begin{itemize}
 	\item Since the algorithm requires iteratively linearizing the problem, an initial guess is required for each of the variables. The initial guess for \( S_k \) can be obtained by linearly interpolating between the Cholesky factors of the initial and terminal covariances. The initial guess for \( L_k \) can be set to zero.
-	\item The SCP algorithm allows the user to choose whether to impose a trust region on the variables, to ensure that the solution remains in a region where the linear approximation is accurate. We observed that a trust region on \( L_k\) is not necessary, and causes chattering close to the solution.
+	\item The SCP algorithm allows the user to choose whether to impose a trust region on the variables, to ensure that the solution remains in a region where the linear approximation is accurate. We observed that a trust region on \( L_k\) is not necessary, and causes chattering close to the solution. Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only appear in the convex constraints and are not subject to the linearization.
 \end{itemize}
 
 \subsection{Comparison with Full Covariance Approach}
+We consider the numerical example in \cite{liuOptimalCovarianceSteering2024} with the following parameters:
+
 The cost function value match to 7 digits between the full covariance steering and the square root QR covariance steering methods.
 
 %  plot the two results side by side
@@ -266,13 +281,16 @@ The cost function value match to 7 digits between the full covariance steering a
 \begin{figure}[h]
 	\centering
 	\includegraphics[width=0.6\textwidth]{sqrt_covariance_steering_convergence.png}
-	\caption{Convergence history of the \textit{SCvx*} algorithm for the proposed method}
+	\caption{Convergence history of the \texttt{SCvx*} algorithm for the proposed method}
 	\label{fig:sqrt_qr_cov_convergence}
 \end{figure}
 
 
 \subsection{Chance constraints}
 Showcase the chance constraints handling capability and compare solution times with full covariance and block approaches.
+
+\section{Discussion}
+
 
 \section{Conclusions}
 
