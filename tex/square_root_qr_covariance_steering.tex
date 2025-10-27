@@ -38,8 +38,7 @@ Covariance steering is a control technique for steering the mean and covariance 
 
 \subsection{Notation}
 Let $\mathbb{L}_+^n$ denote the space of $n \times n$ lower triangular matrices with positive diagonal entries. 
-The square root of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique lower triangular matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \). Its uniqueness is easily shown. $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). The linear matrix inequality $A \succeq B$ means that $A - B $ is positive semidefinite.
-$a\colon b$ denotes the set of integers $a, a+1, \ldots, b$.
+The square root of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique lower triangular matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \). Its uniqueness is easily shown. $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). The linear matrix inequality $A \succ (\succeq) B$ means that $A - B $ is positive (semi)definite. $a\colon b$ denotes the set of integers $a, a+1, \ldots, b$.
 
 
 \subsection{Problem Formulation}
@@ -51,7 +50,7 @@ We address the finite-horizon discrete-time covariance steering problem for a li
 	\text{subject to} \quad & x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad {k \in 0\colon N{-}1} \\
 	& u_k = v_k + K_k (x_k - \E{x_k}), \quad {k \in 0\colon N{-}1} \\
 	& x_0 \sim \mathcal{N}(\mu_{\mathrm{init}}, P_{\mathrm{init}}) \\
-	& x_N \sim \mathcal{N}(\mu_{\mathrm{fin}}, P_{\mathrm{fin}}), \quad P_{\mathrm{fin}} \succeq P_N \\
+	& x_N \sim \mathcal{N}(\mu_{\mathrm{fin}}, P_{\mathrm{fin}}), \quad P_{\mathrm{fin}} \succeq \E{(x_N - \E{x_N})(x_N - \E{x_N})^\top} \\
 	& \mathbb{P}(x_k \in \mathcal{X}_k) \geq 1 - \epsilon_k, \quad {k \in 0\colon N} \\ 
 	& \mathbb{P}(u_k \in \mathcal{U}_k) \geq 1 - \delta_k, \quad {k \in 0\colon N{-}1}
 \end{align}
@@ -59,7 +58,7 @@ We address the finite-horizon discrete-time covariance steering problem for a li
 where \( x_k \in \mathbb{R}^n \) is the state vector, \( u_k \in \mathbb{R}^m \) is the control input, \( w_k \in \mathbb{R}^n \) is standard Gaussian process noise, \( v_k \in \mathbb{R}^m \) is the nominal control input, and \( K_k \in \mathbb{R}^{m \times n} \) is the state feedback gain to be designed. The state-affine feedback was shown to be optimal for the covariance steering problem without chance constraints \cite{liuOptimalCovarianceSteering2024}. The matrices \( A_k \), \( B_k \), and \( G_k \) define the system dynamics. We consider two types of cost functions:
 \begin{equation}
 	J_k (x_k, u_k) = \begin{cases}
-	\E{x_k^\top Q_k x_k + u_k^\top R_k u_k}, \quad Q_k \geq 0, R_k > 0 & \text{(quadratic cost)} \\
+	\E{x_k^\top Q_k x_k + u_k^\top R_k u_k}, \quad Q_k \succeq 0, R_k \succ 0 & \text{(quadratic cost)} \\
 	\mathcal{Q}_{\norm{u_k}_2}(p_J) & \text{(quantile 2-norm cost)}
 	\end{cases}
 \end{equation}
