@@ -241,7 +241,7 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				X_k_ref = [A_k * S_k_ref + B_k * L_k_ref, G_k];
 				dX = [A_k * (S_k - S_k_ref) + B_k * (L_k - L_k_ref), zeros(size(G_k))];
 				
-				[dR, ~, R_X_k_ref] = d_QR(X_k_ref', dX');
+				[dR, ~, R_X_k_ref] = obj.d_QR(X_k_ref', dX');
 
 				constraintLHS = [constraintLHS
 					obj.vec_tril(S_kp1 - R_X_k_ref' - dR')
@@ -277,10 +277,56 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			obj.mu = value(obj.sol.mu);
 			obj.v = value(obj.sol.v);
 		end
+
+		function [dR, Qx, Rx] = d_QR(obj, X, dX, Qx, Rx, Rx_inv)
+			arguments
+				obj
+				X
+				dX
+				Qx = []
+				Rx = []
+				Rx_inv = []
+			end
+			%D_QR Computes the differentials of the QR decomposition.
+			% The dX input can be a sdpvar
+			% If Qx and Rx are not provided, they are computed
+
+			% Perform economy-size QR decomposition of the original matrix X
+			if isempty(Qx) || isempty(Rx)
+				[Qx, Rx] = obj.economy_qr_with_positive_diagonal(X);
+			end
+
+			if isempty(Rx_inv)
+				Rx_inv = inv(Rx);
+			end
+
+			% Calculate the intermediate matrix V
+			V = (Qx' * dX) * Rx_inv;
+
+			% Create the anti-symmetric matrix 'A' from the lower triangular part of V.
+			M = tril(V);
+			A = M - M';
+
+			dR = (V - A) * Rx;
+
+		end
 				
 	end
 
 	methods (Static)
+
+		function [Q, R] = economy_qr_with_positive_diagonal(X)
+			[Q, R] = qr(X, "econ");
+
+			% For uniqueness and consistent comparison, enforce the convention that R
+			% has positive diagonal elements. This fixes sign ambiguities in Q and R.
+			signs = diag(sign(diag(R)));
+			Q = Q * signs;
+			R = signs * R;
+		end
+
+
+
 		function out = vec_tril(M)
 			% Returns the vectorized lower triangular part of matrix M
 			n = size(M,1);
@@ -288,28 +334,4 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			out = M(idx);
 		end
 	end
-end
-
-function [dR, Qx, Rx] = d_QR(X, dX)
-	%D_QR Computes the differentials of the QR decomposition.
-	% The dX input can be a sdpvar
-
-	% Perform economy-size QR decomposition of the original matrix X
-	[Qx_raw, Rx_raw] = qr(X, "econ");
-
-	% For uniqueness and consistent comparison, enforce the convention that R
-	% has positive diagonal elements. This fixes sign ambiguities in Q and R.
-	signs_X = diag(sign(diag(Rx_raw)));
-	Qx = Qx_raw * signs_X;
-	Rx = signs_X * Rx_raw;
-
-	% Calculate the intermediate matrix V
-	V = (Qx' * dX) / Rx;
-
-	% Create the anti-symmetric matrix 'A' from the lower triangular part of V.
-	M = tril(V);
-	A = M - M';
-
-	dR = (V - A) * Rx;
-
 end
