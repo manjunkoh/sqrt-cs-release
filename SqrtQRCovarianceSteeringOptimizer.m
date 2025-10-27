@@ -23,12 +23,12 @@ classdef SqrtQRCovarianceSteeringOptimizer < SqrtQRCovarianceSteering
 			% These correspond to the linearization points for the QR decomposition
 			
 			% Parameters for QR decomposition linearization
-			obj.changing_params.S_ref = sdpvar(obj.nx, obj.nx, obj.N+1, 'full');
-			obj.changing_params.L_ref = sdpvar(obj.nu, obj.nx, obj.N, 'full');
-			
-			% For each time step, we need the reference matrices for linearization
-			for k = 1:obj.N+1
-				obj.changing_params.S_ref(:,:,k) = tril(obj.changing_params.S_ref(:,:,k));
+			obj.changing_params.Q_ref = sdpvar(obj.nx+obj.nw, obj.nx, obj.N, 'full');
+			obj.changing_params.R_ref = sdpvar(obj.nx, obj.nx, obj.N, 'full');
+			obj.changing_params.R_ref_inv = sdpvar(obj.nx, obj.nx, obj.N, 'full');
+			for k = 1:obj.N
+				obj.changing_params.R_ref(:,:,k) = tril(obj.changing_params.R_ref(:,:,k));
+				obj.changing_params.R_ref_inv(:,:,k) = tril(obj.changing_params.R_ref_inv(:,:,k));
 			end
 		end
 
@@ -36,17 +36,25 @@ classdef SqrtQRCovarianceSteeringOptimizer < SqrtQRCovarianceSteering
 			% Numerical update of the parameters that appear in the constraints
 			% This function computes the reference values for linearization
 			
-			p.S_ref = ref_vars.S;
-			p.L_ref = ref_vars.L;
+			p = struct('Q_ref', zeros(obj.nx+obj.nw, obj.nx, obj.N), 'R_ref', zeros(obj.nx, obj.nx, obj.N), 'R_ref_inv', zeros(obj.nx, obj.nx, obj.N));
+			
+			for k = 1:obj.N
+				A_k = obj.A_sys(:,:,k);
+				B_k = obj.B_sys(:,:,k);
+				G_k = obj.G_sys(:,:,k);
+				S_ref_k = ref_vars.S(:,:,k);
+				L_ref_k = ref_vars.L(:,:,k);
+
+				X_ref_k = [A_k * S_ref_k + B_k * L_ref_k, G_k];
+				[p.Q_ref(:,:,k), p.R_ref(:,:,k)] = obj.economy_qr_with_positive_diagonal(X_ref_k');
+				p.R_ref_inv(:,:,k) = inv(p.R_ref(:,:,k));
+			end
 		end
 
 		function constraints = get_changing_constraints(obj, vars, ref_vars)
 			% Get the changing constraints using YALMIP optimizer
 			obj.set_changing_parameters_sdp();
 			p = obj.changing_params;
-
-			% Initialize constraints
-			constraints = [];
 
 			% Linearized QR decomposition constraints
 			% The constraints are built in the same order as noncvx_eq_relaxed
@@ -64,15 +72,15 @@ classdef SqrtQRCovarianceSteeringOptimizer < SqrtQRCovarianceSteering
 				L_k = vars.L(:,:,k);
 				
 				% Reference values for linearization
-				S_k_ref = p.S_ref(:,:,k);
-				L_k_ref = p.L_ref(:,:,k);
+				S_k_ref = ref_vars.S(:,:,k);
+				L_k_ref = ref_vars.L(:,:,k);
 				
 				% Build the matrix for QR decomposition at reference point
 				X_k_ref = [A_k * S_k_ref + B_k * L_k_ref, G_k];
 				dX = [A_k * (S_k - S_k_ref) + B_k * (L_k - L_k_ref), zeros(size(G_k))];
 				
 				% Compute QR derivative using the d_QR function
-				[dR, ~, R_X_k_ref] = d_QR(X_k_ref', dX');
+				[dR, ~, R_X_k_ref] = obj.d_QR(X_k_ref', dX', p.Q_ref(:,:,k), p.R_ref(:,:,k), p.R_ref_inv(:,:,k));
 
 				% Add linearized constraint (same structure as noncvx_eq_relaxed)
 				constraintLHS = [constraintLHS
@@ -81,7 +89,7 @@ classdef SqrtQRCovarianceSteeringOptimizer < SqrtQRCovarianceSteering
 			end
 			
 			% The constraint is that the linearized constraint equals the slack variable
-			constraints = constraintLHS == obj.slack_noncvx_eq;
+			constraints = [constraintLHS == obj.slack_noncvx_eq];
 		end
 
 	end
