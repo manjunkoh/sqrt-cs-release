@@ -27,8 +27,8 @@ classdef SqrtQRCovarianceSteeringOptimizer < SqrtQRCovarianceSteering
 			obj.changing_params.R_ref = sdpvar(obj.nx, obj.nx, obj.N, 'full');
 			obj.changing_params.R_ref_inv = sdpvar(obj.nx, obj.nx, obj.N, 'full');
 			for k = 1:obj.N
-				obj.changing_params.R_ref(:,:,k) = tril(obj.changing_params.R_ref(:,:,k));
-				obj.changing_params.R_ref_inv(:,:,k) = tril(obj.changing_params.R_ref_inv(:,:,k));
+				obj.changing_params.R_ref(:,:,k) = triu(obj.changing_params.R_ref(:,:,k));
+				obj.changing_params.R_ref_inv(:,:,k) = triu(obj.changing_params.R_ref_inv(:,:,k));
 			end
 		end
 
