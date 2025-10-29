@@ -159,7 +159,7 @@ Organizing the above, we have:
 \end{equation}
 Thus, using the Taylor expansion, we can approximate the QR decomposition as a linear function of perturbations in \( X \), around some reference \( \bar{X} = \bar{Q} \bar{R} \):
 \begin{equation}
-	\mathrm{qr}(X) \approx \mathrm{qr}(\bar{X}) + \dd R(X - \bar{X}, \bar{Q}, \bar{R}) = \mathrm{qr}(\bar{X}) + \dd R(X - \bar{X}, \bar{Q}, \bar{R}).
+	\mathrm{qr}(X) \approx \mathrm{qr}(\bar{X}) + \dd R(X - \bar{X}, \bar{Q}, \bar{R}).
 \end{equation}
 Note that \( \mathrm{qr}(\bar{X})\) and \(\bar{R}\) are synonymous.
 
@@ -284,9 +284,23 @@ The cost function value match to 7 digits between the full covariance steering a
 	\label{fig:sqrt_qr_cov_convergence}
 \end{figure}
 
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=0.6\textwidth]{example_cone_path.png}
+	\caption{Example trajectory under chance constraints, solved using the proposed method}
+	\label{fig:example_cone_path}
+\end{figure}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=0.7\textwidth]{comparison_table.png}
+	\caption{Comparison of solutions times between full covariance and square root QR covariance steering methods}
+	\label{fig:comparison_table}
+	
+\end{figure}
 
 \subsection{Chance constraints}
-Showcase the chance constraints handling capability and compare solution times with full covariance and block approaches.
+Showcase the chance constraints handling capability and compare solution times with full covariance and block approaches
 
 \section{Discussion}
 
@@ -294,7 +308,8 @@ Showcase the chance constraints handling capability and compare solution times w
 \section{Conclusions}
 
 
-% \section{Acknowledgements}
+% \section{Acknowledgments}
+% Acknowledge AI use
 % This material is based upon work supported by the Air Force Office of Scientific Research under award number FA9550-23-10512. N. Kumagai acknowledges support for his graduate studies from the Shigeta Education Fund.
 
 \clearpage
