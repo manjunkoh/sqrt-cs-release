@@ -63,6 +63,7 @@ state_cc = [
 ];
 
 % Initial guess
+init.S = interpolate_lower_triangular(chol(Sigma0, 'lower'), chol(SigmaN, 'lower'), N+1, 'log-cholesky');
 init.L = zeros(nu, nx, N);
 init.mu = zeros(nx, N+1);
 init.v = zeros(nu, N);
