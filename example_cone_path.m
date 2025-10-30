@@ -63,7 +63,6 @@ state_cc = [
 ];
 
 % Initial guess
-init.S = linspace_mat(chol(Sigma0, 'lower'), chol(SigmaN, 'lower'), N+1);
 init.L = zeros(nu, nx, N);
 init.mu = zeros(nx, N+1);
 init.v = zeros(nu, N);
