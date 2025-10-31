@@ -10,8 +10,8 @@ figure_settings
 
 % Problem parameters
 N = 30;  % Fixed time horizon
-state_sizes = [4];  % Different state dimensions to test
-num_trials = 20;  % Number of trials per state size for averaging
+state_sizes = [4, 8, 16];  % Different state dimensions to test
+num_trials = 10;  % Number of trials per state size for averaging
 
 % SCP parameters for the square root method
 scp_params = SCPParams();
@@ -37,12 +37,15 @@ results.sqrt_qr_codes = zeros(length(state_sizes), num_trials);
 results.covariance_steering_optimal = zeros(length(state_sizes), num_trials);
 results.sqrt_qr_optimal = zeros(length(state_sizes), num_trials);
 
+% Storage for runtimes (seconds)
+results.full_cov_runtimes = zeros(length(state_sizes), num_trials);
+
 fprintf('Starting runtime comparison across different state sizes...\n');
 fprintf('State sizes: %s\n', mat2str(state_sizes));
 fprintf('Time horizon: %d\n', N);
 fprintf('Number of trials per size: %d\n\n', num_trials);
 
-rng(3)
+rng(0)
 
 for i = 1:length(state_sizes)
     nx = state_sizes(i);
@@ -94,7 +97,9 @@ for i = 1:length(state_sizes)
             Q=Q, R=R, ...
             nx=nx, nu=nu, N=N);
 
+        t_full = tic;
         diagnostic_full_covariance = prob_full_covariance.solve_problem();
+        results.full_cov_runtimes(i, trial) = toc(t_full);
         
         % Store CovarianceSteering status and optimal value
         results.covariance_steering_codes(i, trial) = diagnostic_full_covariance.problem;
@@ -114,11 +119,12 @@ for i = 1:length(state_sizes)
         end
         
         if diagnostic_full_covariance.problem && diagnostic_full_covariance.problem ~= 4
-            error('Full covariance method had issues.');
+            warning('Full covariance method had issues. Skipping QR method\n');
+            continue;
         end
 
         % Initial guess
-        init.S = linspace_mat(chol(Sigma0, 'lower'), chol(SigmaN, 'lower'), N+1);
+        init.S = interpolate_lower_triangular(chol(Sigma0, 'lower'), chol(SigmaN, 'lower'), N+1, 'log-cholesky');
         init.L = zeros(nu, nx, N);
         init.mu = zeros(nx, N+1);
         init.v = zeros(nu, N);
@@ -183,8 +189,8 @@ end
 
 % Create status comparison table
 fprintf('\n=== TERMINATION STATUS COMPARISON ===\n');
-fprintf('Trial | Full Cov Status | SqrtQR Status | FullCovOptVal | SqrtQROptVal | Runtime (s)\n');
-fprintf('------|-----------------|---------------|---------------|-------------|-------------\n');
+fprintf('Trial | Full Cov Status | SqrtQR Status | FullCovOptVal | SqrtQROptVal | FullCovTime (s) | SqrtQRTime (s)\n');
+fprintf('------|-----------------|---------------|---------------|-------------|----------------|---------------\n');
 
 for i = 1:length(state_sizes)
     for trial = 1:num_trials
@@ -199,23 +205,24 @@ for i = 1:length(state_sizes)
             sqrt_qr_opt_str = sprintf('%.2e', results.sqrt_qr_optimal(i, trial));
         end
         
-        fprintf('  %2d  |      %-13s |    %-11s |    %-12s |   %-9s |    %8.2f\n', ...
+        fprintf('  %2d  |      %-13s |    %-11s |    %-12s |   %-9s |      %8.2f   |     %8.2f\n', ...
             trial, ...
             results.covariance_steering_status{i, trial}, ...
             results.sqrt_qr_status{i, trial}, ...
             cov_opt_str, ...
             sqrt_qr_opt_str, ...
+            results.full_cov_runtimes(i, trial), ...
             results.runtimes(i, trial));
     end
     if i < length(state_sizes)
-        fprintf('------|-----------------|---------------|---------------|-------------|-------------\n');
+        fprintf('------|-----------------|---------------|---------------|-------------|----------------|---------------\n');
     end
 end
 
 return
 %%
 % Create visualization plots
-figure('Position', [100, 100, 1200, 800]);
+figure
 
 % Subplot 1: Status comparison heatmap
 subplot(2,2,1);
@@ -298,7 +305,7 @@ set(gca, 'XTick', 1:length(state_sizes), 'XTickLabel', state_sizes);
 ylim([0, 105]);
 
 % Create detailed status table as a separate figure
-figure('Position', [200, 200, 1200, 400]);
+figure
 % Create a table for better visualization
 table_data = {};
 for i = 1:length(state_sizes)
@@ -319,16 +326,17 @@ for i = 1:length(state_sizes)
         table_data{end, 3} = results.sqrt_qr_status{i, trial};
         table_data{end, 4} = cov_opt_str;
         table_data{end, 5} = sqrt_qr_opt_str;
-        table_data{end, 6} = sprintf('%.2f', results.runtimes(i, trial));
+        table_data{end, 6} = sprintf('%.2f', results.full_cov_runtimes(i, trial));
+        table_data{end, 7} = sprintf('%.2f', results.runtimes(i, trial));
     end
 end
 
 % Display table
 uitable('Data', table_data, ...
-    'ColumnName', {'Problem', 'Full Cov Status', 'SqrtQR Status', 'FullCovOptVal', 'SqrtQROptVal', 'Runtime (s)'}, ...
-    'Position', [20, 20, 1160, 360], ...
-    'ColumnWidth', {150, 150, 150, 150, 150, 100});
+    'ColumnName', {'Problem', 'Full Cov Status', 'SqrtQR Status', 'FullCovOptVal', 'SqrtQROptVal', 'FullCovTime (s)', 'SqrtQRTime (s)'}, ...
+    'Position', [20, 20, 1300, 360], ...
+    'ColumnWidth', {150, 150, 150, 150, 150, 140, 140});
 
 % Save results
-save('runtime_comparison_results.mat', 'results');
+save('data/runtime_comparison_results.mat', 'results');
 fprintf('\nResults saved to runtime_comparison_results.mat\n');
