@@ -5,6 +5,7 @@ clear;
 clc;
 addpath ../SCvxStar/src/
 addpath(genpath('./utils'))
+addpath('./src')
 
 figure_settings
 
@@ -15,7 +16,7 @@ num_trials = 10;  % Number of trials per state size for averaging
 
 % SCP parameters for the square root method
 scp_params = SCPParams();
-scp_params.tol_opt = 1E-2;
+scp_params.tol_opt = 1E-4;
 scp_params.tol_feas = 1E-4;
 scp_params.k_max = 200;  % Limit iterations for timing
 
@@ -91,14 +92,14 @@ for i = 1:length(state_sizes)
         R = 1e3 * eye(nu);  % Control cost
 
         % Create Covariance Steering Problem
-        prob_full_covariance = CovarianceSteering(...
-            A=A_sys, B=B_sys, D=G_sys, ...
+        prob_full_covariance = FullCovarianceSteering(...
+            A=A_sys, B=B_sys, G=G_sys, ...
             P_0=Sigma0, P_f=SigmaN, ...
             Q=Q, R=R, ...
-            nx=nx, nu=nu, N=N);
+            N=N);
 
         t_full = tic;
-        diagnostic_full_covariance = prob_full_covariance.solve_problem();
+        diagnostic_full_covariance = prob_full_covariance.solve();
         results.full_cov_runtimes(i, trial) = toc(t_full);
         
         % Store CovarianceSteering status and optimal value
@@ -338,5 +339,5 @@ uitable('Data', table_data, ...
     'ColumnWidth', {150, 150, 150, 150, 150, 140, 140});
 
 % Save results
-save('data/runtime_comparison_results.mat', 'results');
+% save('data/runtime_comparison_results.mat', 'results');
 fprintf('\nResults saved to runtime_comparison_results.mat\n');

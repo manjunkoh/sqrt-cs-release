@@ -1,14 +1,15 @@
 % Square root covariance steering with QR decomposition-based covariance propagation
 clc; clear;
 addpath ../SCvxStar/src/
-addpath(genpath("../utils"))
+addpath(genpath("./utils"))
+addpath('./src')
 yalmip("clear")
 figure_settings()
 
-%%
+%% Problem parameters (from Liu 2025)
 A = [1 0.2; 0 1];
 B = [0.02 0.2]';
-D = [0.4 0; 0.4 0.6];
+G = [0.4 0; 0.4 0.6];
 P_0 = [5 -1; -1 1];
 P_f = [0.5 -0.4; -0.4 2];
 mu_0 = [30; -5];
@@ -17,66 +18,69 @@ Q = 0.5 * eye(2);
 R = 1;
 nx = 2;
 nu = 1;
-nw = size(D, 2);
+nw = size(G, 2);
 N = 29;
 
-%% Lossless relaxation: minimize the sum of trace
-P = sdpvar(nx,nx,N+1);
-U = sdpvar(nu,nx,N);
-Y = sdpvar(nu,nu,N);
-mu = sdpvar(nx,N+1);
-v = sdpvar(nu, N);
+A_sys = repmat(A, [1, 1, N]);
+B_sys = repmat(B, [1, 1, N]);
+G_sys = repmat(G, [1, 1, N]);
 
-J = 0;
-J_cov = 0;
-for k = 1:N
-	J_cov = J_cov + trace(Q*P(:,:,k)) + trace(R * Y(:,:,k));
-	J = J ...
-		+ trace(Q*P(:,:,k)) ...
-		+ trace(R * Y(:,:,k)) ...
-		+ mu(:,k)'*Q*mu(:,k) ...
-		+ v(:,k)'*R*v(:,k);
-end
+%% Solve covariance steering using FullCovarianceSteering class
 
-constraints = [P(:,:,1) == P_0
-	P_f - P(:,:,end) >= 0
-	mu(:,1) == mu_0
-	mu(:,end) == mu_f];
+full_cs = FullCovarianceSteering(...
+	A=A_sys, B=B_sys, G=G_sys, ...
+	P_0=P_0, P_f=P_f, ...
+	Q=Q, R=R, ...
+	 N=N);
 
-for k = 1:N
-	constraints = [constraints
-		Y(:,:,k) >= 0
-		P(:,:,k+1) == A*P(:,:,k)*A.' + A*U(:,:,k).'*B.' + B*U(:,:,k)*A.' + B*Y(:,:,k)*B.' + D * D.'
-		[P(:,:,k) U(:,:,k).'; U(:,:,k) Y(:,:,k)] >= 0
-		mu(:,k+1) == A*mu(:,k) + B*v(:,k)];
-end
+diagnostic = full_cs.solve();
 
-for k= 1:N+1
-	constraints = [constraints
-		P(:,:,k) >= 0];
-end
-
-options = sdpsettings('verbose', 0, 'solver', 'mosek');
-diagnostic = optimize(constraints, J, options);
-
-if diagnostic.problem == 0
-	P = value(P);
-	U = value(U);
-	Y = value(Y);
-	mu = value(mu);
-	v = value(v);
-    J = value(J);
-    J_cov = value(J_cov);
+if diagnostic.problem == 0 || diagnostic.problem == 4
+	P = full_cs.P;
+	Y = full_cs.P_u;
+	K = full_cs.K;
+	
+	% Compute covariance part of objective
+	J_cov = 0;
+	for k = 1:N
+		J_cov = J_cov + trace(Q*P(:,:,k)) + trace(R * Y(:,:,k));
+	end
 else
-	disp('YALMIP solve not successful')
+	disp('FullCovarianceSteering solve not successful')
 	disp(yalmiperror(diagnostic.problem))
 	return
 end
 
-% Retrieve feedback gains
-K = zeros(nu, nx, N);
-for i = 1:N
-	K(:,:,i) = U(:,:,i) / P(:,:,i);
+%% Solve mean steering separately (linear system with fixed boundary conditions)
+% mu_{k+1} = A*mu_k + B*v_k, with mu(1) = mu_0, mu(N+1) = mu_f
+mu = sdpvar(nx, N+1);
+v = sdpvar(nu, N);
+
+J_mean = 0;
+for k = 1:N
+	J_mean = J_mean + mu(:,k)'*Q*mu(:,k) + v(:,k)'*R*v(:,k);
+end
+
+mean_constraints = [mu(:,1) == mu_0, mu(:,end) == mu_f];
+for k = 1:N
+	mean_constraints = [mean_constraints, mu(:,k+1) == A*mu(:,k) + B*v(:,k)];
+end
+
+options = sdpsettings('verbose', 0, 'solver', 'mosek');
+diagnostic_mean = optimize(mean_constraints, J_mean, options);
+
+if diagnostic_mean.problem == 0
+	mu = value(mu);
+	v = value(v);
+	J_mean_val = value(J_mean);
+	J = J_cov + J_mean_val;
+else
+	warning('Mean steering solve not successful, using zero mean trajectory');
+	mu = zeros(nx, N+1);
+	v = zeros(nu, N);
+	mu(:,1) = mu_0;
+	mu(:,end) = mu_f;
+	J = J_cov;
 end
 
 % Plot
@@ -90,7 +94,7 @@ plot3sigmaEllipse(mu_f, P_f, 'r--')
 axis equal
 xlabel("$x_1$")
 ylabel("$x_2$")
-exportgraphics(gcf, './figures/full_covariance_steering_result.png');
+% exportgraphics(gcf, './figures/full_covariance_steering_result.png');
 
 disp("Objective value: " + J)
 disp("Covariance part of objective: " + J_cov)
@@ -107,10 +111,8 @@ disp("Covariance part of objective: " + J_cov)
 % end
 
 %% Perform interpolation of covariances to generate initial guess
-S_0 = chol(P_0, 'lower');
-S_f = chol(P_f, 'lower');
-init_guess_struct.S = linspace_mat(S_0, S_f, N+1);
-% this might be a bad init guess
+% try changing between 'log-cholesky' and 'cholesky'
+init_guess_struct.S = interpolate_lower_triangular(chol(P_0, 'lower'), chol(P_f, 'lower'), N+1, 'log-cholesky');
 init_guess_struct.L = ones(nu, nx, N);
 init_guess_struct.mu = zeros(nx, N+1);
 init_guess_struct.v = zeros(nu, N);
@@ -119,7 +121,7 @@ sqrt_cs = SqrtQRCovarianceSteering(init_guess_struct,...
 	N=N, nx=nx, nu=nu, nw=nw, ...
 	A_sys=repmat(A, [1, 1, N]), ...
 	B_sys=repmat(B, [1, 1, N]), ...
-	G_sys=repmat(D, [1, 1, N]), ...
+	G_sys=repmat(G, [1, 1, N]), ...
 	P_0=P_0, P_f=P_f, Q=Q, R=R, ...
 	mu_0=mu_0, mu_f=mu_f);
 
@@ -142,7 +144,7 @@ plot3sigmaEllipse(mu_f, P_f, 'r--')
 axis equal
 xlabel("$x_1$")
 ylabel("$x_2$")
-exportgraphics(gcf, './figures/sqrt_covariance_steering_result.png');
+% exportgraphics(gcf, './figures/sqrt_covariance_steering_result.png');
 %%
 J_cov_sqrt = 0;
 for k = 1:N
@@ -155,4 +157,4 @@ disp("Covariance part of objective (full covariance method): " + value(J_cov))
 
 %%
 sqrt_cs.scp.plot_iter_history()
-exportgraphics(gcf, './figures/sqrt_covariance_steering_convergence.png');
+% exportgraphics(gcf, './figures/sqrt_covariance_steering_convergence.png');

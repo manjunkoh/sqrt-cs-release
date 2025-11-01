@@ -4,6 +4,7 @@ clear;
 clc;
 addpath ../SCvxStar/src/
 addpath(genpath('./utils'))
+addpath('./src')
 
 figure_settings
 
@@ -19,7 +20,7 @@ nw = nx;
 
 % SCP parameters for the square root method
 scp_params = SCPParams();
-scp_params.tol_opt = 1E-2;
+scp_params.tol_opt = 1E-4;
 scp_params.tol_feas = 1E-4;
 scp_params.k_max = 200;
 
@@ -28,10 +29,17 @@ results = struct();
 results.N_list = N_list;
 results.sqrtqr_time = zeros(length(N_list), num_trials);
 results.fullcov_time = zeros(length(N_list), num_trials);
+results.fullcov_solvertime = zeros(length(N_list), num_trials);
+results.fullcov_yalmiptime = zeros(length(N_list), num_trials);
+results.blockcholesky_time = zeros(length(N_list), num_trials);
+results.blockcholesky_solvertime = zeros(length(N_list), num_trials);
+results.blockcholesky_yalmiptime = zeros(length(N_list), num_trials);
 results.sqrtqr_status = cell(length(N_list), num_trials);
 results.fullcov_status = cell(length(N_list), num_trials);
+results.blockcholesky_status = cell(length(N_list), num_trials);
 results.sqrtqr_opt = NaN(length(N_list), num_trials);
 results.fullcov_opt = NaN(length(N_list), num_trials);
+results.blockcholesky_opt = NaN(length(N_list), num_trials);
 results.sqrtqr_success = false(length(N_list), num_trials);
 
 fprintf('Scalability across horizon sizes with fixed total time T=%.2f s\n', T_total);
@@ -66,22 +74,30 @@ for iN = 1:length(N_list)
     SigmaN = 0.5 * Sigma0;
 
     % Objective weights
-    Q = eye(nx);
-    R = 10 * eye(nu);
+    Q = 0.1 * eye(nx);
+    R = eye(nu);
 
     for trial = 1:num_trials
         fprintf('  Trial %2d/%2d ... ', trial, num_trials);
 
         % Full covariance method
-        prob_full = CovarianceSteering( ...
-            A=A_sys, B=B_sys, D=G_sys, ...
+        prob_full = FullCovarianceSteering( ...
+            A=A_sys, B=B_sys, G=G_sys, ...
             P_0=Sigma0, P_f=SigmaN, ...
             Q=Q, R=R, ...
-            nx=nx, nu=nu, N=N);
+            N=N);
 
         t_full = tic;
-        diag_full = prob_full.solve_problem(verbose=2);
+        diag_full = prob_full.solve();
         results.fullcov_time(iN, trial) = toc(t_full);
+        
+        % Store solver and YALMIP times from diagnostics
+        if isfield(diag_full, 'solvertime')
+            results.fullcov_solvertime(iN, trial) = diag_full.solvertime;
+        end
+        if isfield(diag_full, 'yalmiptime')
+            results.fullcov_yalmiptime(iN, trial) = diag_full.yalmiptime;
+        end
 
         % Interpret status and optimal value
         switch diag_full.problem
@@ -97,9 +113,44 @@ for iN = 1:length(N_list)
                 results.fullcov_status{iN, trial} = sprintf('ERR%d', diag_full.problem);
         end
 
+        % Block Cholesky method
+        prob_block = BlockCholeskySteering( ...
+            A=A_sys, B=B_sys, G=G_sys, ...
+            P_0=Sigma0, P_f=SigmaN, ...
+            Q=Q, R=R, ...
+            N=N);
+
+        t_block = tic;
+        diag_block = prob_block.solve();
+        results.blockcholesky_time(iN, trial) = toc(t_block);
+        
+        % Store solver and YALMIP times from diagnostics
+        if isfield(diag_block, 'solvertime')
+            results.blockcholesky_solvertime(iN, trial) = diag_block.solvertime;
+        end
+        if isfield(diag_block, 'yalmiptime')
+            results.blockcholesky_yalmiptime(iN, trial) = diag_block.yalmiptime;
+        end
+
+        % Interpret status and optimal value for block Cholesky
+        switch diag_block.problem
+            case 0
+                results.blockcholesky_status{iN, trial} = 'SOLVED';
+                results.blockcholesky_opt(iN, trial) = prob_block.optimal_objective;
+            case 1
+                results.blockcholesky_status{iN, trial} = 'INFEASIBLE';
+            case 4
+                results.blockcholesky_status{iN, trial} = 'NUMERICAL';
+                results.blockcholesky_opt(iN, trial) = prob_block.optimal_objective;
+            otherwise
+                results.blockcholesky_status{iN, trial} = sprintf('ERR%d', diag_block.problem);
+        end
+
         % If clearly problematic (not numerical), skip QR to keep stats clean
         if diag_full.problem && diag_full.problem ~= 4
-            fprintf('full=%s (%.2fs), skip QR\n', results.fullcov_status{iN, trial}, results.fullcov_time(iN, trial));
+            fprintf('full=%s (%.2fs), block=%s (%.2fs), skip QR\n', ...
+                results.fullcov_status{iN, trial}, results.fullcov_time(iN, trial), ...
+                results.blockcholesky_status{iN, trial}, results.blockcholesky_time(iN, trial));
             continue;
         end
 
@@ -110,7 +161,7 @@ for iN = 1:length(N_list)
         init.v = zeros(nu, N);
 
         prob = SqrtQRCovarianceSteering(init, ...
-            N=N, nx=nx, nu=nu, nw=nw, ...
+            N=N, ...
             A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
             P_0=Sigma0, P_f=SigmaN, Q=Q, R=R, ...
             objective_type='LQR');
@@ -123,8 +174,9 @@ for iN = 1:length(N_list)
             results.sqrtqr_opt(iN, trial) = prob.optimal_objective;
         end
 
-        fprintf('full=%s (%.2fs), qr=%s (%.2fs)\n', ...
+        fprintf('full=%s (%.2fs), block=%s (%.2fs), qr=%s (%.2fs)\n', ...
             results.fullcov_status{iN, trial}, results.fullcov_time(iN, trial), ...
+            results.blockcholesky_status{iN, trial}, results.blockcholesky_time(iN, trial), ...
             results.sqrtqr_status{iN, trial}, results.sqrtqr_time(iN, trial));
     end
 
@@ -133,13 +185,14 @@ for iN = 1:length(N_list)
     if ~isempty(valid_qr)
         fprintf('  QR avg time: %.2f s\n', mean(valid_qr));
     end
-    fprintf('  FullCov avg time: %.2f s\n\n', mean(results.fullcov_time(iN, :)) );
+    fprintf('  FullCov avg time: %.2f s\n', mean(results.fullcov_time(iN, :)));
+    fprintf('  BlockCholesky avg time: %.2f s\n\n', mean(results.blockcholesky_time(iN, :)));
 end
 
 % Console table summary
 fprintf('\n=== TERMINATION AND TIME SUMMARY (Fixed T=%.2fs) ===\n', T_total);
-fprintf(' N  |   dt    | FullCov Status | SqrtQR Status  | FullCovOptVal | SqrtQROptVal | FullTime(s) | QRTime(s)\n');
-fprintf('----|---------|----------------|----------------|---------------|--------------|-------------|----------\n');
+fprintf(' N  |   dt    | FullCov | BlockChol | SqrtQR  | FullCovOptVal | BlockCholOptVal | SqrtQROptVal | FullTime(s) | BlockTime(s) | QRTime(s)\n');
+fprintf('----|---------|---------|-----------|---------|---------------|-----------------|--------------|-------------|--------------|----------\n');
 for iN = 1:length(N_list)
     N = N_list(iN);
     dt = T_total / N;
@@ -148,25 +201,32 @@ for iN = 1:length(N_list)
         if ~isnan(results.fullcov_opt(iN, trial))
             cov_opt_str = sprintf('%.2e', results.fullcov_opt(iN, trial));
         end
+        block_opt_str = 'N/A';
+        if ~isnan(results.blockcholesky_opt(iN, trial))
+            block_opt_str = sprintf('%.2e', results.blockcholesky_opt(iN, trial));
+        end
         qr_opt_str = 'N/A';
         if ~isnan(results.sqrtqr_opt(iN, trial))
             qr_opt_str = sprintf('%.2e', results.sqrtqr_opt(iN, trial));
         end
-        fprintf('%3d | %7.4f | %-14s | %-14s | %13s | %12s | %10.2f | %8.2f\n', ...
+        fprintf('%3d | %7.4f | %-7s | %-9s | %-7s | %13s | %15s | %12s | %10.2f | %12.2f | %8.2f\n', ...
             N, dt, ...
             results.fullcov_status{iN, trial}, ...
+            results.blockcholesky_status{iN, trial}, ...
             results.sqrtqr_status{iN, trial}, ...
-            cov_opt_str, qr_opt_str, ...
+            cov_opt_str, block_opt_str, qr_opt_str, ...
             results.fullcov_time(iN, trial), ...
+            results.blockcholesky_time(iN, trial), ...
             results.sqrtqr_time(iN, trial));
     end
     if iN < length(N_list)
-        fprintf('----|---------|----------------|----------------|---------------|--------------|------------|----------\n');
+        fprintf('----|---------|---------|-----------|---------|---------------|-----------------|--------------|-------------|--------------|----------\n');
     end
 end
 
 %% Simple plot: average times vs N
 avg_full = mean(results.fullcov_time, 2);
+avg_block = mean(results.blockcholesky_time, 2);
 avg_qr = zeros(length(N_list), 1);
 for iN = 1:length(N_list)
     times = results.sqrtqr_time(iN, results.sqrtqr_time(iN, :) > 0);
@@ -179,13 +239,16 @@ end
 
 figure();
 loglog(N_list, avg_full, 'o-b', 'LineWidth', 2, 'MarkerSize', 8); hold on;
+loglog(N_list, avg_block, '^-g', 'LineWidth', 2, 'MarkerSize', 8); hold on;
 loglog(N_list, avg_qr, 's-r', 'LineWidth', 2, 'MarkerSize', 8);
 grid on;
 xlabel('Horizon length N');
 ylabel('Average runtime (s)');
 title(sprintf('Scalability vs N (T=%.2fs, 3D double integrator)', T_total));
-legend('Full Covariance', 'SqrtQR', 'Location', 'northwest');
+legend('Full Covariance', 'Block Cholesky', 'SqrtQR', 'Location', 'northwest');
+exportgraphics(gcf, 'figures/horizon_size_scalability.png')
 
+%%
 save('data/horizon_size_scalability_results.mat', 'results', 'T_total', 'N_list');
 fprintf('\nSaved results to /data/horizon_size_scalability_results.mat\n');
 

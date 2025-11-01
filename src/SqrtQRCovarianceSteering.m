@@ -26,12 +26,20 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 		K % feedback gain, set after solving
 		objective_type = 'LQG'; % 'LQG' or 'DV99'
 		% Chance constraint support
-		chance_constraints_state = {}   % cell array (1 x N+1) of arrays of AffineChanceConstraint/NormChanceConstraint
-		chance_constraints_control = {} % cell array (1 x N) of arrays of AffineChanceConstraint/NormChanceConstraint
+		% State constraints: cell array of structs with fields:
+		%   - type: 'affine' or 'norm'
+		%   - For affine: alpha (vector), beta (scalar), p (violation prob), nodes (optional, default: all)
+		%   - For norm: gamma (scalar), p (violation prob), n (dimension), nodes (optional, default: all)
+		chance_constraints_state = {}
+		chance_constraints_control = {} % Same format as state constraints
 		mu_0 = []  % initial mean (nx x 1) or empty -> assumed zero
 		mu_f = []  % terminal mean (nx x 1) or empty -> assumed zero
+		waypoints = {}  % cell array of waypoint structs with fields: 'node' (scalar, 1:N+1) and 'mu' (nx x 1 vector)
 		mu % state mean trajectory, set after solving
 		v  % control mean trajectory, set after solving
+		vec_Rchol_L % auxiliary variable for control cost
+		vec_Qchol_S % auxiliary variable for state cost
+
 	end
 
 	methods
@@ -39,9 +47,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			arguments
 				init_guess_struct struct
 				options.N
-				options.nx
-				options.nu
-				options.nw
 				options.A_sys
 				options.B_sys
 				options.G_sys
@@ -54,14 +59,15 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				options.chance_constraints_control = {}
 				options.mu_0 = []
 				options.mu_f = []
+				options.waypoints = {}
 			end
 			obj@SCPProblem();
 			obj.init_guess_struct = init_guess_struct;
 
 			obj.N = options.N;
-			obj.nx = options.nx;
-			obj.nu = options.nu;
-			obj.nw = options.nw;
+			obj.nx = size(options.A_sys, 1);
+			obj.nu = size(options.B_sys, 2);
+			obj.nw = size(options.G_sys, 2);
 			obj.A_sys = options.A_sys;
 			obj.B_sys = options.B_sys;
 			obj.G_sys = options.G_sys;
@@ -76,8 +82,14 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			obj.chance_constraints_control = options.chance_constraints_control;
 			obj.mu_0 = options.mu_0;
 			obj.mu_f = options.mu_f;
+			obj.waypoints = options.waypoints;
+
+			yalmip('clear');
+			% obj.vec_Rchol_L = sdpvar(obj.nu * obj.nx, obj.N, 'full');
+			% obj.vec_Qchol_S = sdpvar(obj.nx^2, obj.N, 'full');
 
 			obj.initialize();
+
 		end
 
 		function vars = define_vars(obj)
@@ -95,15 +107,26 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			J0 = 0;
 			
 			switch obj.objective_type
-				case 'LQG'
+				case {'LQG', 'LQR', 'LQ'}
+
+					% R_chol = chol(obj.R, 'lower');
 					% Add control cost
 					for k = 1:obj.N
+						% J0 = J0 + obj.vec_Rchol_L(:,k)' * obj.vec_Rchol_L(:,k);
+   
+						% M = R_chol' * vars.L(:,:,k);
 						J0 = J0 + trace(vars.L(:,:,k) * vars.L(:,:,k)' * obj.R);
+						% J0 = J0 + norm(vars.L(:,:,k), 'fro');
+						% J0 = J0 + trace(norm(M, 'fro')^2);
 					end
 					
 					% Add state covariance cost
+					% Q_chol = chol(obj.Q, 'lower');
 					for k = 1:obj.N
+						% J0 = J0 + obj.vec_Qchol_S(:,k)' * obj.vec_Qchol_S(:,k);
 						J0 = J0 + trace(vars.S(:,:,k) * vars.S(:,:,k)' * obj.Q);
+						% M = Q_chol' * vars.S(:,:,k);
+						% J0 = J0 + trace(norm(M, 'fro')^2);
 					end
 
 					% Add mean state and control cost
@@ -112,9 +135,12 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 					end
 				case 'DV99'
 					% Add control cost only
+					q = sqrt(chi2inv(0.99, obj.nu));
 					for k = 1:obj.N
-						J0 = J0 + norm(vars.L(:,:,k), 2);
+						J0 = J0 + norm(vars.v(:,k)) + q * norm(vars.L(:,:,k), 2);
 					end
+				otherwise
+					error('Unknown objective type');
 			end
 		end
 
@@ -136,6 +162,32 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			if ~isempty(obj.mu_f)
 				constraints = [constraints; [vars.mu(:,obj.N+1) == obj.mu_f]:'Terminal Mean'];
 			end
+			
+			% enforce waypoint mean constraints (intermediate nodes)
+			% NaN values in wp.mu indicate unconstrained components
+			if ~isempty(obj.waypoints)
+				for i = 1:length(obj.waypoints)
+					wp = obj.waypoints{i};
+					if isfield(wp, 'node') && isfield(wp, 'mu') && wp.node >= 1 && wp.node <= obj.N+1
+						mu_wp = wp.mu(:);
+						% Find non-NaN components to constrain
+						idx_constrained = ~isnan(mu_wp);
+						if any(idx_constrained)
+							constraints = [constraints; [vars.mu(idx_constrained, wp.node) == mu_wp(idx_constrained)]:sprintf('Waypoint Mean (node %d)', wp.node)];
+						end
+					end
+				end
+			end
+
+			% R_chol = chol(obj.R, 'lower');
+			% Q_chol = chol(obj.Q, 'lower');
+			% for k = 1:obj.N
+			% 	constraints = [constraints
+			% 		[obj.vec_Rchol_L(:,k) == reshape(R_chol' * vars.L(:,:,k), [], 1)]:'Control Cost Aux Variable Definition'
+			% 		[obj.vec_Qchol_S(:,k) == reshape(Q_chol' * vars.S(:,:,k), [], 1)]:'State Cost Aux Variable Definition'
+			% 	];
+			% end
+
 		end
 
 		function constraints = convex_ineq(obj, vars)
@@ -143,49 +195,115 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				[norm( chol(obj.P_f, 'lower') \ vars.S(:,:,obj.N+1), 2) - 1 <= 0]:'Terminal Covariance'
 			];
 
+			% Ensure positive diagonal elements of S for uniqueness
 			for k = 1:obj.N+1
 				constraints = [constraints
 					[diag(vars.S(:,:,k)) >= 0]:'Positive Diagonal of S'
 				];
 			end
 
-			% for j = 1:length(obj.chance_constraints_state)
-			% 	c = obj.chance_constraints_state(j);
-			% 	constraints = [constraints; c.toYALMIPConstraint(vars.mu, vars.S)];
-			% end
-			
 			% Add state chance constraints (if provided)
-			p = 0.005;
-			a = [0.2 -1 0 0]';
-			b = 0.2;
-			for k = 1:obj.N
-				mu_k = vars.mu(:,k);
-				S_k = vars.S(:,:,k);
-
-				constraints = [constraints
-					[norminv(1-p) * norm(a' * S_k) + a' * mu_k - b <= 0]:'State Chance Constraint'
-					];
-			end
-
-			a = [0.2 1 0 0]';
-			b = 0.2;
-			for k = 1:obj.N
-				mu_k = vars.mu(:,k);
-				S_k = vars.S(:,:,k);
-
-				constraints = [constraints
-					[norminv(1-p) * norm(a' * S_k) + a' * mu_k - b <= 0]:'State Chance Constraint'
-					];
+			if ~isempty(obj.chance_constraints_state)
+				for i = 1:length(obj.chance_constraints_state)
+					cc = obj.chance_constraints_state{i};
+					if ~isfield(cc, 'type') || ~isfield(cc, 'p')
+						continue;
+					end
+					
+					% Determine which nodes to apply constraint to
+					if isfield(cc, 'nodes') && ~isempty(cc.nodes)
+						nodes = cc.nodes;
+					else
+						nodes = 1:obj.N+1; % Apply to all nodes if not specified
+					end
+					
+					if strcmp(cc.type, 'affine')
+						% Affine chance constraint: P(alpha'*x <= beta) >= 1-p
+						alpha = cc.alpha(:); % ensure column vector
+						beta = cc.beta;
+						p = cc.p;
+						z = norminv(1 - p);
+						
+						for k = nodes
+							if k >= 1 && k <= obj.N+1
+								mu_k = vars.mu(:,k);
+								S_k = vars.S(:,:,k);
+								constraints = [constraints;
+									alpha' * vars.mu(:,k) + z * norm(alpha' * vars.S(:,:,k)) - beta <= 0
+								];
+							end
+						end
+					elseif strcmp(cc.type, 'norm')
+						% Norm chance constraint: P(||x||_2 <= gamma) >= 1-p
+						gamma = cc.gamma;
+						p = cc.p;
+						n = cc.n;
+						q = sqrt(chi2inv(1 - p, n));
+						
+						for k = nodes
+							if k >= 1 && k <= obj.N+1
+								mu_k = vars.mu(:,k);
+								S_k = vars.S(:,:,k);
+								constraints = [constraints;
+									[norm(mu_k, 2) + q * norm(S_k, 2) - gamma <= 0]:sprintf('State Norm Chance Constraint (k=%d)', k)
+								];
+							end
+						end
+					end
+				end
 			end
 
 			% Add control chance constraints (if provided)
-			% for k = 1:obj.N
-			% 	v_k = vars.v(:,k);
-			% 	L_k = vars.L(:,:,k);
-			% 	for c = obj.chance_constraints_control
-			% 		constraints = [constraints; c{1}.toYALMIPConstraint(v_k, L_k)];
-			% 	end
-			% end
+			if ~isempty(obj.chance_constraints_control)
+				for i = 1:length(obj.chance_constraints_control)
+					cc = obj.chance_constraints_control{i};
+					if ~isfield(cc, 'type') || ~isfield(cc, 'p')
+						continue;
+					end
+					
+					% Determine which nodes to apply constraint to
+					if isfield(cc, 'nodes') && ~isempty(cc.nodes)
+						nodes = cc.nodes;
+					else
+						nodes = 1:obj.N; % Apply to all control time steps if not specified
+					end
+					
+					if strcmp(cc.type, 'affine')
+						% Affine chance constraint: P(alpha'*u <= beta) >= 1-p
+						alpha = cc.alpha(:); % ensure column vector
+						beta = cc.beta;
+						p = cc.p;
+						z = norminv(1 - p);
+						
+						for k = nodes
+							if k >= 1 && k <= obj.N
+								v_k = vars.v(:,k);
+								L_k = vars.L(:,:,k);
+								constraints = [constraints;
+									[alpha' * v_k + z * norm(alpha' * L_k) - beta <= 0]:sprintf('Control Affine Chance Constraint (k=%d)', k)
+								];
+							end
+						end
+					elseif strcmp(cc.type, 'norm')
+						% Norm chance constraint: P(||u||_2 <= gamma) >= 1-p
+						gamma = cc.gamma;
+						p = cc.p;
+						n = cc.n;
+						chi2q = chi2inv(1 - p, n);
+						q = sqrt(max(chi2q, 0));
+						
+						for k = nodes
+							if k >= 1 && k <= obj.N
+								v_k = vars.v(:,k);
+								L_k = vars.L(:,:,k);
+								constraints = [constraints;
+									[norm(v_k, 2) + q * norm(L_k, 2) - gamma <= 0]:sprintf('Control Norm Chance Constraint (k=%d)', k)
+								];
+							end
+						end
+					end
+				end
+			end
 		end
 
 		function constraintLHS = noncvx_eq(obj, vars)
@@ -205,15 +323,10 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				
 				X_k = [A_k * S_k + B_k * L_k, G_k];
 
-				S_kp1_predicted = qr(X_k', "econ");
-				% make R have positive diagonal
-				signs = diag(sign(diag(S_kp1_predicted)));
-				S_kp1_predicted = signs * S_kp1_predicted;
-
-				S_kp1_predicted = S_kp1_predicted';
+				[~, R_kp1_predicted] = obj.economy_qr_with_positive_diagonal(X_k');
 
 				constraintLHS = [constraintLHS
-					obj.vec_tril(S_kp1 - S_kp1_predicted)
+					obj.vec_tril(S_kp1 - R_kp1_predicted')
 				];
 			end
 		end
@@ -315,7 +428,17 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 
 	methods (Static)
 
-		function [Q, R] = economy_qr_with_positive_diagonal(X)
+		function [Q, R] = economy_qr_with_positive_diagonal(X, options)
+			arguments
+				X
+				options.check_rank = true
+			end
+			if options.check_rank
+				if rank(X) < min(size(X))
+					error('Input matrix X is rank deficient for QR decomposition.');
+				end
+			end
+
 			[Q, R] = qr(X, "econ");
 
 			% For uniqueness and consistent comparison, enforce the convention that R
@@ -324,8 +447,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			Q = Q * signs;
 			R = signs * R;
 		end
-
-
 
 		function out = vec_tril(M)
 			% Returns the vectorized lower triangular part of matrix M
