@@ -47,12 +47,12 @@ We address the finite-horizon discrete-time covariance steering problem for a li
 \label{eq:problem_statement}
 \begin{align}
 	\minimize_{\{v_k, K_k\}_{k=0}^{N-1}} \quad & J = \sum_{k=0}^{N-1} J_k (x_k, u_k) \\
-	\text{subject to} \quad & x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad {k \in 0\colon N{-}1} \\
-	& u_k = v_k + K_k (x_k - \E{x_k}), \quad {k \in 0\colon N{-}1} \\
+	\text{subject to} \quad & x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad k=0,\cdots, N{-}1 \\
+	& u_k = v_k + K_k (x_k - \E{x_k}), \quad k=0,\cdots, N{-}1 \\
 	& x_0 \sim \mathcal{N}(\mu_{\mathrm{init}}, P_{\mathrm{init}}) \\
 	& x_N \sim \mathcal{N}(\mu_{\mathrm{fin}}, P_{\mathrm{fin}}), \quad P_{\mathrm{fin}} \succeq \E{(x_N - \E{x_N})(x_N - \E{x_N})^\top} \\
 	& \mathbb{P}(x_k \in \mathcal{X}_k) \geq 1 - \epsilon_k, \quad {k \in 0\colon N} \\ 
-	& \mathbb{P}(u_k \in \mathcal{U}_k) \geq 1 - \delta_k, \quad {k \in 0\colon N{-}1}
+	& \mathbb{P}(u_k \in \mathcal{U}_k) \geq 1 - \delta_k, \quad k=0,\cdots, N{-}1
 \end{align}
 \end{subequations}
 where \( x_k \in \mathbb{R}^n \) is the state vector, \( u_k \in \mathbb{R}^m \) is the control input, \( w_k \in \mathbb{R}^n \) is standard Gaussian process noise, \( v_k \in \mathbb{R}^m \) is the nominal control input, and \( K_k \in \mathbb{R}^{m \times n} \) is the state feedback gain to be designed. The state-affine feedback was shown to be optimal for the covariance steering problem without chance constraints \cite{liuOptimalCovarianceSteering2024}. The matrices \( A_k \), \( B_k \), and \( G_k \) define the system dynamics. We consider two types of cost functions:
@@ -172,27 +172,27 @@ The application to covariance steering is straightforward.
 \subsection{Propagation with feedback control}
 Now, since the state is controlled by a the affine feedback control law, the closed-loop dynamics become
 \begin{equation}
-	x_{k+1} = A_k x_k + B_k (v_k + K_k (x_k - \E{x_k})) + G_k w_k \quad {k \in 0\colon N{-}1}.
+	x_{k+1} = A_k x_k + B_k (v_k + K_k (x_k - \E{x_k})) + G_k w_k \quad k=0,\cdots, N{-}1.
 \end{equation}
 The mean dynamics are given by
 \begin{equation}
-	\mu_{k+1} = A_k \mu_k + B_k v_k, \quad {k \in 0\colon N{-}1}.
+	\mu_{k+1} = A_k \mu_k + B_k v_k, \quad k=0,\cdots, N{-}1.
 \end{equation}
 where $\mu_k := \E{x_k}$.
 The square root covariance dynamics are given by:
 \begin{equation}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix} \quad {k \in 0\colon N{-}1}.
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix} \quad k=0,\cdots, N{-}1.
 \end{equation}
 Note that due to the affine feedback control law, the Gaussianity of the state distribution is preserved, and the control input is also Gaussian.
 Since both $P_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \).
 Here, we introduce a new variable $L_k = K_k S_k \in \mathbb{R}^{m \times n}$, so that the bilinear term is replaced with a linear term. $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists when the diagonals of $S_k$ are non-zero (source?), which is by definition guaranteed since $S_k$ is the Cholesky factor of a positive definite covariance matrix (\(\because\) \cref{assump:positive_definite_state}).
 So we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix} \quad {k \in 0\colon N{-}1}.
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix} \quad k=0,\cdots, N{-}1.
 \end{equation}
 with its first-order approximation given by:
 \begin{equation} \label{eq:square_root_covariance_propagation_linearized}
-	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \quad {k \in 0\colon N{-}1}.
+	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \quad k=0,\cdots, N{-}1.
 \end{equation}
 where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference variables, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\).
 \textcolor{red}{\(X \) is full rank if \(AS + BL \) is full rank. If  \( L = 0 \) this is guaranteed. When \(L \) is updated at subsequent iterations, what happens? }
@@ -218,18 +218,18 @@ The terminal distributional constraint is imposed by \cite{okamotoOptimalCovaria
 where \( \norm{\cdot}_2 \) denotes the spectral norm.
 To ensure uniqueness of the square root, we impose:
 \begin{equation} \label{eq:S_diagonals_positive}
-	\mathrm{diag}(S_k) \geq 0, \quad {k \in 0\colon N}
+	\mathrm{diag}(S_k) \geq 0, \quad k=0,\cdots, N
 \end{equation}
 
 Since we are working with the square root form, chance constraints can also be imposed in a convex manner.
 For the linear constraint form \eqref{eq:linear_chance_constraint}, the chance constraint can be exactly expressed as:
 \begin{equation} \label{eq:linear_chance_constraint_deterministic}
-	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0 \quad {k \in 0\colon N}
+	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0 \quad k=0,\cdots, N
 \end{equation}
 where \( \mathcal{Q}_{\mathcal{N}}(p_j) \) is the inverse of the standard normal cumulative distribution function.
 For the norm constraint form \eqref{eq:norm_chance_constraint}, the chance constraint can be conservatively approximated as:
 \begin{equation} \label{eq:norm_chance_constraint_deterministic}
-	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0 \quad {k \in 0\colon N}
+	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0 \quad k=0,\cdots, N
 \end{equation}
 The control chance constraints can be imposed by replacing \( \mu_k \) with \( v_k \) and \( S_k \) with \( L_k \).
 
@@ -247,7 +247,7 @@ where $\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix
 
 To ensure that the solution does not cause artificial infeasibility, we impose a trust region constraint
 \begin{equation} \label{eq:trust_region_constraint}
-	\mathrm{vectril}(S_k - \bar{S}_k) \leq r \quad {k \in 0\colon N}
+	\mathrm{vectril}(S_k - \bar{S}_k) \leq r \quad k=0,\cdots, N
 \end{equation}
 where \( r > 0 \) is the trust region radius. 
 
@@ -282,7 +282,7 @@ The complete algorithm is summarized in Algorithm \ref{alg:sqrt_qr_covariance_st
 	\EndIf
 	\State Update trust region radius \(r\) and penalty weight \(w\)
 \EndWhile
-\State Recover feedback gains: $K_k^* \gets L_k^* (S_k^*)^{-1}$ for $k \in 0\colon N{-}1$
+\State Recover feedback gains: $K_k^* \gets L_k^* (S_k^*)^{-1}$ for $k=0,\cdots, N{-}1$
 \State \Return $((S_k^*)_{k=0}^{N}, (\mu_k^*)_{k=0}^{N}, (v_k^*)_{k=0}^{N-1}, (K_k^*)_{k=0}^{N-1})$
 \end{algorithmic}
 \end{algorithm}
@@ -351,21 +351,27 @@ For problems where the covariance matrices have small numerical values, a numeri
 \end{proof}
 
 \subsection{Scaling for Covariance Steering}
-From the previous lemma, \cref{eq:square_root_covariance_propagation} can be written
+From the previous lemma, a scaled version of \cref{eq:square_root_covariance_propagation} can be written as follows:
 \begin{align*}
 	\bar{S}_{k+1} = D S_{k+1} &= \mathrm{qr}( \begin{bmatrix} A_k S_k + B_k K_k S_k & G_k \end{bmatrix}^\top D)^\top \\
 	&= \mathrm{qr}(\begin{bmatrix} D A_k D^{-1} D S_k + D B_k K_k D^{-1} D S_k & D G_k \end{bmatrix}^\top)^\top \\
-	&= \mathrm{qr}(\begin{bmatrix} \bar{A}_k \bar{S}_k + \bar{B}_k K_k \bar{S}_k & \bar{G}_k \end{bmatrix}^\top)^\top \\
+	&= \mathrm{qr}(\begin{bmatrix} \bar{A}_k \bar{S}_k + \bar{B}_k \bar{K}_k \bar{S}_k & \bar{G}_k \end{bmatrix}^\top)^\top \\
 	&= \mathrm{qr}(\begin{bmatrix} \bar{A}_k \bar{S}_k + \bar{B}_k \bar{L}_k & \bar{G}_k \end{bmatrix}^\top)^\top
 \end{align*}
-where $\bar{A}_k = D A_k D^{-1}$, $\bar{B}_k = D B_k$, $\bar{G}_k = D G_k$, $\bar{L}_k = K_k \bar{S}_k$ and $\bar{S}_k = D S_k$.
+where $\bar{A}_k = D A_k D^{-1}$, $\bar{B}_k = D B_k$, $\bar{G}_k = D G_k$, $\bar{K}_k = K_k D^{-1}$, $\bar{L}_k = \bar{K}_k \bar{S}_k = K_k D^{-1} D S_k = K_k S_k = L_k$ and $\bar{S}_k = D S_k$.
+
+The objective function can written in terms of the scaled variables as follows:
+\begin{align*}
+	J = \sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k + \mathrm{trace} (\bar{Q}_k \bar{S}_k \bar{S}_k^\top + R_k \bar{L}_k \bar{L}_k^\top) \quad \text{(quadratic cost)}
+\end{align*}
+where $\bar{Q}_k = D^{-1} Q_k D^{-1}$. For the quantile 2-norm cost, the cost function is the same.
 
 \section{Numerical Examples}
 The convex optimization problems are solved in MATLAB using YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} on a MacBook Pro with an M4 Max processor with 24GB of RAM. We use the same SCP parameters as in \cite{oguriSuccessiveConvexificationFeasibility2023a}.
 
 Some practical implementation tips:
 \begin{itemize}
-	\item Since the algorithm requires iteratively linearizing the problem, an initial guess is required for each of the variables. The initial guess for \( S_k \) can be obtained by linearly interpolating between the Cholesky factors of the initial and terminal covariances (There are several other options for the interpolation of positive definite matrices \cite{linRiemannianGeometrySymmetric2019}, but a comparison of these is beyond the scope of this paper). The initial guess for \( L_k \) can be set to zero.
+	\item Since the algorithm requires iteratively linearizing the problem, an initial guess is required for each of the variables. The initial guess for \( S_k \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess for \( L_k \) can be set to zero.
 	\item The SCP algorithm allows the user to choose whether to impose a trust region on the variables, to ensure that the solution remains in a region where the linear approximation is accurate. We observed that a trust region on \( L_k\) is not necessary, and causes chattering close to the solution. Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only appear in the convex constraints and are not subject to the linearization.
 \end{itemize}
 
@@ -413,7 +419,26 @@ The cost function value match to 7 digits between the full covariance steering a
 	\includegraphics[width=0.7\textwidth]{comparison_table.png}
 	\caption{Comparison of solutions times between full covariance and square root QR covariance steering methods}
 	\label{fig:comparison_table}
-	
+\end{figure}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=0.7\textwidth]{example_quadrotor_2d.png}
+	\caption{Example trajectory for quadrotor 2D path planning, solved using FullCov and SqrtQR methods}
+	\label{fig:example_quadrotor_2d}
+\end{figure}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=0.7\textwidth]{example_quadrotor_2d_convergence_history.png}
+	\caption{Convergence history of the \texttt{SCvx*} algorithm for the proposed method}
+	\label{fig:example_quadrotor_2d_convergence_history}
+\end{figure}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=0.7\textwidth]{example_quadrotor_2d_results.png}
+	\label{fig:example_quadrotor_2d_results}
 \end{figure}
 
 \subsection{Chance constraints}
