@@ -310,13 +310,12 @@ Let $T: \mathcal{F}_B \rightarrow \mathcal{F}_A$ be a diffeomorphism such that $
 Since $y^*$ is a local minimum of (B), by definition \cite[Chapter 12]{nocedalNumericalOptimization2006}, there exists a neighborhood $\mathcal{N}$ around $y^*$ such that
 \begin{equation}
 \label{eq:local_minimum}
-g(y) \geq g(y^*) \quad \forall y \in \mathcal{N} \cap \mathcal{F}_B.
+g(y) \geq g(y^*) \quad \forall y \in \mathcal{S}_B := \mathcal{N} \cap \mathcal{F}_B.
 \end{equation}
-Define $\mathcal{S}_B = \mathcal{N} \cap \mathcal{F}_B$.
 
 Since $T$ is a diffeomorphism, it is in particular a homeomorphism. Therefore, $T$ maps the open neighborhood $\mathcal{N}$ to an open set $T(\mathcal{N})$ which contains $T(y^*) = x^*$ \cite[Chapter 12]{munkresTopology2014}.
 
-Define $\mathcal{M} = T(\mathcal{N})$. Let $\mathcal{S}_A = \mathcal{M} \cap \mathcal{F}_A$. Then,
+Define $\mathcal{M} = T(\mathcal{N})$ and $\mathcal{S}_A = \mathcal{M} \cap \mathcal{F}_A$. Then,
 \begin{equation}
 \mathcal{S}_A = T(\mathcal{N}) \cap T(\mathcal{F}_B) 
 = T(\mathcal{N} \cap \mathcal{F}_B) 
@@ -419,6 +418,13 @@ The cost function value match to 7 digits between the full covariance steering a
 	\includegraphics[width=0.7\textwidth]{comparison_table.png}
 	\caption{Comparison of solutions times between full covariance and square root QR covariance steering methods}
 	\label{fig:comparison_table}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.7\textwidth]{horizon_size_scalability.png}
+	\caption{Comparison of solutions times between full covariance, block cholesky, and square root QR covariance steering methods}
+	\label{fig:horizon_size_scalability}
 \end{figure}
 
 \begin{figure}[h]
