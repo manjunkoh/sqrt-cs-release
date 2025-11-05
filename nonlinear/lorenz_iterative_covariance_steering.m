@@ -1,5 +1,9 @@
+% Iterative Covariance Steering with Lorenz system
+
 clc; clear;
 
+addpath ../SCvxStar/src/
+addpath ../astrodynamics_base/
 addpath(fullfile(fileparts(mfilename('fullpath')), 'example4'))
 addpath(fullfile(fileparts(mfilename('fullpath')), 'src'))
 addpath(genpath(fullfile(fileparts(mfilename('fullpath')), 'utils')))
@@ -36,7 +40,7 @@ R = 0.1 * eye(nu);       % Control cost matrix
 %% Iterative Covariance Steering (iCS) Parameters
 i_max = 100;         % Maximum number of outer iterations
 tol = 1e-3;         % Convergence tolerance for mean control
-solver_method = 'SqrtQRCovarianceSteering';  % or 'FullCovarianceSteering'
+solver_method = 'SqrtQRCovarianceSteering';
 % solver_method = 'FullCovarianceSteering';
 
 %% Initial Guess for Outer Loop (û¹_k, K¹_k)
@@ -61,7 +65,7 @@ inner_init = struct('S', interpolate_lower_triangular(chol(P0, 'lower'), chol(P_
     'mu', x_hat_i, ...
     'v', v_hat_i);
 
-% SCP parameters for inner loop
+% SCP parameters for inner loop, used for SqrtQR
 scp_params_inner = SCPParams();
 scp_params_inner.tol_opt = 1E-3;
 scp_params_inner.tol_feas = 1E-4;
@@ -110,11 +114,11 @@ for i = 1:i_max
                 N=N, ...
                 A_sys=A, B_sys=B, G_sys=G, ...
                 P_0=P0, P_f=P_fin, Q=Q, R=R, ...
-                objective_type='LQG', ...
+                objective_type='DV99', ...
                 mu_0=mu_0, mu_f=mu_f, ...
                 chance_constraints_control=control_chance_constraint, ...
                 impose_mean_trust_region=impose_mean_trust_region, ...
-                mean_trust_region_radius=1.0, ...
+                mean_trust_region_radius=0.1, ...
                 mu_ref = x_bar_k);
             
             flag_solved = prob_cs.solve(scp_params=scp_params_inner);
@@ -198,7 +202,7 @@ fprintf('Number of outer iterations: %d\n', i);
 if converged
     fprintf('✓ Converged successfully!\n');
 else
-    fprintf('⚠ Did not converge within %d iterations.\n', i_max);
+    fprintf('⚠ Did not converge.\n');
     return
 end
 
