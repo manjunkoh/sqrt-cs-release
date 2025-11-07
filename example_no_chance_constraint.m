@@ -113,12 +113,17 @@ disp("Covariance part of objective: " + J_cov)
 %% Perform interpolation of covariances to generate initial guess
 % try changing between 'log-cholesky' and 'cholesky'
 init_guess_struct.S = interpolate_lower_triangular(chol(P_0, 'lower'), chol(P_f, 'lower'), N+1, 'log-cholesky');
-init_guess_struct.L = ones(nu, nx, N);
+init_guess_struct.L = zeros(nu, nx, N);
+K_init = - dlqr(A, B, Q, R);
+
+for k = 1:N
+    init_guess_struct.L(:,:,k) = K_init * init_guess_struct.S(:,:,k);
+end
 init_guess_struct.mu = zeros(nx, N+1);
 init_guess_struct.v = zeros(nu, N);
 %%
 sqrt_cs = SqrtQRCovarianceSteering(init_guess_struct,...
-	N=N, nx=nx, nu=nu, nw=nw, ...
+	N=N, ...
 	A_sys=repmat(A, [1, 1, N]), ...
 	B_sys=repmat(B, [1, 1, N]), ...
 	G_sys=repmat(G, [1, 1, N]), ...
@@ -127,7 +132,7 @@ sqrt_cs = SqrtQRCovarianceSteering(init_guess_struct,...
 
 scp_params = SCPParams();
 scp_params.tol_opt = 1E-4;
-scp_params.tol_feas = 1E-6;
+scp_params.tol_feas = 1E-5;
 
 sqrt_cs.solve(scp_params = scp_params);
 

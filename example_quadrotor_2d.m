@@ -5,12 +5,13 @@ addpath ../SCvxStar/src/
 addpath(genpath('./utils'))
 addpath('./src')
 
-% Time horizon and discretization
-N = 60;
-dt = 0.1;
+% Time horizon and discretization (60 nodes in original paper)
+tof = 6.0;
+N = 30;
+dt = tof / N;
 
 % Dimensions
-nx = 6; % triple integrator in x and y (position and velocity and accel?)
+nx = 6; % triple integrator in x and y (position and velocity and acceleration)
 nu = 2; % two inputs (x and y thrust)
 nw = 6;
 
@@ -69,6 +70,8 @@ Q = 0.001 * eye(nx);
 R = 0.01 * eye(nu);
 
 %% Solve with BlockCholeskySteering
+skip_block = false;
+if ~skip_block
 disp('=== Solving with BlockCholeskySteering ===');
 prob_bc = BlockCholeskySteering(...
     A=A_sys, B=B_sys, G=G_sys, ...
@@ -91,7 +94,7 @@ else
     disp('BlockCholeskySteering solver failed.');
     disp(yalmiperror(diagnostic_bc.problem));
 end
-
+end
 %% Solve with FullCovarianceSteering
 disp('=== Solving with FullCovarianceSteering ===');
 % Reference covariance for linearization of chance constraints
@@ -172,24 +175,25 @@ if (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) || flag_solved_qr
     hold on
     
     % Plot constraint boundaries (box constraints: x in [-3, 25], y in [-7, 7])
-    plot([-3, -3], [-10, 10], 'r--', 'LineWidth', 1.5, 'DisplayName', 'Constraint: x = -3');
-    plot([25, 25], [-10, 10], 'r--', 'LineWidth', 1.5, 'DisplayName', 'Constraint: x = 25');
-    plot([-5, 27], [-7, -7], 'r--', 'LineWidth', 1.5, 'DisplayName', 'Constraint: y = -7');
-    plot([-5, 27], [7, 7], 'r--', 'LineWidth', 1.5, 'DisplayName', 'Constraint: y = 7');
+    plot([-3, -3], [-10, 10], 'r--', 'LineWidth', 1.5, 'DisplayName', 'Constraint: x = -3', 'HandleVisibility', 'off');
+    plot([25, 25], [-10, 10], 'r--', 'LineWidth', 1.5, 'DisplayName', 'Constraint: x = 25', 'HandleVisibility', 'off');
+    plot([-5, 27], [-7, -7], 'r--', 'LineWidth', 1.5, 'DisplayName', 'Constraint: y = -7', 'HandleVisibility', 'off');
+    plot([-5, 27], [7, 7], 'r--', 'LineWidth', 1.5, 'DisplayName', 'Constraint: y = 7', 'HandleVisibility', 'off');
     
     % Extract position covariance (2x2 submatrix from 6x6 covariance)
     % State is [x, y, vx, vy, ax, ay], so position indices are 1:2
     idx_pos = 1:2;
     
     % Plot BlockCholeskySteering results
-    % Plot covariance ellipses (every 5th step to avoid clutter)
-    % for k = 1:5:N+1
-    %     P_pos_bc = P_bc(idx_pos, idx_pos, k);
-    %     plot3sigmaEllipse(prob_bc.mu(idx_pos, k), P_pos_bc, 'b', 'HandleVisibility', 'off');
-    % end
-    % % Plot mean trajectory
-    % plot(prob_bc.mu(1,:), prob_bc.mu(2,:), 'b+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Block Cholesky');
-    
+    if ~skip_block && ~diagnostic_bc.problem
+        % Plot covariance ellipses (every 5th step to avoid clutter)
+        for k = 1:5:N+1
+            P_pos_bc = P_bc(idx_pos, idx_pos, k);
+            plot3sigmaEllipse(prob_bc.mu(idx_pos, k), P_pos_bc, 'b', 'HandleVisibility', 'off');
+        end
+        % Plot mean trajectory
+        plot(prob_bc.mu(1,:), prob_bc.mu(2,:), 'b+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Block Cholesky');
+    end
     % Plot FullCovarianceSteering results
     if ~isempty(prob_fc) && (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4)
         % Plot covariance ellipses (every 5th step to avoid clutter)
@@ -198,7 +202,7 @@ if (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) || flag_solved_qr
             plot3sigmaEllipse(prob_fc.mu(idx_pos, k), P_pos_fc, 'g', 'HandleVisibility', 'off');
         end
         % Plot mean trajectory
-        plot(prob_fc.mu(1,:), prob_fc.mu(2,:), 'g+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Full Covariance');
+        plot(prob_fc.mu(1,:), prob_fc.mu(2,:), 'g+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'FullCov');
     end
     
     % Plot SqrtQRCovarianceSteering results
@@ -208,37 +212,49 @@ if (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) || flag_solved_qr
             plot3sigmaEllipse(prob_qr.mu(idx_pos, k), prob_qr.P(idx_pos, idx_pos, k), 'm', 'HandleVisibility', 'off');
         end
         % Plot mean trajectory
-        plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'm+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Square Root QR');
+        plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'm+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'SqrtQR');
     end
     
     % Plot initial and terminal conditions
-    plot3sigmaEllipse(mu_i(idx_pos), Sigma_i(idx_pos, idx_pos), 'r', 'LineWidth', 2, 'DisplayName', 'Initial');
-    plot3sigmaEllipse(mu_f(idx_pos), Sigma_f(idx_pos, idx_pos), 'r--', 'LineWidth', 2, 'DisplayName', 'Terminal');
+    plot3sigmaEllipse(mu_i(idx_pos), Sigma_i(idx_pos, idx_pos), 'b', 'LineWidth', 2, 'DisplayName', 'Initial');
+    plot3sigmaEllipse(mu_f(idx_pos), Sigma_f(idx_pos, idx_pos), 'b--', 'LineWidth', 2, 'DisplayName', 'Terminal');
     
     % Plot waypoints
     for i = 1:length(waypoints)
         wp = waypoints{i};
-        plot(wp.mu(1), wp.mu(2), 'ro', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'r', ...
-            'DisplayName', sprintf('Waypoint (node %d)', wp.node));
+        if i == 1
+            HandleVisibility = 'on';
+        else
+            HandleVisibility = 'off';
+        end
+        plot(wp.mu(1), wp.mu(2), 'ro', 'MarkerSize', 10, 'LineWidth', 2, 'MarkerFaceColor', 'r', 'HandleVisibility', HandleVisibility, ...
+            'DisplayName', sprintf('Waypoints ($N {=} %d, %d$)', waypoints{1}.node, waypoints{2}.node));
     end
     
     xlabel('$x$ (position)', 'Interpreter', 'latex')
     ylabel('$y$ (position)', 'Interpreter', 'latex')
-    title('Quadrotor 2D Path Planning')
-    % legend('Location', 'best')
+    % title('Quadrotor 2D Path Planning')
+    legend('Location', 'best', 'NumColumns', 2)
     grid on
     axis equal
 
 end
 
-%% Summary
-fprintf('\n=== Solution Summary ===\n');
-% if diagnostic_bc.problem == 0 || diagnostic_bc.problem == 4
-%     fprintf('BlockCholeskySteering:  Time = %.3f s, Objective = %.6f\n', time_bc, prob_bc.optimal_objective);
-% else
-%     fprintf('BlockCholeskySteering:  Failed\n');
-% end
+exportgraphics(gcf, 'figures/example_quadrotor_2d.png')
 
+%% Plot the convergence history
+prob_qr.scp.plot_iter_history()
+exportgraphics(gcf, 'figures/example_quadrotor_2d_convergence_history.png')
+
+%% Summary
+fprintf('\n=== Solution Summary for Quadrotor 2D Path Planning ===\n');
+if ~skip_block
+    if diagnostic_bc.problem == 0 || diagnostic_bc.problem == 4
+        fprintf('BlockCholeskySteering:  Time = %.3f s, Objective = %.6f\n', time_bc, prob_bc.optimal_objective);
+    else
+        fprintf('BlockCholeskySteering:  Failed\n');
+    end
+end
 if (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) && ~isempty(prob_fc)
     fprintf('FullCovarianceSteering: Time = %.3f s, Objective = %.6f\n', time_fc, prob_fc.optimal_objective);
 else

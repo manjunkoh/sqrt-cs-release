@@ -93,7 +93,7 @@ end
 disp('=== Solving with SqrtQRCovarianceSteering ===');
 % Initial guess for SqrtQRCovarianceSteering
 init.S = interpolate_lower_triangular(chol(Sigma0, 'lower'), chol(SigmaN, 'lower'), N+1, 'log-cholesky');
-init.L = zeros(nu, nx, N);
+init.L = -ones(nu, nx, N);
 init.mu = zeros(nx, N+1);
 init.v = zeros(nu, N);
 
@@ -105,14 +105,15 @@ prob_qr = SqrtQRCovarianceSteering(init, ...
     chance_constraints_state=state_cc, ...
     mu_0=mu0, mu_f=muN);
 
+prob_qr.impose_trust_region_struct.L = false;
+
 scp_params = SCPParams();
 scp_params.tol_opt = 1E-4;
 scp_params.tol_feas = 1E-4;
 scp_params.r_init = 1.0;
 
-tic
 flag_solved_qr = prob_qr.solve(save_bool=false, scp_params=scp_params);
-time_qr = toc;
+time_qr = seconds(prob_qr.scp.report.time);
 
 if flag_solved_qr
     prob_qr.postprocess();
