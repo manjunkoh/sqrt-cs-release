@@ -38,7 +38,7 @@ Covariance steering is a control technique for steering the mean and covariance 
 
 \subsection{Notation}
 Let $\mathbb{L}_+^n$ denote the space of $n \times n$ lower triangular matrices with positive diagonal entries. 
-The square root of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique lower triangular matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \). Its uniqueness is easily shown. $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). The linear matrix inequality $A \succ (\succeq) B$ means that $A - B $ is positive (semi)definite. $a\colon b$ denotes the set of integers $a, a+1, \ldots, b$.
+The square root of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique lower triangular matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}. $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). The linear matrix inequality $A \succ (\succeq) B$ means that $A - B $ is positive (semi)definite. $a\colon b$ denotes the set of integers $a, a+1, \ldots, b$.
 
 
 \subsection{Problem Formulation}
@@ -195,7 +195,7 @@ with its first-order approximation given by:
 	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \quad k=0,\cdots, N{-}1.
 \end{equation}
 where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference variables, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\).
-\textcolor{red}{\(X \) is full rank if \(AS + BL \) is full rank. If  \( L = 0 \) this is guaranteed. When \(L \) is updated at subsequent iterations, what happens? }
+\textcolor{red}{\(X \) is full rank if \(AS + BL \) is full rank. If  \( L = 0 \) this is guaranteed. When \(L \) is updated at subsequent iterations, what happens? --- Since G is discretized from a continuous-time process, it is usually full rank.}
 
 \subsection{Objective function}
 After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and some standard manipulations, the objective function can be expressed as deterministic convex functions of \( L_k \) and \( S_k \):
@@ -245,11 +245,31 @@ In order to take advantage of the convex representation of the objective and con
 \end{equation}
 where $\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix, and \( \chi_k \in \mathbb{R}^{\frac{n(n-1)}{2}}\) is a slack variable, penalized in the objective function via an Augmented Lagrangian method \cite{oguriSuccessiveConvexificationFeasibility2023a}. By using the specific SCP algorithm $\texttt{SCvx*}$, we can ensure that 1. the nonlinear dynamics are obeyed at convergence, and 2. the converged solution is locally optimal. 
 
-To ensure that the solution does not cause artificial infeasibility, we impose a trust region constraint
-\begin{equation} \label{eq:trust_region_constraint}
-	\mathrm{vectril}(S_k - \bar{S}_k) \leq r \quad k=0,\cdots, N
-\end{equation}
-where \( r > 0 \) is the trust region radius. 
+To ensure that the solution does not cause artificial infeasibility, we impose a trust region constraint. A notable difference from typical trust region constraints is that the variable \( S_k \) is defined on a manifold. As described in \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the Riemannian metric is used to define the trust region constraint. 
+
+\subsection{Riemannian geometry on Cholesky spaces}
+Let \( L \in \mathcal{L}_+^n \).
+For \( X, Y \) in the tangent space of \( \mathcal{L}_+^n \) at \( L \), the Riemannian metric is given by \cite{linRiemannianGeometrySymmetric2019}:
+\begin{equation}
+	g_L(X,Y)
+ = \sum_{i>j} X_{ij} Y_{ij} + \sum_{jj} X_{jj} Y_{jj} L_{jj}^{-2}
+ \end{equation}
+
+ Then, as described in \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the trust region constraint is given by:
+ \begin{equation} \label{eq:trust_region_constraint}
+ 	g_{\bar{S}_k}(S_k - \bar{S}_k, S_k - \bar{S}_k) \leq r^2
+ \end{equation}
+ where \( r > 0 \) is the trust region radius. This is a quadratic convex constraint.
+
+ For \(L_k\), we simply impose a Euclidean trust region constraint:
+ \begin{equation} \label{eq:trust_region_constraint_L}
+ 	\|L_k - \bar{L}_k\|_F \leq r_L
+ \end{equation}
+
+% \begin{equation} \label{eq:trust_region_constraint}
+% 	\mathrm{vectril}(S_k - \bar{S}_k) \leq r \quad k=0,\cdots, N
+% \end{equation}
+% where \( r > 0 \) is the trust region radius. 
 
 The objective function is augmented with a penalty term as follows:
 \begin{equation} \label{eq:objective_augmented}
@@ -370,8 +390,10 @@ The convex optimization problems are solved in MATLAB using YALMIP \cite{lofberg
 
 Some practical implementation tips:
 \begin{itemize}
-	\item Since the algorithm requires iteratively linearizing the problem, an initial guess is required for each of the variables. The initial guess for \( S_k \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess for \( L_k \) can be set to zero.
-	\item The SCP algorithm allows the user to choose whether to impose a trust region on the variables, to ensure that the solution remains in a region where the linear approximation is accurate. We observed that a trust region on \( L_k\) is not necessary, and causes chattering close to the solution. Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only appear in the convex constraints and are not subject to the linearization.
+	\item Since the algorithm requires iteratively linearizing the problem, an initial guess is required for each of the variables. The initial guess for \( S_k \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess for \( L_k \) can be obtained, for example, by calculating feedback gains \(K_{k,\mathrm{LQR}} \) via the Riccati equation, and then setting \( L_k = K_{k,\mathrm{LQR}} S_k \).
+	\item The SCP algorithm allows the user to choose whether to impose a trust region on the variables, to ensure that the solution remains in a region where the linear approximation is accurate. 
+	% We observed that a trust region on \( L_k\) is not necessary, and causes chattering close to the solution. 
+	Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only appear in the convex constraints and are not subject to the linearization.
 \end{itemize}
 
 \subsection{Comparison with Full Covariance Approach}
@@ -451,7 +473,9 @@ The cost function value match to 7 digits between the full covariance steering a
 Showcase the chance constraints handling capability and compare solution times with full covariance and block approaches
 
 \section{Discussion}
-
+\begin{itemize}
+	\item The idea of using the QR decomposition derivative can be used in other trajectory optimization methods. 
+\end{itemize}
 
 \section{Conclusions}
 
