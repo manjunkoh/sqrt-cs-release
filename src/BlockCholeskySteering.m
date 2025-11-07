@@ -25,7 +25,8 @@ classdef BlockCholeskySteering < CovarianceSteeringBase
 			obj.sdpvars.K = [obj.block_diag_sdp(nu, nx, N) zeros(N*nu, nx)];
 			
 			% V is the open-loop control mean (vectorized) - needed if chance constraints or mean boundary conditions
-			if ~isempty(obj.chance_constraints_state) || ~isempty(obj.mu_0) || ~isempty(obj.mu_f)
+			if ~isempty(obj.chance_constraints_state) || ~isempty(obj.chance_constraints_control) ...
+					|| ~isempty(obj.mu_0) || ~isempty(obj.mu_f)
 				obj.sdpvars.V = sdpvar(N*nu, 1, 'full');
 			else
 				obj.sdpvars.V = [];
@@ -36,35 +37,64 @@ classdef BlockCholeskySteering < CovarianceSteeringBase
 		end
 
 		function set_objective(obj)
-			% Set objective for block Cholesky method
-			[A_blk, B_blk, ~, ~, G_blk, ~] = obj.get_block_matrices();
-			
-			% Create block diagonal Q and R matrices
-			Q_blk = obj.repblkdiag(obj.Q, obj.N+1);
-			R_blk = obj.repblkdiag(obj.R, obj.N);
-			
-			% Compute S matrix
-			S = A_blk * obj.P_0 * A_blk' + G_blk * G_blk';
-			I = eye((obj.N+1) * obj.nx);
-			
-			% Covariance part of objective (always included) - using K (Okamoto 2019)
-			J_cov = trace(((I + B_blk * obj.sdpvars.K)' * Q_blk * (I + B_blk * obj.sdpvars.K) + obj.sdpvars.K' * R_blk * obj.sdpvars.K) * S);
-			
-			% Mean part of objective (if V is defined, following Okamoto et al. 2019)
-			if ~isempty(obj.sdpvars.V)
-				% Initialize x_0_bar
-				if ~isempty(obj.mu_0)
-					x_0_bar = obj.mu_0(:);
-				else
-					x_0_bar = zeros(obj.nx, 1);
-				end
-				
-				% Mean part: (A_blk*x_0_bar+B_blk*V)'*Q_blk*(A_blk*x_0_bar+B_blk*V) + V'*R_blk*V
-				J_mean = (A_blk * x_0_bar + B_blk * obj.sdpvars.V)' * Q_blk * (A_blk * x_0_bar + B_blk * obj.sdpvars.V) + obj.sdpvars.V' * R_blk * obj.sdpvars.V;
-				
-				obj.sdpvars.J = J_mean + J_cov;
-			else
-				obj.sdpvars.J = J_cov;
+			switch obj.objective_type
+				case {'LQG', 'LQR', 'LQ'}
+					% Set objective for block Cholesky method
+					[A_blk, B_blk, ~, ~, G_blk, ~] = obj.get_block_matrices();
+					
+					% Create block diagonal Q and R matrices
+					Q_blk = obj.repblkdiag(obj.Q, obj.N+1);
+					R_blk = obj.repblkdiag(obj.R, obj.N);
+					
+					% Compute S matrix
+					S = A_blk * obj.P_0 * A_blk' + G_blk * G_blk';
+					I = eye((obj.N+1) * obj.nx);
+					
+					% Covariance part of objective (always included) - using K (Okamoto 2019)
+					J_cov = trace(((I + B_blk * obj.sdpvars.K)' * Q_blk * (I + B_blk * obj.sdpvars.K) + obj.sdpvars.K' * R_blk * obj.sdpvars.K) * S);
+					
+					% Mean part of objective (if V is defined, following Okamoto et al. 2019)
+					if ~isempty(obj.sdpvars.V)
+						% Initialize x_0_bar
+						if ~isempty(obj.mu_0)
+							x_0_bar = obj.mu_0(:);
+						else
+							x_0_bar = zeros(obj.nx, 1);
+						end
+						
+						% Mean part: (A_blk*x_0_bar+B_blk*V)'*Q_blk*(A_blk*x_0_bar+B_blk*V) + V'*R_blk*V
+						J_mean = (A_blk * x_0_bar + B_blk * obj.sdpvars.V)' * Q_blk * (A_blk * x_0_bar + B_blk * obj.sdpvars.V) + obj.sdpvars.V' * R_blk * obj.sdpvars.V;
+						
+						obj.sdpvars.J = J_mean + J_cov;
+					else
+						obj.sdpvars.J = J_cov;
+					end
+					
+				case 'DV99'
+					% DV99 objective: minimize 99th percentile of control norm
+					% Formulation: sum_k [norm(Eu_k * V) + q * norm(Eu_k * K * chol_S)]
+					% where q = sqrt(chi2inv(0.99, nu))
+					% Similar to norm control chance constraints
+					if isempty(obj.sdpvars.V)
+						error('BlockCholeskySteering: Mean control variables (V) must be defined for DV99 objective.');
+					end
+					
+					[~, ~, ~, Eu, ~, chol_S] = obj.get_block_matrices();
+					q = sqrt(chi2inv(0.99, obj.nu));
+					obj.sdpvars.J = 0;
+					
+					for k = 1:obj.N
+						% Mean part: norm(Eu_k * V)
+						V_bar_k = Eu(:,:,k) * obj.sdpvars.V;
+						
+						% Covariance part: q * norm(Eu_k * K * chol_S)
+						L_k = Eu(:,:,k) * obj.sdpvars.K * chol_S;
+						
+						obj.sdpvars.J = obj.sdpvars.J + norm(V_bar_k, 2) + q * norm(L_k, 2);
+					end
+					
+				otherwise
+					error('BlockCholeskySteering: Unknown objective type ''%s''.', obj.objective_type);
 			end
 		end
 
@@ -156,6 +186,74 @@ classdef BlockCholeskySteering < CovarianceSteeringBase
 								];
 							end
 						end
+					end
+				end
+			end
+			
+			% Control chance constraints (following Okamoto et al. 2019)
+			if ~isempty(obj.chance_constraints_control) && ~isempty(obj.sdpvars.V)
+				for i = 1:length(obj.chance_constraints_control)
+					cc = obj.chance_constraints_control{i};
+					if ~isfield(cc, 'type') || ~isfield(cc, 'p')
+						continue;
+					end
+					
+					% Determine which nodes to apply constraint to
+					if isfield(cc, 'nodes') && ~isempty(cc.nodes)
+						nodes = cc.nodes;
+					else
+						nodes = 1:obj.N; % Apply to all control time steps if not specified
+					end
+					
+					if strcmp(cc.type, 'affine')
+						% Affine chance constraint: P(alpha'*u <= beta) >= 1-p
+						% Following Okamoto 2019: norminv(1-p) * norm(alpha' * Eu * K * chol_S) 
+						%                        + alpha' * Eu * V <= beta
+						alpha = cc.alpha(:); % ensure column vector
+						beta = cc.beta;
+						p = cc.p;
+						z = norminv(1 - p);
+						
+						for k = nodes
+							if k >= 1 && k <= obj.N
+								% Mean part: alpha' * Eu_k * V
+								mean_part = alpha' * Eu(:,:,k) * obj.sdpvars.V;
+								
+								% Covariance part: z * norm(alpha' * Eu_k * K * chol_S)
+								cov_part = z * norm(alpha' * Eu(:,:,k) * obj.sdpvars.K * chol_S);
+								
+								obj.sdpvars.constraints = [
+									obj.sdpvars.constraints;
+									cov_part + mean_part - beta <= 0
+								];
+							end
+						end
+						
+					elseif strcmp(cc.type, 'norm')
+						% Norm chance constraint: P(||u||_2 <= gamma) >= 1-p
+						gamma = cc.gamma;
+						p = cc.p;
+						n = cc.n;
+						chi2q = chi2inv(1 - p, n);
+						q = sqrt(chi2q);
+						
+						for k = nodes
+							if k >= 1 && k <= obj.N
+								% Mean part: norm(Eu_k * V)
+								V_bar_k = Eu(:,:,k) * obj.sdpvars.V;
+								
+								% Covariance part: q * norm(Eu_k * K * chol_S)
+								L_k = Eu(:,:,k) * obj.sdpvars.K * chol_S;
+								
+								obj.sdpvars.constraints = [
+									obj.sdpvars.constraints;
+									norm(V_bar_k, 2) + q * norm(L_k, 2) - gamma <= 0
+								];
+							end
+						end
+						
+					else
+						error('BlockCholeskySteering: Unsupported control chance constraint type.');
 					end
 				end
 			end

@@ -17,8 +17,10 @@ classdef CovarianceSteeringBase < handle
 		P_0 % Initial state covariance
 		P_f % Final state covariance
 		P_ref % Reference covariance for linearization (e.g., from previous SCP iteration), size (nx x nx x N+1) or empty; only used for FullCovarianceSteering
+		Y_ref % Reference control covariance for linearization (e.g., from previous SCP iteration), size (nu x nu x N) or empty; only used for FullCovarianceSteering control constraints
 		Q % State cost matrix; assume constant over time
 		R % Control cost matrix; assume constant over time
+		objective_type = 'LQG' % Objective type: 'LQG' (default) or 'DV99' (99th percentile control norm)
 		nx % State dimension
 		nu % Control dimension
 		nw % Process noise dimension
@@ -33,6 +35,11 @@ classdef CovarianceSteeringBase < handle
 		%   - For affine: alpha (vector), beta (scalar), p (violation prob), nodes (optional, default: all)
 		%   - For norm: gamma (scalar), p (violation prob), n (dimension), nodes (optional, default: all)
 		chance_constraints_state = {}
+		% Control constraints: cell array of structs with fields:
+		%   - type: 'affine' or 'norm'
+		%   - For affine: alpha (vector), beta (scalar), p (violation prob), nodes (optional, default: all)
+		%   - For norm: gamma (scalar), p (violation prob), n (dimension), nodes (optional, default: all)
+		chance_constraints_control = {}
 		mu_0 = []  % initial mean (nx x 1) or empty -> assumed zero
 		mu_f = []  % terminal mean (nx x 1) or empty -> assumed zero
 		waypoints = {}  % cell array of waypoint structs with fields: 'node' (scalar, 1:N+1) and 'mu' (nx x 1 vector)
@@ -55,10 +62,13 @@ classdef CovarianceSteeringBase < handle
 				options.N
 				options.covariance_scaling = 1
 				options.chance_constraints_state = {}
+				options.chance_constraints_control = {}
 				options.mu_0 = []
 				options.mu_f = []
 				options.waypoints = {}
 				options.P_ref = []
+				options.Y_ref = []
+				options.objective_type = 'LQG'
 			end
 			
 			obj.A = options.A;
@@ -67,6 +77,7 @@ classdef CovarianceSteeringBase < handle
 			obj.P_0 = options.P_0;
 			obj.P_f = options.P_f;
 			obj.P_ref = options.P_ref;
+			obj.Y_ref = options.Y_ref;
 			obj.Q = options.Q;
 			obj.R = options.R;
 			obj.nx = size(options.A, 1);
@@ -74,9 +85,11 @@ classdef CovarianceSteeringBase < handle
 			obj.nw = size(options.G, 2);
 			obj.N = options.N;
 			obj.covariance_scaling = options.covariance_scaling;
+			obj.objective_type = options.objective_type;
 			
 			% Optional chance constraint and mean parameters
 			obj.chance_constraints_state = options.chance_constraints_state;
+			obj.chance_constraints_control = options.chance_constraints_control;
 			if ~isempty(options.mu_0)
 				obj.mu_0 = options.mu_0(:); % ensure column vector
 			end

@@ -26,7 +26,8 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 			obj.sdpvars.Y = sdpvar(nu, nu, N); % Auxiliary variable for input covariance
 			
 			% Mean variables (if mean constraints are specified)
-			if ~isempty(obj.chance_constraints_state) || ~isempty(obj.mu_0) || ~isempty(obj.mu_f) || ~isempty(obj.waypoints)
+			if ~isempty(obj.chance_constraints_state) || ~isempty(obj.chance_constraints_control) ...
+					|| ~isempty(obj.mu_0) || ~isempty(obj.mu_f) || ~isempty(obj.waypoints)
 				obj.sdpvars.mu = sdpvar(nx, N+1, 'full'); % State mean trajectory
 				obj.sdpvars.v = sdpvar(nu, N, 'full'); % Control mean trajectory
 			else
@@ -39,25 +40,63 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 		end
 
 		function set_objective(obj)
-			% Covariance part of objective (always included)
-			J_cov = 0;
-			for k = 1:obj.N
-				J_cov = J_cov + trace(obj.Q * obj.sdpvars.P(:,:,k)) ...
-					+ trace(obj.R * obj.sdpvars.Y(:,:,k));
-			end
-			
-			% Mean part of objective (if mean variables are defined)
-			if ~isempty(obj.sdpvars.mu) && ~isempty(obj.sdpvars.v)
-				J_mean = 0;
-				for k = 1:obj.N
-					J_mean = J_mean + obj.sdpvars.mu(:,k)' * obj.Q * obj.sdpvars.mu(:,k) ...
-						+ obj.sdpvars.v(:,k)' * obj.R * obj.sdpvars.v(:,k);
-				end
-				% Add terminal state mean cost
-				J_mean = J_mean + obj.sdpvars.mu(:,obj.N+1)' * obj.Q * obj.sdpvars.mu(:,obj.N+1);
-				obj.sdpvars.J = J_mean + J_cov;
-			else
-				obj.sdpvars.J = J_cov;
+			switch obj.objective_type
+				case {'LQG', 'LQR', 'LQ'}
+					% Covariance part of objective (always included)
+					J_cov = 0;
+					for k = 1:obj.N
+						J_cov = J_cov + trace(obj.Q * obj.sdpvars.P(:,:,k)) ...
+							+ trace(obj.R * obj.sdpvars.Y(:,:,k));
+					end
+					
+					% Mean part of objective (if mean variables are defined)
+					if ~isempty(obj.sdpvars.mu) && ~isempty(obj.sdpvars.v)
+						J_mean = 0;
+						for k = 1:obj.N
+							J_mean = J_mean + obj.sdpvars.mu(:,k)' * obj.Q * obj.sdpvars.mu(:,k) ...
+								+ obj.sdpvars.v(:,k)' * obj.R * obj.sdpvars.v(:,k);
+						end
+						% Add terminal state mean cost
+						J_mean = J_mean + obj.sdpvars.mu(:,obj.N+1)' * obj.Q * obj.sdpvars.mu(:,obj.N+1);
+						obj.sdpvars.J = J_mean + J_cov;
+					else
+						obj.sdpvars.J = J_cov;
+					end
+					
+				case 'DV99'
+					% DV99 objective: minimize 99th percentile of control norm
+					% Formulation: sum_k [norm(v_k) + q * sqrt(lambda_max(Y_k))]
+					% where q = sqrt(chi2inv(0.99, nu))
+					% Since sqrt(lambda_max(Y_k)) is not convex, we linearize around Y_ref
+					% Similar to norm control chance constraints
+					if isempty(obj.Y_ref)
+						error('FullCovarianceSteering: Y_ref must be provided for DV99 objective.');
+					end
+					
+					if isempty(obj.sdpvars.v)
+						error('FullCovarianceSteering: Mean control variables (v) must be defined for DV99 objective.');
+					end
+					
+					q = sqrt(chi2inv(0.99, obj.nu));
+					obj.sdpvars.J = 0;
+					
+					for k = 1:obj.N
+						% Get reference for linearization
+						if size(obj.Y_ref, 3) == 1
+							Y_ref_k = obj.Y_ref;
+						else
+							Y_ref_k = obj.Y_ref(:,:,k);
+						end
+						sqrt_lambda_max_ref = sqrt(lambda_max(Y_ref_k));
+						
+						% Linearized objective: norm(v_k) + q * [sqrt_lambda_max_ref + lambda_max(Y_k) / (2 * sqrt_lambda_max_ref)]
+						obj.sdpvars.J = obj.sdpvars.J + norm(obj.sdpvars.v(:,k), 2) ...
+							+ q * sqrt_lambda_max_ref ...
+							+ q * lambda_max(obj.sdpvars.Y(:,:,k)) / (2 * sqrt_lambda_max_ref);
+					end
+					
+				otherwise
+					error('FullCovarianceSteering: Unknown objective type ''%s''.', obj.objective_type);
 			end
 		end
 
@@ -71,6 +110,7 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 				obj.get_positive_semidefinite_constraints()
 				obj.get_mean_boundary_constraints()
 				obj.get_chance_constraints_state()
+				obj.get_chance_constraints_control()
 			];
 
 			obj.sdpvars.constraints = constraints;
@@ -179,16 +219,94 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 								end
 							end
 					
+						% case 'norm'
+						% 	% Norm chance constraint: P(||x||_2 <= gamma) >= 1-p
+						% 	gamma = cc.gamma;
+						% 	p = cc.p;
+						% 	n = cc.n;
+						% 	q = sqrt(chi2inv(1 - p, n));
+							
+						% 	error('FullCovarianceSteering: Norm chance constraints are not supported for full covariance method.');
+						otherwise
+							error('FullCovarianceSteering: Unsupported chance constraint type.');
+					end
+				end
+			end
+		end
+		
+		function constraints = get_chance_constraints_control(obj)
+			% Control chance constraints for full covariance method
+			constraints = [];
+			if ~isempty(obj.chance_constraints_control) && ~isempty(obj.sdpvars.v)
+				for i = 1:length(obj.chance_constraints_control)
+					cc = obj.chance_constraints_control{i};
+					if ~isfield(cc, 'type') || ~isfield(cc, 'p')
+						continue;
+					end
+					
+					% Determine which nodes to apply constraint to
+					if isfield(cc, 'nodes') && ~isempty(cc.nodes)
+						nodes = cc.nodes;
+					else
+						nodes = 1:obj.N; % Apply to all control time steps if not specified
+					end
+									
+					if isempty(obj.Y_ref)
+						error('FullCovarianceSteering: Y_ref must be provided for affine control chance constraints.');
+					end
+
+					switch cc.type
+						case 'affine'
+							% Affine chance constraint: P(alpha'*u <= beta) >= 1-p
+							% Using linearized formulation around reference control covariance Y_ref:
+							% z * (1/(2*sqrt(alpha'*Y_ref*alpha))) * alpha'*Y_k*alpha + alpha'*v_k 
+							%   - (beta - z*(1/2)*sqrt(alpha'*Y_ref*alpha)) <= 0
+							% This is the first-order Taylor expansion of sqrt(alpha'*Y_k*alpha) around Y_ref
+							alpha = cc.alpha(:); % ensure column vector
+							beta = cc.beta;
+							p = cc.p;
+							z = norminv(1 - p);
+							
+							for k = nodes
+								if k >= 1 && k <= obj.N
+									if size(obj.Y_ref, 3) == 1
+										Y_ref_k = obj.Y_ref;
+									else
+										Y_ref_k = obj.Y_ref(:,:,k);
+									end
+									sqrt_ref = sqrt(alpha' * Y_ref_k * alpha);
+									constraints = [constraints
+										z / (2 * sqrt_ref) * (alpha' * obj.sdpvars.Y(:,:,k) * alpha) ...
+											+ alpha' * obj.sdpvars.v(:,k) - beta + z * sqrt_ref / 2 <= 0
+									];
+								end
+							end
+							
 						case 'norm'
-							% Norm chance constraint: P(||x||_2 <= gamma) >= 1-p
+							% Norm chance constraint: P(||u||_2 <= gamma) >= 1-p
+							% Formulation: norm(v_k, 2) + q * sqrt(lambda_max(Y_k)) <= gamma
+							% where q = sqrt(chi2inv(1-p, n))
 							gamma = cc.gamma;
 							p = cc.p;
 							n = cc.n;
 							q = sqrt(chi2inv(1 - p, n));
 							
-							error('FullCovarianceSteering: Norm chance constraints are not supported for full covariance method.');
+							for k = nodes
+								if k >= 1 && k <= obj.N
+									% Conservative approximation: norm(v_k) + q * sqrt(lambda_max(Y_k)) <= gamma
+									if size(obj.Y_ref, 3) == 1
+										Y_ref_k = obj.Y_ref;
+									else
+										Y_ref_k = obj.Y_ref(:,:,k);
+									end
+									sqrt_lambda_max_ref = sqrt(lambda_max(Y_ref_k));
+									constraints = [constraints
+										norm(obj.sdpvars.v(:,k), 2) + q * sqrt_lambda_max_ref + q * lambda_max(obj.sdpvars.Y(:,:,k)) / (2 * sqrt_lambda_max_ref) - gamma <= 0
+									];
+								end
+							end
 						otherwise
-							error('FullCovarianceSteering: Unsupported chance constraint type.');
+							error('FullCovarianceSteering: Unsupported control chance constraint type.');
 					end
 				end
 			end
@@ -290,11 +408,12 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 			end
 		end
 
-		function [is_lossless, worst_loss] = check_lossless(obj, tol)
+		function [is_lossless, worst_loss] = check_lossless(obj, tol, verbose)
 			% Check losslessness of the solution for full covariance method
 			arguments
 				obj
 				tol = 1E-4
+				verbose = false
 			end
 
 			if isempty(obj.P)
@@ -319,7 +438,7 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 				end
 			end
 
-			if is_lossless
+			if is_lossless && verbose
 				fprintf('Losslessness verified within tolerance %g.\n', tol);
 			else
 				fprintf('Losslessness NOT verified. Worst relative loss: %g\n', worst_loss);

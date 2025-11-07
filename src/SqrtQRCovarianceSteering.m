@@ -6,7 +6,7 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 		init_guess_struct
 		% imposing trust region on L is not recommended, as it causes chattering
 		% near the solution and slower convergence.
-		impose_trust_region_struct = struct('S', true, 'L', false, 'mu', false, 'v', false);
+		impose_trust_region_struct = struct('S', true, 'L', true, 'mu', false, 'v', false);
 	end
 
 	properties
@@ -37,9 +37,12 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 		waypoints = {}  % cell array of waypoint structs with fields: 'node' (scalar, 1:N+1) and 'mu' (nx x 1 vector)
 		mu % state mean trajectory, set after solving
 		v  % control mean trajectory, set after solving
-		vec_Rchol_L % auxiliary variable for control cost
-		vec_Qchol_S % auxiliary variable for state cost
+		% vec_Rchol_L % auxiliary variable for control cost
+		% vec_Qchol_S % auxiliary variable for state cost
 
+		mean_trust_region_radius = 0.1;
+		impose_mean_trust_region = false;
+		mu_ref = []; % reference mean trajectory, used for mean trust region
 	end
 
 	methods
@@ -60,6 +63,9 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				options.mu_0 = []
 				options.mu_f = []
 				options.waypoints = {}
+				options.mean_trust_region_radius = 0.1;
+				options.impose_mean_trust_region = false;
+				options.mu_ref = [];
 			end
 			obj@SCPProblem();
 			obj.init_guess_struct = init_guess_struct;
@@ -76,7 +82,9 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			obj.Q = options.Q;
 			obj.R = options.R;
 			obj.objective_type = options.objective_type;
-
+			obj.mean_trust_region_radius = options.mean_trust_region_radius;
+			obj.impose_mean_trust_region = options.impose_mean_trust_region;
+			obj.mu_ref = options.mu_ref;
 			% optional chance constraints and endpoint means
 			obj.chance_constraints_state = options.chance_constraints_state;
 			obj.chance_constraints_control = options.chance_constraints_control;
@@ -98,8 +106,16 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				vars.S(:,:,k) = tril(vars.S(:,:,k));
 			end
 			vars.L = sdpvar(obj.nu, obj.nx, obj.N);
-			vars.mu = sdpvar(obj.nx, obj.N+1);
-			vars.v = sdpvar(obj.nu, obj.N);
+			
+			% Mean variables (only if needed for chance constraints, boundary conditions, or waypoints)
+			if ~isempty(obj.chance_constraints_state) || ~isempty(obj.chance_constraints_control) ...
+					|| ~isempty(obj.mu_0) || ~isempty(obj.mu_f) || ~isempty(obj.waypoints)
+				vars.mu = sdpvar(obj.nx, obj.N+1);
+				vars.v = sdpvar(obj.nu, obj.N);
+			else
+				vars.mu = [];
+				vars.v = [];
+			end
 		end
 
 		function J0 = objective(obj, vars)
@@ -129,15 +145,21 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 						% J0 = J0 + trace(norm(M, 'fro')^2);
 					end
 
-					% Add mean state and control cost
-					for k = 1:obj.N
-						J0 = J0 + vars.mu(:,k)' * obj.Q * vars.mu(:,k) + vars.v(:,k)' * obj.R * vars.v(:,k);
+					% Add mean state and control cost (if mean variables are defined)
+					if isfield(vars, 'mu') && isfield(vars, 'v') && ~isempty(vars.mu) && ~isempty(vars.v)
+						for k = 1:obj.N
+							J0 = J0 + vars.mu(:,k)' * obj.Q * vars.mu(:,k) + vars.v(:,k)' * obj.R * vars.v(:,k);
+						end
 					end
 				case 'DV99'
 					% Add control cost only
 					q = sqrt(chi2inv(0.99, obj.nu));
 					for k = 1:obj.N
-						J0 = J0 + norm(vars.v(:,k)) + q * norm(vars.L(:,:,k), 2);
+						if isfield(vars, 'v') && ~isempty(vars.v)
+							J0 = J0 + norm(vars.v(:,k)) + q * norm(vars.L(:,:,k), 2);
+						else
+							J0 = J0 + q * norm(vars.L(:,:,k), 2);
+						end
 					end
 				otherwise
 					error('Unknown objective type');
@@ -149,31 +171,37 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				[vars.S(:,:,1) == chol(obj.P_0, 'lower')]:'Initial Covariance'
 			];
 
-			% initial mean if provided, otherwise zero
-			if ~isempty(obj.mu_0)
-				constraints = [constraints; [vars.mu(:,1) == obj.mu_0]:'Initial Mean'];
-			end
-			for k = 1:obj.N
-				A_k = obj.A_sys(:,:,k);
-				B_k = obj.B_sys(:,:,k);
-				constraints = [constraints; [vars.mu(:,k+1) == A_k * vars.mu(:,k) + B_k * vars.v(:,k)]:'Mean Dynamics'];
-			end
-			% enforce terminal mean if provided in mu_f
-			if ~isempty(obj.mu_f)
-				constraints = [constraints; [vars.mu(:,obj.N+1) == obj.mu_f]:'Terminal Mean'];
-			end
-			
-			% enforce waypoint mean constraints (intermediate nodes)
-			% NaN values in wp.mu indicate unconstrained components
-			if ~isempty(obj.waypoints)
-				for i = 1:length(obj.waypoints)
-					wp = obj.waypoints{i};
-					if isfield(wp, 'node') && isfield(wp, 'mu') && wp.node >= 1 && wp.node <= obj.N+1
-						mu_wp = wp.mu(:);
-						% Find non-NaN components to constrain
-						idx_constrained = ~isnan(mu_wp);
-						if any(idx_constrained)
-							constraints = [constraints; [vars.mu(idx_constrained, wp.node) == mu_wp(idx_constrained)]:sprintf('Waypoint Mean (node %d)', wp.node)];
+			% Mean dynamics constraints (only if mean variables are defined)
+			if isfield(vars, 'mu') && isfield(vars, 'v') && ~isempty(vars.mu) && ~isempty(vars.v)
+				% initial mean if provided, otherwise zero
+				if ~isempty(obj.mu_0)
+					constraints = [constraints; [vars.mu(:,1) == obj.mu_0]:'Initial Mean'];
+				end
+				
+				% Mean dynamics: mu_{k+1} = A_k * mu_k + B_k * v_k
+				for k = 1:obj.N
+					A_k = obj.A_sys(:,:,k);
+					B_k = obj.B_sys(:,:,k);
+					constraints = [constraints; [vars.mu(:,k+1) == A_k * vars.mu(:,k) + B_k * vars.v(:,k)]:'Mean Dynamics'];
+				end
+				
+				% enforce terminal mean if provided in mu_f
+				if ~isempty(obj.mu_f)
+					constraints = [constraints; [vars.mu(:,obj.N+1) == obj.mu_f]:'Terminal Mean'];
+				end
+				
+				% enforce waypoint mean constraints (intermediate nodes)
+				% NaN values in wp.mu indicate unconstrained components
+				if ~isempty(obj.waypoints)
+					for i = 1:length(obj.waypoints)
+						wp = obj.waypoints{i};
+						if isfield(wp, 'node') && isfield(wp, 'mu') && wp.node >= 1 && wp.node <= obj.N+1
+							mu_wp = wp.mu(:);
+							% Find non-NaN components to constrain
+							idx_constrained = ~isnan(mu_wp);
+							if any(idx_constrained)
+								constraints = [constraints; [vars.mu(idx_constrained, wp.node) == mu_wp(idx_constrained)]:sprintf('Waypoint Mean (node %d)', wp.node)];
+							end
 						end
 					end
 				end
@@ -219,6 +247,10 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 					
 					if strcmp(cc.type, 'affine')
 						% Affine chance constraint: P(alpha'*x <= beta) >= 1-p
+						% Note: affine chance constraints require mean variables
+						if ~isfield(vars, 'mu') || isempty(vars.mu)
+							error('State affine chance constraints require mean variables. Provide mu_0, mu_f, waypoints, or ensure mean variables are defined.');
+						end
 						alpha = cc.alpha(:); % ensure column vector
 						beta = cc.beta;
 						p = cc.p;
@@ -226,8 +258,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 						
 						for k = nodes
 							if k >= 1 && k <= obj.N+1
-								mu_k = vars.mu(:,k);
-								S_k = vars.S(:,:,k);
 								constraints = [constraints;
 									alpha' * vars.mu(:,k) + z * norm(alpha' * vars.S(:,:,k)) - beta <= 0
 								];
@@ -235,6 +265,10 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 						end
 					elseif strcmp(cc.type, 'norm')
 						% Norm chance constraint: P(||x||_2 <= gamma) >= 1-p
+						% Note: norm chance constraints require mean variables
+						if ~isfield(vars, 'mu') || isempty(vars.mu)
+							error('State norm chance constraints require mean variables. Provide mu_0, mu_f, waypoints, or ensure mean variables are defined.');
+						end
 						gamma = cc.gamma;
 						p = cc.p;
 						n = cc.n;
@@ -270,6 +304,10 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 					
 					if strcmp(cc.type, 'affine')
 						% Affine chance constraint: P(alpha'*u <= beta) >= 1-p
+						% Note: affine chance constraints require mean variables
+						if ~isfield(vars, 'v') || isempty(vars.v)
+							error('Control affine chance constraints require mean variables. Provide mu_0, mu_f, waypoints, or ensure mean variables are defined.');
+						end
 						alpha = cc.alpha(:); % ensure column vector
 						beta = cc.beta;
 						p = cc.p;
@@ -286,11 +324,15 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 						end
 					elseif strcmp(cc.type, 'norm')
 						% Norm chance constraint: P(||u||_2 <= gamma) >= 1-p
+						% Note: norm chance constraints require mean variables
+						if ~isfield(vars, 'v') || isempty(vars.v)
+							error('Control norm chance constraints require mean variables. Provide mu_0, mu_f, waypoints, or ensure mean variables are defined.');
+						end
 						gamma = cc.gamma;
 						p = cc.p;
 						n = cc.n;
 						chi2q = chi2inv(1 - p, n);
-						q = sqrt(max(chi2q, 0));
+						q = sqrt(chi2q);
 						
 						for k = nodes
 							if k >= 1 && k <= obj.N
@@ -303,6 +345,13 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 						end
 					end
 				end
+
+			end
+
+			if obj.impose_mean_trust_region
+				constraints = [constraints;
+					norm(vec(vars.mu - obj.mu_ref), inf) <= obj.mean_trust_region_radius
+				];
 			end
 		end
 
@@ -387,8 +436,17 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				obj.P_u(:,:,k) = L_k * L_k';
 				obj.K(:,:,k) = L_k / S_k;
 			end
-			obj.mu = value(obj.sol.mu);
-			obj.v = value(obj.sol.v);
+			% Mean variables (only if they were defined)
+			if isfield(obj.sol, 'mu') && ~isempty(obj.sol.mu)
+				obj.mu = value(obj.sol.mu);
+			else
+				obj.mu = zeros(obj.nx, obj.N+1);
+			end
+			if isfield(obj.sol, 'v') && ~isempty(obj.sol.v)
+				obj.v = value(obj.sol.v);
+			else
+				obj.v = zeros(obj.nu, obj.N);
+			end
 		end
 
 		function [dR, Qx, Rx] = d_QR(obj, X, dX, Qx, Rx, Rx_inv)
