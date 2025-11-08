@@ -99,26 +99,19 @@ classdef CovarianceSteeringBase < handle
 			obj.waypoints = options.waypoints;
 		end
 
-		function diagnostic = solve(obj, options)
+		function diagnostic = solve(obj, sdp_settings)
 			% Solve the SDP using YALMIP
 			% This method calls the abstract methods implemented by derived classes
 			arguments
 				obj
-				options.verbose = 0
-				options.solver = 'mosek'
-				options.savesolveroutput = true
+				sdp_settings = sdpsettings();
 			end
-			
 			% Call abstract methods implemented by derived classes
 			obj.set_sdpvars();
 			obj.set_objective();
 			obj.set_constraints();
 
-			settings = sdpsettings();
-			settings.verbose = options.verbose;
-			settings.solver = options.solver;
-			settings.savesolveroutput = options.savesolveroutput;
-
+			settings = sdpsettings(sdp_settings);
 			diagnostic = optimize(obj.sdpvars.constraints, obj.sdpvars.J, settings);
 
 			switch diagnostic.problem
