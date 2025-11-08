@@ -94,8 +94,12 @@ R = 1 * eye(nu);   % Control cost
 %% Solve with FullCovarianceSteering
 disp('=== Solving CWH Problem with FullCovarianceSteering ===');
 
-% Reference covariance for linearization of chance constraints
+% Reference covariance for linearization of objective and chance constraints
 % P_ref = 1.5 * eye(nx) * max([sigma_r0_km^2, sigma_v0_kms^2]);
+Y_ref = 1E-6 * eye(nu);
+
+% Optionally try scaling the covariance dynamics.
+d = 1;
 
 prob_fc = FullCovarianceSteering(...
     A=A_sys, B=B_sys, G=G_sys, ...
@@ -104,11 +108,35 @@ prob_fc = FullCovarianceSteering(...
     N=N, ...
     objective_type='DV99',...
     chance_constraints_control=control_chance_constraint, ...
-    Y_ref=2E-6 * eye(nu), ...
+    Y_ref=Y_ref, ...
+    covariance_scaling = d, ...
     mu_0=mu_0, mu_f=mu_f);
 
 tic
-diagnostic_fc = prob_fc.solve('verbose', 1, 'solver', 'mosek');
+
+sdp_settings = sdpsettings('verbose', 2, 'solver', 'mosek', 'savesolveroutput',1, 'savesolverinput', 1);
+
+% dump MOSEK data as a text file 
+sdp_settings.mosektaskfile = 'data/mosek_dump.ptf';
+
+
+sdp_settings.mosek.MSK_IPAR_LOG_INTPNT = 10;
+
+% See link for tips on debugging numerical issues: https://docs.mosek.com/11.0/toolbox/debugging-numerical.html
+
+% 1. MOSEK automatically chooses whether to solve the primal or dual.
+% Manually set this by choosing 'MSK_SOLVE_PRIMAL' or 'MSK_SOLVE_DUAL'
+% sdp_settings.mosek.MSK_IPAR_INTPNT_SOLVE_FORM = 'MSK_SOLVE_DUAL';
+
+% 2. MOSEK automatically chooses whether to presolve the problem. 
+% Manually set this by choosing 'MSK_PRESOLVE_MODE_ON' or 'MSK_PRESOLVE_MODE_OFF'
+% sdp_settings.mosek.MSK_IPAR_PRESOLVE_USE = 'MSK_PRESOLVE_MODE_ON';
+
+% 3. MOSEK by default uses the maximum number of available threads
+% Manually set the number of threads.
+% sdp_settings.mosek.MSK_IPAR_NUM_THREADS = 1;
+
+diagnostic_fc = prob_fc.solve(sdp_settings);
 time_fc = toc;
 
 if diagnostic_fc.problem == 0
@@ -116,6 +144,7 @@ if diagnostic_fc.problem == 0
     fprintf('  Objective value: %.6f\n', prob_fc.optimal_objective);
 elseif diagnostic_fc.problem == 4
     fprintf('FullCovarianceSteering experienced numerical issues\n')
+    fprintf('  MOSEK error message: %s\n', diagnostic_fc.solveroutput.res.rcodestr)
     fprintf('  Objective value: %.6f\n', prob_fc.optimal_objective);
     prob_fc.check_lossless();
 else
@@ -128,8 +157,10 @@ end
 disp('=== Solving CWH Problem with SqrtQRCovarianceSteering ===');
 
 % Initial guess - Linear interpolation between initial and final states
+S0 = chol(P0, 'lower');
+S_f = chol(P_f, 'lower');
 init_guess = struct();
-init_guess.S = interpolate_lower_triangular(chol(P0, 'lower'), chol(P_f, 'lower'), N+1, 'log-cholesky');
+init_guess.S = interpolate_lower_triangular(S0, S_f, N+1, 'log-cholesky');
 init_guess.L = NaN(nu, nx, N);
 init_guess.mu = linspace_vec(mu_0, mu_f, N+1);
 init_guess.v = zeros(nu, N);
@@ -171,7 +202,7 @@ end
 % figure
 % plot_traj_with_cov_ellipses(init_guess.mu, init_guess.S, init_guess=true);
 
-%%
+
 prob_qr = SqrtQRCovarianceSteering(init_guess, ...
     N=N, ...
     A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
@@ -181,7 +212,7 @@ prob_qr = SqrtQRCovarianceSteering(init_guess, ...
     mu_0=mu_0, mu_f=mu_f);
 
 % prob_qr.trust_region_scaling.S = 1;
-prob_qr.trust_region_scaling.L = 1E-1;
+% prob_qr.trust_region_scaling.L = 1E-1;
 
 scp_params = SCPParams();
 scp_params.tol_opt = 1E-5;
@@ -217,11 +248,11 @@ end
 
 %% Plot Results
 % Define flags for which solutions to plot
-use_fc = exist('prob_fc', 'var') && ~isempty(prob_fc) && (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) && prob_fc.check_lossless();
+use_fc = exist('prob_fc', 'var') && ~isempty(prob_fc) && (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4);
 use_qr = exist('prob_qr', 'var') && flag_solved_qr && ~isempty(prob_qr);
 
 if use_fc || use_qr
-    
+
     figure
     hold on
     
@@ -261,12 +292,11 @@ if use_fc || use_qr
     
     xlabel('$x$ (km)', 'Interpreter', 'latex')
     ylabel('$y$ (km)', 'Interpreter', 'latex')
-    title('CWH Relative Motion: XY Plane')
     legend('Location', 'best', 'NumColumns', 2)
     grid on
     axis equal
     
-    % exportgraphics(gcf, 'figures/example_cwh_xy.png')
+    exportgraphics(gcf, 'figures/example_cwh_trajectory.png')
     
     %% Plot Control History
     figure
@@ -341,9 +371,10 @@ if use_fc || use_qr
     end
     xlabel('Time (s)', 'Interpreter', 'latex')
     ylabel('$\|u\|_2$ (m/s)', 'Interpreter', 'latex')
-    title('Control Magnitude')
     legend('Location', 'best')
     grid on
+
+    exportgraphics(gcf, 'figures/example_cwh_control_history.png')
     
 end
 
