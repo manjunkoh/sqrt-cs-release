@@ -69,6 +69,9 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 					% where q = sqrt(chi2inv(0.99, nu))
 					% Since sqrt(lambda_max(Y_k)) is not convex, we linearize around Y_ref
 					% Similar to norm control chance constraints
+
+					% add a small quadratic term to the objective to ensure losslessness
+					epsilon_lossless = 1E-3;
 					if isempty(obj.Y_ref)
 						error('FullCovarianceSteering: Y_ref must be provided for DV99 objective.');
 					end
@@ -81,18 +84,21 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 					obj.sdpvars.J = 0;
 					
 					for k = 1:obj.N
+						obj.sdpvars.J = obj.sdpvars.J + epsilon_lossless * trace(obj.sdpvars.Y(:,:,k)) / obj.covariance_scaling;
+
 						% Get reference for linearization
 						if size(obj.Y_ref, 3) == 1
 							Y_ref_k = obj.Y_ref;
 						else
 							Y_ref_k = obj.Y_ref(:,:,k);
 						end
+						Y_ref_k = Y_ref_k * obj.covariance_scaling;
 						sqrt_lambda_max_ref = sqrt(lambda_max(Y_ref_k));
 						
 						% Linearized objective: norm(v_k) + q * [sqrt_lambda_max_ref + lambda_max(Y_k) / (2 * sqrt_lambda_max_ref)]
 						obj.sdpvars.J = obj.sdpvars.J + norm(obj.sdpvars.v(:,k), 2) ...
-							+ q * sqrt_lambda_max_ref ...
-							+ q * lambda_max(obj.sdpvars.Y(:,:,k)) / (2 * sqrt_lambda_max_ref);
+							+ sqrt(obj.covariance_scaling) * q * sqrt_lambda_max_ref ...
+							+ sqrt(obj.covariance_scaling) * q * lambda_max(obj.sdpvars.Y(:,:,k)) / (2 * sqrt_lambda_max_ref);
 					end
 					
 				otherwise
@@ -384,12 +390,12 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 			K = zeros(nu, nx, N);
 			
 			% Store state and control covariances
-			obj.P = value(obj.sdpvars.P);
-			obj.P_u = value(obj.sdpvars.Y);
+			obj.P = value(obj.sdpvars.P) / obj.covariance_scaling;
+			obj.P_u = value(obj.sdpvars.Y) / obj.covariance_scaling;
 			
 			for k = 1:N
 				P_k = obj.P(:,:,k);
-				U_k = value(obj.sdpvars.U(:,:,k));
+				U_k = value(obj.sdpvars.U(:,:,k)) / obj.covariance_scaling;
 				K(:,:,k) = U_k / P_k; % Feedback gain
 			end
 			obj.K = K;
