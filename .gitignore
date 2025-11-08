@@ -2,3 +2,4 @@
 /data/
 /dev/
 .DS_Store
+venv/
