@@ -1,10 +1,10 @@
-\documentclass[10pt]{article}
-\usepackage{amsmath, amssymb, amsfonts}
+\documentclass{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
 \usepackage{amsthm}
 \usepackage{graphicx}
+\usepackage{textcomp}
 \usepackage{hyperref}
-\usepackage{geometry}
-\geometry{margin=1in}
 \usepackage{enumitem}
 \usepackage{physics}
 \usepackage{bm}
@@ -13,6 +13,8 @@
 \usepackage{siunitx}
 \usepackage{caption}
 \usepackage{subcaption}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
 %  define custom commands
 \input{commands.tex}
@@ -21,7 +23,8 @@
 \graphicspath{{../figures/}}
 
 \title{Square Root QR Covariance Steering}
-\author{Naoya Kumagai}
+\author{Naoya Kumagai
+\thanks{N. Kumagai is with the School of Aeronautics and Astronautics, Purdue University, IN47907 (e-mail: nkumagai@purdue.edu).}}
 
 \begin{document}
 
@@ -31,11 +34,15 @@
 
 \end{abstract}
 
+\begin{IEEEkeywords}
+Covariance steering, square root methods, QR decomposition, chance constraints, sequential convex programming
+\end{IEEEkeywords}
+
 \section{Introduction}
 
 \subsection{Notation}
 $\mathbb{L}^n$ denotes the space of $n \times n$ lower triangular matrices.
-$\mathbb{L}_+^n$ denotes the space of $n \times n$ lower triangular matrices with positive diagonal entries. $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric positive definite matrices. The Cholesky factor of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). The linear matrix inequality $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. 
+$\mathbb{L}_+^n$ denotes the space of $n \times n$ lower triangular matrices with positive diagonal entries. $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric positive definite matrices. The Cholesky factor of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). The linear matrix inequality $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \(\N_{a}^{b}\) denotes the set of integers from \( a \) to \( b \).
 
 
 \subsection{Problem Formulation}
@@ -43,29 +50,30 @@ We address the finite-horizon discrete-time covariance steering problem for a li
 \begin{subequations}
 \label{eq:problem_statement}
 \begin{align}
-	\minimize_{\{v_k, K_k\}_{k=0}^{N-1}} \quad & J = \sum_{k=0}^{N-1} J_k (x_k, u_k) \\
-	\text{subject to} \quad & x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad k=0,\cdots, N{-}1 \\
-	& u_k = v_k + K_k (x_k - \E{x_k}), \quad k=0,\cdots, N{-}1 \label{eq:feedback_control_law}\\
+	\min_{\{v_k, K_k\}_{k=0}^{N-1}} \quad & J = \sum_{k=0}^{N-1} J_k (x_k, u_k) \\
+	\text{s.t.} \quad & x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad k \in \N_{0}^{N-1} \\
+	& u_k = v_k + K_k (x_k - \E{x_k}), \quad k \in \N_{0}^{N-1} \label{eq:feedback_control_law}\\
 	& x_0 \sim \mathcal{N}(\mu_{\mathrm{init}}, P_{\mathrm{init}}) \\
-	& x_N \sim \mathcal{N}(\mu_{\mathrm{fin}}, P_{\mathrm{fin}}), \quad P_{\mathrm{fin}} \succeq \E{(x_N - \E{x_N})(x_N - \E{x_N})^\top} \\
-	& \mathbb{P}(x_k \in \mathcal{X}_k) \geq 1 - \epsilon_k, \quad k=0,\cdots, N \label{eq:state_chance_constraint}\\ 
-	& \mathbb{P}(u_k \in \mathcal{U}_k) \geq 1 - \delta_k, \quad k=0,\cdots, N{-}1 \label{eq:control_chance_constraint}
+	& x_N \sim \mathcal{N}(\mu_{\mathrm{fin}}, P_{\mathrm{fin}}) \\
+	& P_{\mathrm{fin}} \succeq \E{(x_N - \E{x_N})(x_N - \E{x_N})^\top} \\
+	& \mathbb{P}(x_k \in \mathcal{X}_k) \geq 1 - \epsilon_k, \quad k \in \N_{0}^{N} \label{eq:state_chance_constraint}\\ 
+	& \mathbb{P}(u_k \in \mathcal{U}_k) \geq 1 - \delta_k, \quad k \in \N_{0}^{N-1} \label{eq:control_chance_constraint}
 \end{align}
 \end{subequations}
 where \( x_k \in \mathbb{R}^n \) is the state vector, \( u_k \in \mathbb{R}^m \) is the control input, \( w_k \in \mathbb{R}^n \) is standard Gaussian process noise. \( v_k \in \mathbb{R}^m \) and \( K_k \in \mathbb{R}^{m \times n} \) are respectively the nominal control input and the state feedback gain to be designed. We restrict the form of feedback control to \cref{eq:feedback_control_law} since it is shown to be optimal for the covariance steering problem without chance constraints \cite{liuOptimalCovarianceSteering2025} (i.e. \cref{eq:problem_statement} without \cref{eq:state_chance_constraint} and \cref{eq:control_chance_constraint}). The matrices \( A_k \), \( B_k \), and \( G_k \) are of appropriate dimensions, with the following assumption on \(G_k\):
 \begin{assumption} \label{assump:full_rank_G}
-	\( \mathrm{rank}(G_k) = n \) for all \( k=0,\cdots, N{-}1 \).
+	\( \mathrm{rank}(G_k) = n \) for all \( k \in \N_{0}^{N-1} \).
 \end{assumption}
 This assumption is reasonable as the process noise is usually discretized from a continuous-time process. 
 
 We consider two types of cost functions:
 \begin{equation}
 	J_k (x_k, u_k) = \begin{cases}
-	\E{x_k^\top Q_k x_k + u_k^\top R_k u_k}, \quad Q_k \succeq 0, R_k \succ 0 & \text{(quadratic cost)} \\
-	\mathcal{Q}_{\norm{u_k}_2}(p_J) & \text{(quantile 2-norm cost)}
+	\E{x_k^\top Q_k x_k + u_k^\top R_k u_k} & \text{(quadratic)} \\
+	\mathcal{Q}_{\norm{u_k}_2}(p_J) & \text{(quantile 2-norm)}
 	\end{cases}
 \end{equation}
-where \( \mathcal{Q}_{\norm{u_k}_2}(p_J) \) is $p_J$-quantile of the 2-norm of the control input $u_k$.
+with \( Q_k \succeq 0 \) and \( R_k \succ 0 \), and \( \mathcal{Q}_{\norm{u_k}_2}(p_J) \) is $p_J$-quantile of the 2-norm of the control input $u_k$.
 
 The sets \( \mathcal{X}_k \) and \( \mathcal{U}_k \) represent state and control constraints, respectively, with associated violation probabilities \( \epsilon_k \) and \( \delta_k \). We assume that the feasible region defined by the chance constraints is given in one of two forms: a linear constraint or a norm constraint. For the linear constraint form, the chance constraint can be expressed as:
 \begin{equation} \label{eq:linear_chance_constraint}
@@ -129,7 +137,7 @@ Let the system dynamics be given by:
 with state \( x_k \in \mathbb{R}^n \), where \( w_k \in \mathbb{R}^m \) is standard Gaussian noise.
 By defining $P_k := \E{(x_k - \E{x_k})(x_k - \E{x_k})^\top}$, the covariance propagation equation is given by:
 \begin{equation}
-	P_{k+1} = \Phi_k P_k \Phi_k^T + G_k G_k^\top
+	P_{k+1} = \Phi_k P_k \Phi_k^T + G_k G_k^\top.
 \end{equation}
 If we define \( S_k \in \mathbb{L}_+^n \) as \( S_k = P_k^{1/2} \), the covariance propagation can be expressed as:
 \begin{equation}
@@ -137,7 +145,7 @@ If we define \( S_k \in \mathbb{L}_+^n \) as \( S_k = P_k^{1/2} \), the covarian
 \end{equation}
 where $S_{k+1} \in \mathbb{L}_+^n$ is the next step square root covariance, and we define
 \begin{equation}
-	X_{k+1} := \begin{bmatrix} \Phi_k S_k & G_k \end{bmatrix} \in \mathbb{R}^{n \times (n+m)}
+	X_{k+1} := \begin{bmatrix} \Phi_k S_k & G_k \end{bmatrix}.
 \end{equation}
 Note that we want $S_{k+1} \in \mathbb{L}_+^n$, while $X_{k+1} \in \mathbb{R}^{n \times (n+m)}$.
 For a matrix $Q_{k} \in \R^{(n+m) \times n}$ such that $Q_{k} Q_{k}^\top = I$, (\textcolor{red}{is this iff?})
@@ -178,36 +186,36 @@ The application to covariance steering is straightforward and allows us to formu
 \subsection{Square Root Covariance Propagation with feedback control}
 Since the state is controlled by a the affine feedback control law, the closed-loop dynamics are given by:
 \begin{equation}
-	x_{k+1} = A_k x_k + B_k (v_k + K_k (x_k - \E{x_k})) + G_k w_k \quad k=0,\cdots, N{-}1.
+	x_{k+1} = A_k x_k + B_k (v_k + K_k (x_k - \E{x_k})) + G_k w_k \quad k \in \N_{0}^{N-1}.
 \end{equation}
 Taking the expectation, the mean dynamics are given by
 \begin{equation} \label{eq:mean_dynamics}
-	\mu_{k+1} = A_k \mu_k + B_k v_k, \quad k=0,\cdots, N{-}1.
+	\mu_{k+1} = A_k \mu_k + B_k v_k
 \end{equation}
 where $\mu_k := \E{x_k}$.
 Then, the square root covariance dynamics are given by \cref{eq:square_root_covariance_propagation_nonlinear}:
 \begin{equation} \label{eq:square_root_covariance_propagation_nonlinear_feedback_control}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix} \quad k=0,\cdots, N{-}1.
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix}
 \end{equation}
 Note that due to the affine feedback control law, the Gaussianity of the state distribution is preserved, and the control input is also Gaussian.
 Since both $P_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \) in \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control}.
 For the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is positive definite by \cref{assump:positive_definite_state}.
 So we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix} \quad k=0,\cdots, N{-}1.
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix},
 \end{equation}
 with its first-order approximation given by:
 \begin{equation} \label{eq:square_root_covariance_propagation_linearized}
-	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \quad k=0,\cdots, N{-}1.
+	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \quad.
 \end{equation}
-where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference values, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\). Since the column space of \(X_{k+1}\) includes the column space of \(G_k\), and by \cref{assump:full_rank_G}, \(G_k\) is full rank, it follows that \(X_{k+1}\) is full rank. Then, it follows that this QR decomposition is unique.
+, where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference values, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\). Since the column space of \(X_{k+1}\) includes the column space of \(G_k\), and by \cref{assump:full_rank_G}, \(G_k\) is full rank, it follows that \(X_{k+1}\) is full rank. Then, it follows that this QR decomposition is unique.
 
 \subsection{Objective function}
 After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and performing some standard manipulations, the objective function can be expressed as deterministic convex functions of \( L_k \) and \( S_k \):
 \begin{equation} \label{eq:objective_deterministic}
 	J = \begin{cases}
-	\sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k + \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(quadratic cost)} \\
-	\sum_{k=0}^{N-1} \norm{v_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_m}(p_J)} \ \norm{L_k}_2 & \text{(quantile 2-norm cost)}.
+	\sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k + \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(quadratic)} \\
+	\sum_{k=0}^{N-1} \norm{v_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_m}(p_J)} \ \norm{L_k}_2 & \text{(quantile 2-norm)}.
 	\end{cases}
 \end{equation}
 The 2-norm cost is a conservative approximation \cite{oguriChanceConstrainedControlSafe2024a}; \( \mathcal{Q}_{\chi^2_m}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( m \) degrees of freedom.
@@ -215,7 +223,7 @@ The 2-norm cost is a conservative approximation \cite{oguriChanceConstrainedCont
 
 The structure of \(S_k\) is imposed by
 \begin{equation} \label{eq:S_structure_constraint}
-	S_k \in \mathbb{L}^n, \quad \mathrm{diag}(S_k) \geq 0, \quad k=0,\cdots, N.
+	S_k \in \mathbb{L}^n, \quad \mathrm{diag}(S_k) \geq 0, \quad k \in \N_{0}^{N}.
 \end{equation}
 The initial distributional constraint is imposed by
 \begin{equation} \label{eq:initial_distributional_constraint}
@@ -230,18 +238,18 @@ where \( \norm{\cdot}_2 \) denotes the spectral norm.
 Since we are working with the square root form, chance constraints can be imposed exactly in a convex manner, which presents a notable advantage over the full covariance approaches, e.g. \cite{liuOptimalCovarianceSteering2025}.
 For the linear constraint form \eqref{eq:linear_chance_constraint}, the chance constraint can be exactly expressed as \cite{okamotoOptimalCovarianceControl2018}:
 \begin{equation} \label{eq:linear_chance_constraint_deterministic}
-	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0 \quad k=0,\cdots, N
+	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0, \quad k \in \N_{0}^{N}
 \end{equation}
 where \( \mathcal{Q}_{\mathcal{N}}(p_j) \) is the inverse of the standard normal cumulative distribution function.
 For the norm constraint form \eqref{eq:norm_chance_constraint}, similar to the quantile 2-norm cost, the chance constraint can be conservatively imposed as \cite{oguriChanceConstrainedControlSafe2024a}:
 \begin{equation} \label{eq:norm_chance_constraint_deterministic}
-	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0 \quad k=0,\cdots, N
+	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0, \quad k \in \N_{0}^{N}
 \end{equation}
 The control chance constraints can be imposed by replacing \( \mu_k \) with \( v_k \) and \( S_k \) with \( L_k \).
 
 To summarize, \eqref{eq:problem_statement} is converted into a nonconvex optimization problem as follows:
 \begin{equation} \label{eq:nonconvex_problem_statement}
-	\minimize_{\bm{v}, \bm{L}, \bm{\mu}, \bm{S}} \eqref{eq:objective_deterministic} \quad \text{subject to} 
+	\min_{\bm{v}, \bm{L}, \bm{\mu}, \bm{S}} \eqref{eq:objective_deterministic} \quad \text{s.t.} 
 	\quad 
 	\eqref{eq:S_structure_constraint}, 
 	\eqref{eq:mean_dynamics},
@@ -263,8 +271,8 @@ where $\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix
 
 To ensure that the linearization process does not cause artificial infeasibility/unboundedness \cite{maoSuccessiveConvexificationNonconvex2016}, we impose a trust region constraint. 
 \begin{align} \label{eq:trust_region_constraint}
-	\norm{\mathrm{vectril}(D_S(S_k - \bar{S}_k))}_\infty &\leq r \quad k=0,\cdots, N, \\
-	\norm{\mathrm{vec}(D_L(L_k - \bar{L}_k))}_\infty &\leq r, \quad k=0,\cdots, N-1
+	\norm{\mathrm{vectril}(D_S(S_k - \bar{S}_k))}_\infty &\leq r, \quad k \in \N_{0}^{N}, \\
+	\norm{\mathrm{vec}(D_L(L_k - \bar{L}_k))}_\infty &\leq r, \quad k \in \N_{0}^{N-1}
 \end{align}
 where \( r > 0 \) is the trust region radius, and \( D_S \) and \( D_L \) are diagonal matrices for scaling.
 % A notable difference from typical trust region constraints is that the variable \( S_k \) is defined on a manifold. As described in \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the Riemannian metric is used to define the trust region constraint. 
@@ -301,7 +309,7 @@ where \( \lambda_k \) are Lagrange multipliers, \( w > 0\) is the penalty weight
 
 The subproblem is then given by:
 \begin{equation} \label{eq:subproblem}
-	\minimize_{\bm{v}, \bm{L}, \bm{\mu}, \bm{S}, \bm{\xi}} \eqref{eq:objective_augmented} \quad \text{subject to} \quad 
+	\min_{\bm{v}, \bm{L}, \bm{\mu}, \bm{S}, \bm{\xi}} \eqref{eq:objective_augmented} \quad \text{s.t.} \quad 
 	\eqref{eq:S_structure_constraint}, 
 	\eqref{eq:mean_dynamics},
 	\eqref{eq:linearized_dynamics}, 
@@ -343,7 +351,7 @@ The algorithm terminates when \(\Delta J\) and \(\chi\) are below their respecti
 	\EndIf
 	\State Update trust region radius \(r\) and penalty weight \(w\)
 \EndWhile
-\State Recover feedback gains: $K_k^* \gets L_k^* (S_k^*)^{-1}$ for $k=0,{\cdots}, N{-}1$
+\State Recover feedback gains: $K_k^* \gets L_k^* (S_k^*)^{-1}$ for $k \in \N_{0}^{N-1}$
 \State \Return $\bm{v}^*, \bm{\mu}^*, \bm{S}^*, \bm{K}^* := (K_k^*)_{k=0}^{N-1}$
 \end{algorithmic}
 \end{algorithm}
@@ -513,7 +521,7 @@ The concept of using the QR decomposition and its derivative can be used in othe
 % Acknowledge AI use
 % This material is based upon work supported by the Air Force Office of Scientific Research under award number FA9550-23-10512. N. Kumagai acknowledges support for his graduate studies from the Shigeta Education Fund.
 
-\bibliographystyle{plain}
+\bibliographystyle{IEEEtran}
 \bibliography{references}
 
 
