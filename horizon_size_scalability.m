@@ -11,7 +11,7 @@ figure_settings
 % Fixed total time and horizon sizes to test
 T_total = 3.0;                  % total time [s]
 N_list = [10, 20, 40, 80];      % different horizon lengths to test
-num_trials = 1;                % trials per N for averaging
+num_trials = 5;                % trials per N for averaging
 
 % Problem dimensions for 3D double integrator
 nx = 6; % [px, py, pz, vx, vy, vz]
@@ -237,16 +237,60 @@ for iN = 1:length(N_list)
     end
 end
 
-figure();
+% Compute average objective values
+avg_full_opt = zeros(length(N_list), 1);
+avg_block_opt = zeros(length(N_list), 1);
+avg_qr_opt = zeros(length(N_list), 1);
+for iN = 1:length(N_list)
+    % Full covariance: average over non-NaN values
+    valid_full = results.fullcov_opt(iN, ~isnan(results.fullcov_opt(iN, :)));
+    if ~isempty(valid_full)
+        avg_full_opt(iN) = mean(valid_full);
+    else
+        avg_full_opt(iN) = NaN;
+    end
+    
+    % Block Cholesky: average over non-NaN values
+    valid_block = results.blockcholesky_opt(iN, ~isnan(results.blockcholesky_opt(iN, :)));
+    if ~isempty(valid_block)
+        avg_block_opt(iN) = mean(valid_block);
+    else
+        avg_block_opt(iN) = NaN;
+    end
+    
+    % SqrtQR: average over non-NaN values
+    valid_qr = results.sqrtqr_opt(iN, ~isnan(results.sqrtqr_opt(iN, :)));
+    if ~isempty(valid_qr)
+        avg_qr_opt(iN) = mean(valid_qr);
+    else
+        avg_qr_opt(iN) = NaN;
+    end
+end
+
+%% Plot runtime
+figure(Position=[0, 0, 20, 12]);
 loglog(N_list, avg_full, 'o-b', 'LineWidth', 2, 'MarkerSize', 8); hold on;
 loglog(N_list, avg_block, '^-g', 'LineWidth', 2, 'MarkerSize', 8); hold on;
 loglog(N_list, avg_qr, 's-r', 'LineWidth', 2, 'MarkerSize', 8);
 grid on;
 xlabel('Horizon length N');
 ylabel('Average runtime (s)');
-title(sprintf('Scalability vs N (T=%.2fs, 3D double integrator)', T_total));
-legend('Full Covariance', 'Block Cholesky', 'SqrtQR', 'Location', 'northwest');
-exportgraphics(gcf, 'figures/horizon_size_scalability.png')
+xticks(N_list)
+legend('Liu et al. (2025)', 'Okamoto & Tsiotras (2019)', 'Proposed method', 'Location', 'northwest');
+exportgraphics(gcf, 'figures/horizon_size_scalability.png', Resolution=300)
+
+%% Plot objective function values
+figure(Position=[0, 0, 20, 12]);
+semilogy(N_list, avg_block_opt./avg_full_opt, '^-g', 'LineWidth', 2, 'MarkerSize', 8); hold on;
+semilogy(N_list, avg_qr_opt./avg_full_opt, 's-r', 'LineWidth', 2, 'MarkerSize', 8);
+grid on;
+xlabel('Horizon length N');
+ylabel('Cost ratio to Liu et al.');
+xticks(N_list)
+legend('Okamoto & Tsiotras (2019)', 'Proposed method', 'Location', 'west');
+xlim([N_list(1) N_list(end)])
+
+exportgraphics(gcf, 'figures/horizon_size_cost_comparision.png', Resolution=300)
 
 %%
 save('data/horizon_size_scalability_results.mat', 'results', 'T_total', 'N_list');
