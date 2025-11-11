@@ -15,16 +15,16 @@
 \usepackage{subcaption}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
-
+\pdfminorversion=4
 %  define custom commands
 \input{commands.tex}
 
 % set path for figures
 \graphicspath{{../figures/}}
 
-\title{Square Root QR Covariance Steering}
+\title{QR Decomposition-based Covariance Steering}
 \author{Naoya Kumagai
-\thanks{N. Kumagai is with the School of Aeronautics and Astronautics, Purdue University, IN47907 (e-mail: nkumagai@purdue.edu).}}
+\thanks{N. Kumagai is with the School of Aeronautics and Astronautics, Purdue University, IN 47907 (e-mail: nkumagai@purdue.edu).}}
 
 \begin{document}
 
@@ -40,7 +40,7 @@ Covariance steering, square root methods, QR decomposition, chance constraints, 
 
 \section{Introduction}
 
-\subsection{Notation}
+\subsection{Notation and Preliminaries}
 $\mathbb{L}^n$ denotes the space of $n \times n$ lower triangular matrices.
 $\mathbb{L}_+^n$ denotes the space of $n \times n$ lower triangular matrices with positive diagonal entries. $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric positive definite matrices. The Cholesky factor of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). The linear matrix inequality $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \(\N_{a}^{b}\) denotes the set of integers from \( a \) to \( b \).
 
@@ -75,12 +75,12 @@ We consider two types of cost functions:
 \end{equation}
 with \( Q_k \succeq 0 \) and \( R_k \succ 0 \), and \( \mathcal{Q}_{\norm{u_k}_2}(p_J) \) is $p_J$-quantile of the 2-norm of the control input $u_k$.
 
-The sets \( \mathcal{X}_k \) and \( \mathcal{U}_k \) represent state and control constraints, respectively, with associated violation probabilities \( \epsilon_k \) and \( \delta_k \). We assume that the feasible region defined by the chance constraints is given in one of two forms: a linear constraint or a norm constraint. For the linear constraint form, the chance constraint can be expressed as:
+The sets \( \mathcal{X}_k \) and \( \mathcal{U}_k \) represent state and control feasible sets, respectively, with associated violation probabilities \( \epsilon_k \) and \( \delta_k \). We assume that the chance constraints are given in one of two forms: a linear constraint or a norm constraint. For the linear constraint form, the chance constraint is given by:
 \begin{equation} \label{eq:linear_chance_constraint}
 	\mathbb{P}(\alpha_j ^\top x_k \leq \beta_j) \geq 1 - p_j
 \end{equation}
 for each linear constraint defined by \( \alpha_j \in \mathbb{R}^n \) and \( \beta_j \in \mathbb{R} \), with violation probability \( p_j \).
-For the norm constraint form, the chance constraint can be expressed as:
+For the norm constraint form, the chance constraint is given by:
 \begin{equation} \label{eq:norm_chance_constraint}
 	\mathbb{P}(\| x_k \|_2 \leq \gamma) \geq 1 - p_\gamma
 \end{equation}
@@ -134,7 +134,7 @@ Let the system dynamics be given by:
 \begin{equation}
 	x_{k+1} = \Phi_k x_k + G_k w_k
 \end{equation}
-with state \( x_k \in \mathbb{R}^n \), where \( w_k \in \mathbb{R}^m \) is standard Gaussian noise.
+where the definitions of \( x_k\), \( G_k \), and \( w_k \) are as in \cref{eq:problem_statement}. \( \Phi_k \in \mathbb{R}^{n \times n} \) represents a general state transition matrix (i.e. open-loop or closed-loop).
 By defining $P_k := \E{(x_k - \E{x_k})(x_k - \E{x_k})^\top}$, the covariance propagation equation is given by:
 \begin{equation}
 	P_{k+1} = \Phi_k P_k \Phi_k^T + G_k G_k^\top.
@@ -159,7 +159,7 @@ In other words, the square root covariance propagation can be expressed as a non
 \begin{equation} \label{eq:square_root_covariance_propagation_nonlinear}
 	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top = (\mathrm{qr}( \begin{bmatrix} \Phi_k S_k & G_k \end{bmatrix} ^\top))^\top
 \end{equation}
-where \( \mathrm{qr}(\cdot) \) denotes the operation of extracting the upper triangular factor \( R \) from the QR decomposition. 
+where \( \mathrm{qr}(\cdot) \) denotes the operation of extracting the upper triangular factor \( R \) from the QR decomposition. Since the column space of \(X_{k+1}\) includes the column space of \(G_k\), and by \cref{assump:full_rank_G}, \(G_k\) is full rank, it follows that \(X_{k+1}\) is full rank. Then, it follows that this QR decomposition is unique.
 
 
 \subsection{QR decomposition derivative}
@@ -180,6 +180,7 @@ Thus, using the Taylor expansion, we can approximate the QR decomposition as a l
 \begin{equation}
 	\mathrm{qr}(M) \approx \bar{R} + \dd R(M - \bar{M}, \bar{Q}, \bar{R}).
 \end{equation}
+\( \dd Q \) can also be computed as a function of \( \dd M\) \cite{deleeuwDifferentiatingQRDecomposition2023}; it is not used for this work, so we omit it here.
 
 \section{Application to Covariance Steering}
 The application to covariance steering is straightforward and allows us to formulate \cref{eq:problem_statement} as a nonconvex deterministic optimization problem.
@@ -208,7 +209,7 @@ with its first-order approximation given by:
 \begin{equation} \label{eq:square_root_covariance_propagation_linearized}
 	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \quad.
 \end{equation}
-, where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference values, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\). Since the column space of \(X_{k+1}\) includes the column space of \(G_k\), and by \cref{assump:full_rank_G}, \(G_k\) is full rank, it follows that \(X_{k+1}\) is full rank. Then, it follows that this QR decomposition is unique.
+, where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference values, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\). 
 
 \subsection{Objective function}
 After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and performing some standard manipulations, the objective function can be expressed as deterministic convex functions of \( L_k \) and \( S_k \):
@@ -233,7 +234,7 @@ The terminal distributional constraint is imposed by \cite{okamotoOptimalCovaria
 \begin{equation} \label{eq:terminal_distributional_constraint}
 	\mu_N = \mu_{\mathrm{fin}}, \quad \norm{P_{\mathrm{fin}}^{-1/2} S_N}_2 - 1 \leq 0
 \end{equation}
-where \( \norm{\cdot}_2 \) denotes the spectral norm.
+where \( \norm{\cdot}_2 \) denotes the spectral norm here.
 
 Since we are working with the square root form, chance constraints can be imposed exactly in a convex manner, which presents a notable advantage over the full covariance approaches, e.g. \cite{liuOptimalCovarianceSteering2025}.
 For the linear constraint form \eqref{eq:linear_chance_constraint}, the chance constraint can be exactly expressed as \cite{okamotoOptimalCovarianceControl2018}:
@@ -275,6 +276,10 @@ To ensure that the linearization process does not cause artificial infeasibility
 	\norm{\mathrm{vec}(D_L(L_k - \bar{L}_k))}_\infty &\leq r, \quad k \in \N_{0}^{N-1}
 \end{align}
 where \( r > 0 \) is the trust region radius, and \( D_S \) and \( D_L \) are diagonal matrices for scaling.
+Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only appear in the convex constraints.
+
+
+
 % A notable difference from typical trust region constraints is that the variable \( S_k \) is defined on a manifold. As described in \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the Riemannian metric is used to define the trust region constraint. 
 
 % \subsection{Riemannian geometry on Cholesky spaces}
@@ -345,8 +350,8 @@ The algorithm terminates when \(\Delta J\) and \(\chi\) are below their respecti
 \While{$|\Delta J| > \epsilon_{\mathrm{opt}}$ or $\chi > \epsilon_{\mathrm{feas}}$}
 	\State $(\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*, \bm{\xi}^*) \gets \arg\min$ \eqref{eq:subproblem}
 	\If{step acceptance conditions are met}
-		\State $(\bar{\bm{S}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{v}}) \gets (\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*)$ \Comment{Update the reference variables}
-		\State Update the reference QR matrices: $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix})$
+		\State $(\bar{\bm{S}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{v}}) \gets (\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*)$ 
+		\State Update the reference QR matrices: $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix})$ for $k \in \N_{0}^{N-1}$
 		\State Update Lagrange multipliers \(\lambda_k\) and stationarity tolerance
 	\EndIf
 	\State Update trust region radius \(r\) and penalty weight \(w\)
@@ -422,9 +427,7 @@ The convex optimization problems are solved in MATLAB using YALMIP \cite{lofberg
 Some practical implementation tips:
 \begin{itemize}
 	\item Since the algorithm requires iteratively linearizing the problem, an initial guess is required for each of the variables. The initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) can be obtained, for example, by calculating feedback gains \(K_{k,\mathrm{LQR}} \) via the Riccati equation, and then setting \( \bar{L}_k = K_{k,\mathrm{LQR}} \bar{S}_k \).
-	\item The SCP algorithm allows the user to choose whether to impose a trust region on the variables, to ensure that the solution remains in a region where the linear approximation is accurate. 
-	% We observed that a trust region on \( L_k\) is not necessary, and causes chattering close to the solution. 
-	Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only appear in the convex constraints.
+	\item In some cases, a trust region on \( L_k\) is not necessary, and causes chattering close to the solution. 
 \end{itemize}
 
 \subsection{Optimality and Scalability without Chance Constraints}
@@ -453,7 +456,6 @@ Here, we perform a similar comparative analysis as in \cite{rapakouliasDiscreteT
 \end{figure}
 
 
-\clearpage
 \subsection{Chance constraints}
 Showcase the chance constraints handling capability and compare solution times with full covariance and block approaches
 
@@ -478,11 +480,17 @@ On the other hand, the full covariance approach is not able to solve the problem
 		\caption{Control history}
 		\label{fig:example_cwh_control_history}
 	\end{subfigure}
-	\caption{Example trajectory and control history, obtained using the proposed method}
+	\caption{Example trajectory and control history for the spacecraft rendezvous problem}
 	\label{fig:example_cwh_results}
 \end{figure}
 
-\clearpage
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\linewidth]{example_cwh_scp_iter_history.png}
+	\caption{Convergence history of the \texttt{SCvx*} algorithm for the spacecraft rendezvous problem}
+	\label{fig:example_cwh_scp_iter_history}
+\end{figure}
+
 
 \section{Conclusions}
 We proposed a novel method for solving the chance-constrained covariance steering problem. Due to the nonconvex representation of the square root covariance propagation equations, the problem is solved iteratively via sequential convex programming. Nevertheless, the method is shown to be 1. globally optimal when chance constraints are not present, 2. more scalable for large horizon length thant the block approach, and 3. numerically reliable for problems with small variance components compared to the full covariance approach. Furthermore, it is free of any proofs of lossless convexification that rely on a specific quadratic objective function (cf. \cite{liuOptimalCovarianceSteering2025}).
