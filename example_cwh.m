@@ -288,25 +288,26 @@ if use_fc || use_qr
         % Plot covariance ellipses in XY plane (every 3rd step)
         for k = 1:N+1
             P_pos_qr = prob_qr.P([1,2], [1,2], k);
-            plot3sigmaEllipse(prob_qr.mu([1,2], k), P_pos_qr, 'm', 'HandleVisibility', 'off');
+            plot3sigmaEllipse(prob_qr.mu([1,2], k), P_pos_qr, 'k', 'HandleVisibility', 'off');
         end
         % Plot mean trajectory (XY plane)
-        plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'm+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', '($\mu_k, P_k$)');
+        plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'k+-', 'LineWidth', 1.5, 'MarkerSize', 6, 'DisplayName', '($\mu_k, P_k$)');
         % Plot mean control vectors
-        quiver2d(prob_qr.mu(1:2,1:N), prob_qr.v(1:2,1:N), 'k', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Nominal control $v_k$');
+        quiver2d(prob_qr.mu(1:2,1:N), prob_qr.v(1:2,1:N), 'Color', '#0082B2', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Nominal control $v_k$');
     end
     
     % Plot initial and terminal conditions
-    plot3sigmaEllipse(mu_0([1,2]), P0([1,2], [1,2]), 'b', 'LineWidth', 2, 'DisplayName', 'Initial ($\mu_{\mathrm{init}}, P_{\mathrm{init}}$)');
-    plot3sigmaEllipse(mu_f([1,2]), P_f([1,2], [1,2]), 'r--', 'LineWidth', 2, 'DisplayName', 'Terminal ($\mu_{\mathrm{fin}}, P_{\mathrm{fin}}$)');
+    % plot3sigmaEllipse(mu_0([1,2]), P0([1,2], [1,2]), 'b', 'LineWidth', 2, 'DisplayName', 'Initial ($\mu_{\mathrm{init}}, P_{\mathrm{init}}$)');
+    plot3sigmaEllipse(mu_f([1,2]), P_f([1,2], [1,2]), '--', 'Color', '#D55E00', 'LineWidth', 2, 'DisplayName', 'Terminal ($\mu_{\mathrm{fin}}, P_{\mathrm{fin}}$)');
     
     xlabel('$x$ (km)', 'Interpreter', 'latex')
     ylabel('$y$ (km)', 'Interpreter', 'latex')
-    legend('Location', 'south', 'NumColumns', 2)
+    legend('Location', 'south', 'NumColumns', 1, 'Box', 'off')
     grid on
     axis equal
     
-    % exportgraphics(gcf, 'figures/example_cwh_trajectory.png', Resolution=300)
+    exportgraphics(gcf, 'figures/example_cwh_trajectory.png', Resolution=300)
+    exportgraphics(gcf, 'figures/example_cwh_trajectory.pdf', ContentType='vector')
     
     %% Plot Control History
     figure(Position=[0, 0, 15, 17])
@@ -337,14 +338,27 @@ if use_fc || use_qr
             upper_comp_qr = v_comp_qr + sigma_comp_qr';
             lower_comp_qr = v_comp_qr - sigma_comp_qr';
             
-            stairsZOH(t_his, upper_comp_qr, 'm:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-            stairsZOH(t_his, lower_comp_qr, 'm:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-            stairsZOH(t_his, v_comp_qr, 'm--', 'LineWidth', 1.5, 'DisplayName', 'SqrtQR');
+            % Get stair-step coordinates for upper and lower bounds (without plotting yet)
+            [t_plot, upper_comp_qr_plot] = stairs(t_his, [upper_comp_qr, upper_comp_qr(end)]);
+            [~,  lower_comp_qr_plot] = stairs(t_his, [lower_comp_qr, lower_comp_qr(end)]);
+            % Create filled region between upper and lower bounds
+            % For stairs plot: go forward along upper, then backward along lower
+            patch_x = [t_plot(:); flipud(t_plot(:))];
+            patch_y = [upper_comp_qr_plot(:); flipud(lower_comp_qr_plot(:))];
+            % Plot patch first (so it's behind the lines)
+            patch(patch_x, patch_y, 'k', 'FaceAlpha', 0.1, 'EdgeColor', 'none', 'DisplayName', '$3\sigma$ bounds');
+            % Now plot the bounds and mean
+            stairsZOH(t_his, upper_comp_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            stairsZOH(t_his, lower_comp_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            stairsZOH(t_his, v_comp_qr, 'k--', 'LineWidth', 1.5, 'DisplayName', 'Nominal control $v_k$');
         end
         
         ylabel([component_labels{comp_idx}, ' (m/s)'], 'Interpreter', 'latex')
         grid on
         xlim([t_his(1), t_his(end)])
+        if comp_idx == 1
+            legend('Location', 'northeast')
+        end
 
     end
     
@@ -376,16 +390,17 @@ if use_fc || use_qr
         end
         upper_norm_qr = u_norm_qr + sigma_norm_qr;
         
-        stairsZOH(t_his, upper_norm_qr, 'm:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-        stairsZOH(t_his, u_norm_qr, 'm--', 'LineWidth', 1.5, 'DisplayName', 'SqrtQR');
+        stairsZOH(t_his, upper_norm_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+        stairsZOH(t_his, u_norm_qr, 'k--', 'LineWidth', 1.5, 'DisplayName', 'SqrtQR');
     end
     xlabel('Time (s)', 'Interpreter', 'latex')
     ylabel('$\|u\|_2$ (m/s)', 'Interpreter', 'latex')
-    legend('Location', 'south')
+    % legend('Location', 'southeast')
     grid on
     xlim([t_his(1), t_his(end)])
 
-    % exportgraphics(gcf, 'figures/example_cwh_control_history.png', Resolution=300)
+    exportgraphics(gcf, 'figures/example_cwh_control_history.png', Resolution=300)
+    exportgraphics(gcf, 'figures/example_cwh_control_history.pdf', ContentType='vector')
     
 end
 
@@ -405,6 +420,7 @@ end
 
 %% Plot iteration history for QR method
 
-prob_qr.scp.plot_iter_history(figure(Position=[0, 0, 20, 15]))
+prob_qr.scp.plot_iter_history(fig=figure(Position=[0, 0, 20, 15]), plot_delta=false)
 
 exportgraphics(gcf, 'figures/example_cwh_scp_iter_history.png', Resolution=300)
+exportgraphics(gcf, 'figures/example_cwh_scp_iter_history.pdf', ContentType='vector')

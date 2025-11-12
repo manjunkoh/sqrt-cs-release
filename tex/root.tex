@@ -336,13 +336,15 @@ The algorithm terminates when \(\Delta J\) and \(\chi\) are below their respecti
 \Require Initial guess $\bar{\bm{S}}, \bar{\bm{L}}$
 \Require SCP parameters \(\epsilon_{\mathrm{feas}} > 0, \epsilon_{\mathrm{opt}} > 0\) among others.
 \State Initialize SCP parameters
-\State Compute the reference QR matrices: $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix})$
+\State Compute the reference QR matrices: $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix})$ for \( k \in \N_{0}^{N-1} \)
 \While{$|\Delta J| > \epsilon_{\mathrm{opt}}$ or $\chi > \epsilon_{\mathrm{feas}}$}
 	\State $(\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*, \bm{\xi}^*) \gets \arg\min$ \cref{eq:subproblem}
 	\If{step acceptance conditions are met}
 		\State $(\bar{\bm{S}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{v}}) \gets (\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*)$ 
 		\State Update the reference QR matrices: $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix})$ for $k \in \N_{0}^{N-1}$
-		\State Update Lagrange multipliers \(\lambda_k\) and stationarity tolerance
+		\If{(15) of \cite{oguriSuccessiveConvexificationFeasibility2023a} is met}
+			\State Update Lagrange multipliers \(\{\lambda_k\}_{k=0}^{N-1}\) and stationarity tolerance \( \delta \)
+		\EndIf
 	\EndIf
 	\State Update trust region radius \(r\) and penalty weight \(w\)
 \EndWhile
@@ -398,7 +400,7 @@ Hence, \(x^*\) is a local minimum of (A).
 Next, we apply this result to our specific problem. The following proposition is used in the proof.
 \begin{proposition}[\cite{linRiemannianGeometrySymmetric2019}]
 	\label{prop:cholesky_diffeomorphism}
-	The Cholesky map \(\mathcal{L} : \mathbb{L}_+^n \rightarrow \mathbb{S}^n_+\) is a diffeomorphism.
+	The Cholesky map \(\mathcal{L} : \mathbb{S}^n_+ \rightarrow \mathbb{L}_+^n\) is a diffeomorphism.
 \end{proposition}
 
 \begin{theorem} \label{th:global_optimality}
@@ -441,15 +443,15 @@ For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers f
 
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width=0.4\textwidth]{horizon_size_scalability.png}
+	\includegraphics[width=0.4\textwidth]{horizon_size_scalability.pdf}
 	\caption{Comparison of solution times between \cite{liuOptimalCovarianceSteering2025,okamotoOptimalStochasticVehicle2019}, and the proposed method}
 	\label{fig:horizon_size_scalability}
 \end{figure}
 
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width=0.4\textwidth]{horizon_size_cost_comparision.png}
-	\caption{Comparison of solutions costs between \cite{liuOptimalCovarianceSteering2025,okamotoOptimalStochasticVehicle2019}, and the proposed method}
+	\includegraphics[width=0.4\textwidth]{horizon_size_cost_comparision.pdf}
+	\caption{Comparison of solution costs between \cite{liuOptimalCovarianceSteering2025,okamotoOptimalStochasticVehicle2019}, and the proposed method}
 	\label{fig:horizon_size_cost_comparision}
 \end{figure}
 
@@ -474,21 +476,21 @@ A loss larger than 0.1 was observed in all cases.
 
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width=\linewidth]{example_cwh_trajectory.png}
+	\includegraphics[width=\linewidth]{example_cwh_trajectory.pdf}
 	\caption{Trajectory for the spacecraft rendezvous problem}
 	\label{fig:example_cwh_trajectory}
 \end{figure}
 
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width=\linewidth]{example_cwh_control_history.png}
+	\includegraphics[width=0.8\linewidth]{example_cwh_control_history.pdf}
 	\caption{Control history for the spacecraft rendezvous problem}
 	\label{fig:example_cwh_control_history}
 \end{figure}
 
 \begin{figure}[h]
 	\centering
-	\includegraphics[width=\linewidth]{example_cwh_scp_iter_history.png}
+	\includegraphics[width=\linewidth]{example_cwh_scp_iter_history.pdf}
 	\caption{Convergence history of \cref{alg:sqrt_qr_covariance_steering} for the spacecraft rendezvous problem}
 	\label{fig:example_cwh_scp_iter_history}
 \end{figure}
