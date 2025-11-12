@@ -30,7 +30,7 @@ nx = DS.nx;  % 6 (position + velocity in 3D)
 nu = DS.nu;  % 3 (acceleration control in 3D)
 nw = 3;      % Process noise dimension (stochastic acceleration)
 
-%% Uncertainty Parameters
+% Uncertainty Parameters
 % Initial dispersion
 sigma_r0_m = 100;    % Initial position dispersion (m)
 sigma_v0_mps = 1.0;    % Initial velocity dispersion (m/s)
@@ -70,6 +70,16 @@ mu_f = [0.0; 0.05; 0; 0; 0; 0];    % [r; v] in km and km/s
 g = @(t,x) sigma_a_kms32 * [zeros(3); eye(3)];
 [A_sys, B_sys, ~, G_sys] = DS.discretize_LT_SDE(zeros(nx,N), zeros(nu,N), t_his, g);
 
+% Comment out for low thrust
+% for k = 1:N
+    % B_sys(:,:,k) = A_sys(:,:,k) * [zeros(3); eye(3)];
+% end
+% B_sys = repmat([zeros(3); eye(3)], [1, 1, N]);
+% A_sys = cat(3, A_sys, eye(6));
+% B_sys = cat(3, B_sys, [zeros(3); eye(3)]);
+% G_sys = cat(3, G_sys, zeros(nx, nx));
+% N = N + 1;
+
 % Chance Constraints
 % Risk bounds
 epsilon_x = 1e-3;  % State risk bound
@@ -96,7 +106,7 @@ disp('=== Solving CWH Problem with FullCovarianceSteering ===');
 
 % Reference covariance for linearization of objective and chance constraints
 % P_ref = 1.5 * eye(nx) * max([sigma_r0_km^2, sigma_v0_kms^2]);
-Y_ref = 1E-6 * eye(nu);
+Y_ref = 2E-6 * eye(nu);
 
 % Optionally try scaling the covariance dynamics.
 d = 1;
@@ -106,9 +116,9 @@ prob_fc = FullCovarianceSteering(...
     P_0=P0, P_f=P_f, ...
     Q=Q, R=R, ...
     N=N, ...
-    objective_type='DV99',...
+    objective_type='LQG',...
     chance_constraints_control=control_chance_constraint, ...
-    Y_ref=Y_ref, ...
+    Y_ref = Y_ref, ...
     covariance_scaling = d, ...
     mu_0=mu_0, mu_f=mu_f);
 
@@ -117,10 +127,10 @@ tic
 sdp_settings = sdpsettings('verbose', 2, 'solver', 'mosek', 'savesolveroutput',1, 'savesolverinput', 1);
 
 % dump MOSEK data as a text file 
-sdp_settings.mosektaskfile = 'data/mosek_dump.ptf';
+% sdp_settings.mosektaskfile = 'data/mosek_dump.ptf';
 
 
-sdp_settings.mosek.MSK_IPAR_LOG_INTPNT = 10;
+% sdp_settings.mosek.MSK_IPAR_LOG_INTPNT = 10;
 
 % See link for tips on debugging numerical issues: https://docs.mosek.com/11.0/toolbox/debugging-numerical.html
 
@@ -142,11 +152,16 @@ time_fc = toc;
 if diagnostic_fc.problem == 0
     fprintf('FullCovarianceSteering solved successfully in %.3f seconds\n', time_fc);
     fprintf('  Objective value: %.6f\n', prob_fc.optimal_objective);
+    prob_fc.check_lossless();
+    prob_fc.control_covariance_is_SDP(true);
+
 elseif diagnostic_fc.problem == 4
     fprintf('FullCovarianceSteering experienced numerical issues\n')
     fprintf('  MOSEK error message: %s\n', diagnostic_fc.solveroutput.res.rcodestr)
     fprintf('  Objective value: %.6f\n', prob_fc.optimal_objective);
     prob_fc.check_lossless();
+    prob_fc.control_covariance_is_SDP(true);
+
 else
     disp('FullCovarianceSteering solver failed.');
     disp(yalmiperror(diagnostic_fc.problem));
@@ -208,7 +223,6 @@ prob_qr = SqrtQRCovarianceSteering(init_guess, ...
     A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
     P_0=P0, P_f=P_f, Q=Q, R=R, ...
     objective_type='DV99', ...
-    chance_constraints_control=control_chance_constraint, ...
     mu_0=mu_0, mu_f=mu_f);
 
 % prob_qr.trust_region_scaling.S = 1;
@@ -252,13 +266,13 @@ use_fc = exist('prob_fc', 'var') && ~isempty(prob_fc) && (diagnostic_fc.problem 
 use_qr = exist('prob_qr', 'var') && flag_solved_qr && ~isempty(prob_qr);
 
 if use_fc || use_qr
-
-    figure
+    
+    figure(Position=[0, 0, 20, 10])
     hold on
     
     % Plot FullCovarianceSteering results
     if use_fc
-        % Plot covariance ellipses in XY plane (every 3rd step to avoid clutter)
+        % Plot covariance ellipses in XY plane
         for k = 1:N+1
             P_pos_fc = prob_fc.P([1,2], [1,2], k);
             plot3sigmaEllipse(prob_fc.mu([1,2], k), P_pos_fc, 'g', 'HandleVisibility', 'off');
@@ -266,7 +280,7 @@ if use_fc || use_qr
         % Plot mean trajectory (XY plane)
         plot(prob_fc.mu(1,:), prob_fc.mu(2,:), 'g+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'FullCov');
         % Plot mean control vectors
-        quiver3d(prob_fc.mu(1:3,1:N), prob_fc.v(1:3,1:N), 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Control');
+        quiver2d(prob_fc.mu(1:2,1:N), prob_fc.v(1:2,1:N), 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Nominal control');
     end
     
     % Plot SqrtQRCovarianceSteering results
@@ -277,31 +291,26 @@ if use_fc || use_qr
             plot3sigmaEllipse(prob_qr.mu([1,2], k), P_pos_qr, 'm', 'HandleVisibility', 'off');
         end
         % Plot mean trajectory (XY plane)
-        plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'm+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'SqrtQR');
+        plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'm+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', '($\mu_k, P_k$)');
         % Plot mean control vectors
-        quiver3d(prob_qr.mu(1:3,1:N), prob_qr.v(1:3,1:N), 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Control');
+        quiver2d(prob_qr.mu(1:2,1:N), prob_qr.v(1:2,1:N), 'k', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Nominal control $v_k$');
     end
     
     % Plot initial and terminal conditions
-    plot3sigmaEllipse(mu_0([1,2]), P0([1,2], [1,2]), 'b', 'LineWidth', 2, 'DisplayName', 'Initial');
-    plot3sigmaEllipse(mu_f([1,2]), P_f([1,2], [1,2]), 'b--', 'LineWidth', 2, 'DisplayName', 'Terminal');
-    
-    % Plot initial and final mean positions
-    plot(mu_0(1), mu_0(2), 'bo', 'MarkerSize', 10, 'MarkerFaceColor', 'b', 'DisplayName', 'Start');
-    plot(mu_f(1), mu_f(2), 'rs', 'MarkerSize', 10, 'MarkerFaceColor', 'r', 'DisplayName', 'Goal');
+    plot3sigmaEllipse(mu_0([1,2]), P0([1,2], [1,2]), 'b', 'LineWidth', 2, 'DisplayName', 'Initial ($\mu_{\mathrm{init}}, P_{\mathrm{init}}$)');
+    plot3sigmaEllipse(mu_f([1,2]), P_f([1,2], [1,2]), 'r--', 'LineWidth', 2, 'DisplayName', 'Terminal ($\mu_{\mathrm{fin}}, P_{\mathrm{fin}}$)');
     
     xlabel('$x$ (km)', 'Interpreter', 'latex')
     ylabel('$y$ (km)', 'Interpreter', 'latex')
-    legend('Location', 'best', 'NumColumns', 2)
+    legend('Location', 'south', 'NumColumns', 2)
     grid on
     axis equal
     
-    exportgraphics(gcf, 'figures/example_cwh_trajectory.png')
+    % exportgraphics(gcf, 'figures/example_cwh_trajectory.png', Resolution=300)
     
     %% Plot Control History
-    figure
+    figure(Position=[0, 0, 15, 17])
     tiledlayout(3, 1)
-    t_control = t_his(1:end-1);  % Control is applied at nodes 1 to N
     
     % Plot u_x, u_y components
     component_labels = {'$u_x$', '$u_y$'};
@@ -316,9 +325,9 @@ if use_fc || use_qr
             upper_comp = v_comp + sigma_comp';
             lower_comp = v_comp - sigma_comp';
             
-            stairs(t_control, upper_comp, 'k:', 'LineWidth', 1, 'HandleVisibility', 'off');
-            stairs(t_control, lower_comp, 'k:', 'LineWidth', 1, 'HandleVisibility', 'off');
-            stairs(t_control, v_comp, 'k-', 'LineWidth', 1.5, 'DisplayName', 'FullCov');
+            stairsZOH(t_his, upper_comp, 'g:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            stairsZOH(t_his, lower_comp, 'g:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            stairsZOH(t_his, v_comp, 'g-', 'LineWidth', 1.5, 'DisplayName', 'FullCov');
         end
         
         if use_qr
@@ -328,14 +337,15 @@ if use_fc || use_qr
             upper_comp_qr = v_comp_qr + sigma_comp_qr';
             lower_comp_qr = v_comp_qr - sigma_comp_qr';
             
-            stairs(t_control, upper_comp_qr, 'k:', 'LineWidth', 1, 'HandleVisibility', 'off');
-            stairs(t_control, lower_comp_qr, 'k:', 'LineWidth', 1, 'HandleVisibility', 'off');
-            stairs(t_control, v_comp_qr, 'k--', 'LineWidth', 1.5, 'DisplayName', 'SqrtQR');
+            stairsZOH(t_his, upper_comp_qr, 'm:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            stairsZOH(t_his, lower_comp_qr, 'm:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            stairsZOH(t_his, v_comp_qr, 'm--', 'LineWidth', 1.5, 'DisplayName', 'SqrtQR');
         end
         
-        xlabel('Time (s)', 'Interpreter', 'latex')
         ylabel([component_labels{comp_idx}, ' (m/s)'], 'Interpreter', 'latex')
         grid on
+        xlim([t_his(1), t_his(end)])
+
     end
     
     % Plot control norm
@@ -351,10 +361,10 @@ if use_fc || use_qr
         end
         upper_norm_fc = u_norm_fc + sigma_norm_fc;
         
-        stairs(t_control, upper_norm_fc, 'k:', 'LineWidth', 1, 'HandleVisibility', 'off');
-        stairs(t_control, u_norm_fc, 'k-', 'LineWidth', 1.5, 'DisplayName', 'FullCov');
+        stairsZOH(t_his, upper_norm_fc, 'g:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+        stairsZOH(t_his, u_norm_fc, 'g-', 'LineWidth', 1.5, 'DisplayName', 'FullCov');
         % Add constraint line
-        yline(u_max_ms, 'r--', 'LineWidth', 1.5, 'DisplayName', sprintf('Max: %.1f m/s', u_max_ms));
+        % yline(u_max_ms, 'r--', 'LineWidth', 1.5, 'DisplayName', sprintf('Max: %.1f m/s', u_max_ms));
     end
     if use_qr
         u_norm_qr = vecnorm(prob_qr.v, 2, 1) * 1000;  % Convert to m/s
@@ -366,15 +376,16 @@ if use_fc || use_qr
         end
         upper_norm_qr = u_norm_qr + sigma_norm_qr;
         
-        stairs(t_control, upper_norm_qr, 'k:', 'LineWidth', 1, 'HandleVisibility', 'off');
-        stairs(t_control, u_norm_qr, 'k--', 'LineWidth', 1.5, 'DisplayName', 'SqrtQR');
+        stairsZOH(t_his, upper_norm_qr, 'm:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+        stairsZOH(t_his, u_norm_qr, 'm--', 'LineWidth', 1.5, 'DisplayName', 'SqrtQR');
     end
     xlabel('Time (s)', 'Interpreter', 'latex')
     ylabel('$\|u\|_2$ (m/s)', 'Interpreter', 'latex')
-    legend('Location', 'best')
+    legend('Location', 'south')
     grid on
+    xlim([t_his(1), t_his(end)])
 
-    exportgraphics(gcf, 'figures/example_cwh_control_history.png')
+    % exportgraphics(gcf, 'figures/example_cwh_control_history.png', Resolution=300)
     
 end
 
@@ -393,5 +404,7 @@ else
 end
 
 %% Plot iteration history for QR method
-figure;
-prob_qr.scp.plot_iter_history()
+
+prob_qr.scp.plot_iter_history(figure(Position=[0, 0, 20, 15]))
+
+exportgraphics(gcf, 'figures/example_cwh_scp_iter_history.png', Resolution=300)
