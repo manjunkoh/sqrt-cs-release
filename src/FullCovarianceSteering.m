@@ -450,5 +450,24 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 				fprintf('Losslessness NOT verified. Worst relative loss: %g\n', worst_loss);
 			end
 		end
+
+		function [is_SDP] = control_covariance_is_SDP(obj, verbose)
+			arguments
+				obj
+				verbose = false
+			end
+			is_SDP = true;
+			for k = 1:obj.N
+				[~, flag] = chol(obj.P_u(:,:,k));
+				is_SDP = is_SDP && flag == 0;
+			end
+			if verbose
+				if is_SDP
+					fprintf('Control covariance is SDP.\n');
+				else
+					fprintf('Control covariance is not SDP.\n');
+				end
+			end
+		end
 	end
 end
