@@ -92,15 +92,15 @@ For convenience, we make the following assumption, which is reasonable in practi
 \end{assumption}
 
 \subsection{Relevant works}
-The covariance steering problem dates back to the early works by Hotz and Skelton \cite{hotzCovarianceControlTheory1987}. Recent works in the discrete-time setting mainly focus on converting the problem into a convex optimization problem. Skaf and Boyd \cite{skafDesignAffineControllers2010} considers a state-history feedback controller and formulates the problem as a semidefinite programming (SDP) problem. Okamoto et al. \cite{okamotoOptimalCovarianceControl2018} later adds chance constraints while maintaining convexity. However, these methods suffer from the poor computational complexity as the horizon length increases, due to the large linear matrix inequality (LMI) constraints involved \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019} remedied the need for block lower triangular matrix variables in these methods by introducing an alternative affine feedback control law, requiring only a block diagonal structure. Nevertheless, due to the implicit representation of the covariance matrix variables as a function of all the previous system matrices, the LMIs to be solved remain rather large. For later discussion, it is also important to note that the problem variables involve the ``square root'' of the covariance matrix variables. This allows affine chance constraints to be expressed exactly as second-order cone constraints.
+The covariance steering problem dates back to the early works by Hotz and Skelton \cite{hotzCovarianceControlTheory1987}. Recent works in the discrete-time setting mainly focus on converting the problem into a convex optimization problem. Skaf and Boyd \cite{skafDesignAffineControllers2010} considers a state-history feedback controller and formulates the problem as a semidefinite programming (SDP) problem. Okamoto et al. \cite{okamotoOptimalCovarianceControl2018} later adds chance constraints while maintaining convexity. However, these methods suffer from the poor computational complexity as the horizon length increases, due to the large linear matrix inequality (LMI) constraints involved \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019} remedied the need for block lower triangular matrix variables in these methods by introducing an alternative affine feedback control law, requiring only a block diagonal structure. Nevertheless, due to the implicit representation of the covariance matrix variables as a function of all the previous system matrices, the LMIs to be solved remain rather large. It is also important to note that the problem variables involve the ``square root'' of the covariance matrix variables. This allows affine chance constraints to be expressed exactly as second-order cone constraints.
 
-More recently, Liu et al. \cite{liuOptimalCovarianceSteering2025} uses the covariance matrix directly as the optimization variable; in combination with an elegant proof, it converts the seemingly nonconvex problem into an equivalent convex problem (SDP). Compared to the block approach, this method explicitly represents the covariance matrix variables, scales much better with the growth in problem size, and its proof of convexity has been extended to the chance-constrained problem \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. 
+More recently, Liu et al. \cite{liuOptimalCovarianceSteering2025} uses the covariance matrix directly as the optimization variable; in combination with an elegant proof, it converts the seemingly nonconvex problem into an equivalent SDP. Compared to the block approaches (\cite{skafDesignAffineControllers2010,okamotoOptimalCovarianceControl2018,okamotoOptimalStochasticVehicle2019}), this method explicitly represents the covariance matrix variables, scales much better with the growth in problem size, and its proof of convexity has been extended to the chance-constrained problem \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. 
 
-At the same time, we have observed several drawbacks of this method for practical applications. First, in practical scenarios \cite{oguriChanceConstrainedControlSafe2024a,kumagaiRobustCislunarLowThrust2025a} where the state components have smaller variance compared to the mean values, this can lead to difficulties for numerical solvers. We hypothesize that part of the numerical difficulties can be attributed to the fact that dealing with the covariance matrix directly necessarily squares the system units and causes problems for solvers working in finite precision. This hypothesis is drawn from the works of Thornton and Bierman \cite{thorntonNumericalComparisonDiscrete1976} who in the 1970s demonstrated the numerical instability of the standard Kalman filter, and called for propagating the square root of the covariance matrix instead. 
-Second, when dealing with objective functions or constraints that involve the covariance square root (e.g., affine/norm chance constraints), a reference covariance matrix for constraint linearization \cite{rapakouliasDiscreteTimeOptimalCovariance2023} or iterative algorithms \cite{pilipovskyComputationallyEfficientChance2024} are required. Third, due to the requirement of a proof of convexity which relies on a quadratic objective function, whenever the problem formulation changes slightly, theoretical work is required to ensure the convexity of the new formulation; for example, when using a non-quadratic objective function \cite{kumagaiRobustCislunarLowThrust2025a}, a small regularizing quadratic term was added to the objective function to ensure convexity.
+At the same time, we have observed several drawbacks of \cite{liuOptimalCovarianceSteering2025} in application. First, in practical scenarios \cite{oguriChanceConstrainedControlSafe2024a,kumagaiRobustCislunarLowThrust2025a} where the state components have small variance compared to the mean values, this can lead to difficulties for numerical solvers. We hypothesize that part of the numerical difficulties can be attributed to the fact that dealing with the covariance matrix directly necessarily squares the system units and causes problems for solvers working in finite precision. This hypothesis is drawn from the square root Kalman filter literature. A notable work is that of Thornton and Bierman \cite{thorntonNumericalComparisonDiscrete1976} who in the 1970s demonstrated the numerical instability of the standard Kalman filter compared to its counterparts that propagate factorized versions of the covariance matrix, such as the Cholesky and LDL factorizations. 
+Second, when dealing with objective functions or constraints that involve the covariance square root (e.g., affine/norm chance constraints), a reference covariance matrix for conservatively approximating the square root via linearization \cite{rapakouliasDiscreteTimeOptimalCovariance2023} or iterative algorithms \cite{pilipovskyComputationallyEfficientChance2024} are required. Third, due to the requirement of a proof of convexity which relies on a quadratic objective function, whenever the problem formulation changes slightly, theoretical work is required to ensure the convexity of the new formulation; for example, when using a non-quadratic objective function \cite{kumagaiRobustCislunarLowThrust2025a}, a small quadratic term was added to the objective function to ensure convexity.
 
 \subsection{Contributions}
-We propose a novel method for solving the chance-constrained covariance steering problem. Due to the nonconvex representation of the square root covariance propagation equations, the problem is solved iteratively via sequential convex programming. Nevertheless, the method is shown to be 1. globally optimal when chance constraints are not present, 2. more scalable for large horizon length thant the block approach, and 3. numerically reliable for problems with small variance components compared to the full covariance approach. Furthermore, it is free of any proofs of lossless convexification that rely on a specific quadratic objective function (cf. \cite{liuOptimalCovarianceSteering2025}).
+We propose a novel method for solving the chance-constrained covariance steering problem. Due to the nonconvex representation of the square root covariance propagation equations, the problem is solved iteratively via sequential convex programming. Nevertheless, the method is shown to be 1. globally optimal when chance constraints are not present, 2. more scalable for large horizon length than the block approach, and 3. numerically reliable for problems with small variance components compared to the full covariance approach. Furthermore, it is free of any proofs of lossless convexification that rely on a specific quadratic objective function (cf. \cite{liuOptimalCovarianceSteering2025}).
 
 We note that this work is not the first to propagate the square root of the covariance matrix in the context of covariance steering. \cite{oguriStochasticSequentialConvex2022} addressed this with some shortcomings: the variable that represents the square root of the covariance matrix grows in size with the horizon length, and the feedback gains are retrieved via a least-squares matrix inversion.
 
@@ -148,11 +148,12 @@ where $S_{k+1} \in \mathbb{L}_+^n$ is the next step square root covariance, and 
 	X_{k+1} := \begin{bmatrix} \Phi_k S_k & G_k \end{bmatrix}.
 \end{equation}
 Note that we want $S_{k+1} \in \mathbb{L}_+^n$, while $X_{k+1} \in \mathbb{R}^{n \times (n+m)}$.
-For a matrix $Q_{k} \in \R^{(n+m) \times n}$ such that $Q_{k} Q_{k}^\top = I$, (\textcolor{red}{is this iff?})
+For a matrix $Q_{k} \in \R^{(n+m) \times n}$ such that $Q_{k} Q_{k}^\top = I$,
 \begin{equation} \label{eq:Q_S_X_relation}
-     X_{k+1}^\top = Q_{k} S_{k+1}^\top
-	\implies
-	X_{k+1} X_{k+1}^\top = S_{k+1} Q_{k}^\top Q_{k} S_{k+1}^\top = S_{k+1} S_{k+1}^\top.
+\begin{split}
+     X_{k+1}^\top &= Q_{k} S_{k+1}^\top \\
+	\implies X_{k+1} X_{k+1}^\top &= S_{k+1} Q_{k}^\top Q_{k} S_{k+1}^\top = S_{k+1} S_{k+1}^\top.
+\end{split}
 \end{equation}
 Since $S_{k+1} \in \mathbb{L}_+^n$, its transpose is upper triangular, so the first equality in \cref{eq:Q_S_X_relation} is a QR decomposition of $X_{k+1}^\top$. By \cref{lemma:existence_and_uniqueness_of_economy_size_qr_decomposition}, if $X_{k+1}^\top$ is full rank, there exists a unique set of matrices $Q_{k}$ and $S_{k+1}$ that satisfy the equation.
 In other words, the square root covariance propagation can be expressed as a nonlinear operation:
@@ -163,7 +164,7 @@ where \( \mathrm{qr}(\cdot) \) denotes the operation of extracting the upper tri
 
 
 \subsection{QR decomposition derivative}
-In order to use this square root covariance propagation in an optimization framework, we require the derivative of the QR decomposition operation (i.e. the sensitivity of the $Q$ and $R$ matrices with respect to perturbations in the $M$ matrix); this is documented in the literature \cite{deleeuwDifferentiatingQRDecomposition2023}, but for completeness, we provide a brief overview here. $\dd R$ and $\dd M$ are related by the following equation:
+In order to use this square root covariance propagation in an optimization framework, we utilize the derivative of the QR decomposition operation (i.e. the sensitivity of the $Q$ and $R$ matrices with respect to perturbations in the $M$ matrix). $\dd R$ and $\dd M$ are related by the following equation \cite{deleeuwDifferentiatingQRDecomposition2023}:
 \begin{equation}
 	A + (\dd R) R^{-1} = Q^\top (\dd M) R^{-1}
 \end{equation}
@@ -174,9 +175,9 @@ where \( A \) is a skew-symmetric matrix such that
 \( \mathrm{tril}(A) \) replaces the upper triangular part of \( A \) with zeros.
 Organizing the above, we have:
 \begin{equation}
-	\dd R = \dd R(\dd M, Q, R) := Q^\top (\dd M) - \mathrm{tril}(Q^\top (\dd M) R^{-1}) R.
+	\dd R = \dd R(\dd M, Q, R) = Q^\top (\dd M) - \mathrm{tril}(Q^\top (\dd M) R^{-1}) R.
 \end{equation}
-Thus, using the Taylor expansion, we can approximate the QR decomposition as a linear function of perturbations in \( M \), around some reference \( \bar{M} = \bar{Q} \bar{R} \):
+Using the Taylor expansion, we can approximate the QR decomposition as a linear function of perturbations in \( M \), around some reference \( \bar{M} = \bar{Q} \bar{R} \):
 \begin{equation}
 	\mathrm{qr}(M) \approx \bar{R} + \dd R(M - \bar{M}, \bar{Q}, \bar{R}).
 \end{equation}
@@ -187,7 +188,7 @@ The application to covariance steering is straightforward and allows us to formu
 \subsection{Square Root Covariance Propagation with feedback control}
 Since the state is controlled by a the affine feedback control law, the closed-loop dynamics are given by:
 \begin{equation}
-	x_{k+1} = A_k x_k + B_k (v_k + K_k (x_k - \E{x_k})) + G_k w_k \quad k \in \N_{0}^{N-1}.
+	x_{k+1} = A_k x_k + B_k (v_k + K_k (x_k - \E{x_k})) + G_k w_k, \quad k \in \N_{0}^{N-1}.
 \end{equation}
 Taking the expectation, the mean dynamics are given by
 \begin{equation} \label{eq:mean_dynamics}
@@ -196,26 +197,26 @@ Taking the expectation, the mean dynamics are given by
 where $\mu_k := \E{x_k}$.
 Then, the square root covariance dynamics are given by \cref{eq:square_root_covariance_propagation_nonlinear}:
 \begin{equation} \label{eq:square_root_covariance_propagation_nonlinear_feedback_control}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix}
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} := \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix}
 \end{equation}
 Note that due to the affine feedback control law, the Gaussianity of the state distribution is preserved, and the control input is also Gaussian.
-Since both $P_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \) in \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control}.
-For the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is positive definite by \cref{assump:positive_definite_state}.
+Since both $P_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \) in \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control}; for the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is positive definite by \cref{assump:positive_definite_state}.
 So we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix},
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix}
 \end{equation}
 with its first-order approximation given by:
 \begin{equation} \label{eq:square_root_covariance_propagation_linearized}
-	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \quad.
+	S_{k+1} \approx (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top + \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top
 \end{equation}
-, where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference values, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\). 
+where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference values, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\). 
 
 \subsection{Objective function}
 After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and performing some standard manipulations, the objective function can be expressed as deterministic convex functions of \( L_k \) and \( S_k \):
 \begin{equation} \label{eq:objective_deterministic}
 	J = \begin{cases}
-	\sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k + \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(quadratic)} \\
+	\sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k & \\
+	\quad + \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(quadratic)} \\
 	\sum_{k=0}^{N-1} \norm{v_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_m}(p_J)} \ \norm{L_k}_2 & \text{(quantile 2-norm)}.
 	\end{cases}
 \end{equation}
@@ -236,7 +237,7 @@ The terminal distributional constraint is imposed by \cite{okamotoOptimalCovaria
 \end{equation}
 where \( \norm{\cdot}_2 \) denotes the spectral norm here.
 
-Since we are working with the square root form, chance constraints can be imposed exactly in a convex manner, which presents a notable advantage over the full covariance approaches, e.g. \cite{liuOptimalCovarianceSteering2025}.
+Since we are working with the square root form, chance constraints can be imposed exactly in a convex manner, which presents a notable advantage over the full covariance approach \cite{liuOptimalCovarianceSteering2025}.
 For the linear constraint form \cref{eq:linear_chance_constraint}, the chance constraint can be exactly expressed as \cite{okamotoOptimalCovarianceControl2018}:
 \begin{equation} \label{eq:linear_chance_constraint_deterministic}
 	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0, \quad k \in \N_{0}^{N}
@@ -259,11 +260,14 @@ where the only source of nonconvexity is the square root covariance dynamics \cr
 \section{Algorithm Overview}
 In order to take advantage of the convex representation of the objective and constraints, we use a specific sequential convex programming (SCP) algorithm \texttt{SCvx*} \cite{oguriSuccessiveConvexificationFeasibility2023a} to solve \cref{eq:nonconvex_problem_statement}; this ensures that the nonlinear dynamics are obeyed at convergence, and the converged solution is locally optimal. At each iteration, the linearized dynamics \cref{eq:square_root_covariance_propagation_linearized} are imposed with penalization of violations:
 \begin{equation} \label{eq:linearized_dynamics}
-	\mathrm{vectril} \left\{ S_{k+1} - (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top - \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \right\} = \xi_k
+\begin{split}
+	&\mathrm{vectril} \left\{ S_{k+1} - (\mathrm{qr}(\bar{X}_{k+1}^\top))^\top \right. \\
+	&\left. - \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \right\} = \xi_k
+\end{split}
 \end{equation}
 where $\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix, and \( \xi_k \in \mathbb{R}^{\frac{n(n-1)}{2}}\) is a slack variable, penalized in the objective function via an Augmented Lagrangian method. 
 
-To ensure that the linearization process does not cause artificial infeasibility/unboundedness \cite{maoSuccessiveConvexificationNonconvex2016}, we impose a trust region constraint. 
+To ensure that the linearization process does not cause artificial infeasibility/unboundedness \cite{maoSuccessiveConvexificationNonconvex2016}, we impose a trust region constraint:
 \begin{align} \label{eq:trust_region_constraint}
 	\norm{\mathrm{vectril}(D_S(S_k - \bar{S}_k))}_\infty &\leq r, \quad k \in \N_{0}^{N}, \\
 	\norm{\mathrm{vec}(D_L(L_k - \bar{L}_k))}_\infty &\leq r, \quad k \in \N_{0}^{N-1}
@@ -311,7 +315,7 @@ The subproblem is then given by:
 	\cref{eq:S_structure_constraint,eq:mean_dynamics,eq:linearized_dynamics,eq:initial_distributional_constraint,eq:terminal_distributional_constraint,eq:linear_chance_constraint_deterministic,eq:norm_chance_constraint_deterministic,eq:trust_region_constraint}.
 \end{equation}
 
-The complete algorithm is summarized in Algorithm \ref{alg:sqrt_qr_covariance_steering}. The algorithm iteratively solves a sequence of convex optimization problems, where at each iteration, the nonlinear square root covariance dynamics \cref{eq:square_root_covariance_propagation} are linearized around the current reference variables. 
+The complete solution process is summarized in Algorithm \ref{alg:sqrt_qr_covariance_steering}. The algorithm solves a sequence of convex optimization problems, where at each iteration, the nonlinear square root covariance dynamics \cref{eq:square_root_covariance_propagation} are linearized around the current reference variables. 
 At each iteration, the difference between the augmented objective, evaluated at the current versus the reference variables is calculated. The violation of the nonlinear dynamics is also calculated:
 \begin{align}
 	\Delta J &:= J_{\mathrm{aug}}(\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*, \bm{\xi}^*) - J_{\mathrm{aug}}(\bar{\bm{v}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{S}}, \bar{\bm{\xi}}) \\
@@ -394,7 +398,7 @@ Hence, \(x^*\) is a local minimum of (A).
 Next, we apply this result to our specific problem. The following proposition is used in the proof.
 \begin{proposition}[\cite{linRiemannianGeometrySymmetric2019}]
 	\label{prop:cholesky_diffeomorphism}
-	The Cholesky map \(\mathcal{L}\) is a diffeomorphism between smooth manifolds \(\mathbb{L}_+^n\) and \(\mathbb{S}^n_+\).
+	The Cholesky map \(\mathcal{L} : \mathbb{L}_+^n \rightarrow \mathbb{S}^n_+\) is a diffeomorphism.
 \end{proposition}
 
 \begin{theorem} \label{th:global_optimality}
@@ -409,10 +413,9 @@ Next, we apply this result to our specific problem. The following proposition is
 \section{Numerical Examples}
 The convex optimization problems are solved in MATLAB using YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} on a MacBook Pro with an M4 Max processor with 24GB of RAM. We use the same SCP parameters as in \cite{oguriSuccessiveConvexificationFeasibility2023a}.
 \footnote{The code is available at \url{https://github.com/naoya-kumagai/sqrt_covariance_steering/}.}
-
-Some practical implementation tips:
+Some practical implementation tips are:
 \begin{itemize}
-	\item Since the algorithm requires iteratively linearizing the problem, an initial guess is required for each of the variables. The initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) can be obtained, for example, by calculating feedback gains \(K_{k,\mathrm{LQR}} \) via the Riccati equation, and then setting \( \bar{L}_k = K_{k,\mathrm{LQR}} \bar{S}_k \).
+	\item Since the algorithm requires iterative linearization, an initial guess is required for each of the variables. The initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) can be obtained, for example, by calculating feedback gains \(K_{k,\mathrm{LQR}} \) via the Riccati equation, and then setting \( \bar{L}_k = K_{k,\mathrm{LQR}} \bar{S}_k \).
 	\item In some cases, a trust region on \( L_k\) is not necessary, and causes chattering close to the solution. 
 \end{itemize}
 
@@ -422,7 +425,7 @@ The dynamics is given by:
 \begin{equation}
 	A = \begin{bmatrix}
 		I_3 & \Delta t I_3 \\
-		0_{3} & I_3
+		0_{3 \times 3} & I_3
 	\end{bmatrix},
 	B = \begin{bmatrix}
 		0.5 \Delta t^2 I_3 \\
@@ -454,9 +457,9 @@ For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers f
 \subsection{Numerical Reliability}
 Here, we demonstrate the numerical reliability of the proposed method when the variance of some state components are small. We consider the problem from \cite{oguriChanceConstrainedControlSafe2024a} which considers covariance steering for a spacecraft rendezvous setting. We greatly simplify the problem, using the same system dynamics and boundary condition; we also consider finite-thrust control compared to an impulsive control. The problem considers a 2-norm type objective function \cref{eq:objective_function} which is common for minimizing spacecraft fuel consumption. We emphasize that the parameters of uncertainty are rather realistic for a spacecraft rendezvous setting, and is not an artificial example. For the specific parameters, see the arXiv version of \cite{oguriChanceConstrainedControlSafe2024a}.
 
-The solution is obtained using the proposed method. The results are shown in \cref{fig:example_cwh_trajectory,fig:example_cwh_control_history}. 
+The solution is obtained using the proposed method. The results are shown in \cref{fig:example_cwh_trajectory,fig:example_cwh_control_history}. The convergence history is shown in \cref{fig:example_cwh_scp_iter_history}. The result shows that the covariance is steered to the terminal covariance. The infeasibility \(\chi\) reduces almost monotonically during the solution process.
 
-For the full covariance approach, since it cannot directly handle the ``square-root of maximum eigenvalue'' term, we linearize it around a reference covariance matrix, as in the chance constraint handling described in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. In this case, a small term \(\epsilon \trace(Y_k)\) is added to the objective function to ensure valid convexification \cite{kumagaiRobustCislunarLowThrust2025a}, with \(\epsilon = 10^{-3}\) chosen. The full covariance approach is not able to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues\cite{lofbergYALMIPToolboxModeling2004}; when this happens, the solver returns a solution that may or may not be close to a feasible and optimal solution. For this problem, we checked that the covariance dynamics are largely violated. This supports our hypothesis that working with the covariance matrix directly, squares the units of the optimization variables, and can introduce numerical issues for conic solvers. We also tested with alternative objective functions, such as the quadratic cost function, \( \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), \(\norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. We measured the loss in covariance propagation as follows:
+For the full covariance approach, since it cannot directly handle the ``square-root of maximum eigenvalue'' term, we linearize it around a reference covariance matrix, as in the chance constraint handling described in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. In this case, a small term \(\epsilon \trace(Y_k)\) is added to the objective function to ensure valid convexification \cite{kumagaiRobustCislunarLowThrust2025a}, with \(\epsilon = 10^{-3}\) chosen. The full covariance approach is not able to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues, and the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. For this problem, we checked that the covariance dynamics are largely violated. This supports our hypothesis that working with the covariance matrix squares the units of the optimization variables, and can introduce numerical issues for conic solvers. We also tested with alternative objective functions, such as the quadratic cost function, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. We measured the loss in covariance propagation as follows:
 \begin{equation}
 	\text{Loss} = \frac{\norm{\phi(K_k, P_k) - P_{k+1}}_F}{\norm{P_{k+1}}_F}
 \end{equation}
