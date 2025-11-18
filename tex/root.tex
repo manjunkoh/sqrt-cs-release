@@ -9,8 +9,9 @@
 \usepackage{physics}
 \usepackage{bm}
 \usepackage{algorithm}
-\usepackage{algpseudocode}
+\usepackage{algpseudocodex}
 \usepackage{siunitx}
+\usepackage{booktabs}
 \usepackage{caption}
 \usepackage{subcaption}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
@@ -263,9 +264,9 @@ The control chance constraints can be imposed by replacing \( \mu_k \) with \( v
 
 To summarize, \cref{eq:problem_statement} is converted into a nonconvex optimization problem as follows:
 \begin{equation} \label{eq:nonconvex_problem_statement}
-	\min_{\bm{v}, \bm{L}, \bm{\mu}, \bm{S}} \cref{eq:objective_deterministic} \quad \text{s.t.} 
+	\minimize_{\bm{v}, \bm{L}, \bm{\mu}, \bm{S}} \cref{eq:objective_deterministic} \quad \text{s.t.} 
 	\quad 
-	\cref{eq:S_structure_constraint,eq:mean_dynamics,eq:square_root_covariance_propagation,eq:initial_distributional_constraint,eq:terminal_distributional_constraint,eq:linear_chance_constraint_deterministic,eq:norm_chance_constraint_deterministic,eq:trust_region_constraint}
+	\text{\cref{eq:S_structure_constraint,eq:mean_dynamics,eq:square_root_covariance_propagation,eq:initial_distributional_constraint,eq:terminal_distributional_constraint,eq:linear_chance_constraint_deterministic,eq:norm_chance_constraint_deterministic,eq:trust_region_constraint}}
 \end{equation}
 where the only source of nonconvexity is the square root covariance dynamics \cref{eq:square_root_covariance_propagation}. For notational simplicity, we define \(\bm{L} := \{L_k\}_{k=0}^{N-1}\), \(\bm{\mu} := \{\mu_k\}_{k=0}^{N}\), and \(\bm{S} := \{S_k\}_{k=0}^{N}\).
 
@@ -277,8 +278,9 @@ In order to take advantage of the convex representation of the objective and con
 	&\left. - \left( \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1}) \right)^\top \right\} = \xi_k
 \end{split}
 \end{equation}
-where $\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix, and \( \xi_k \in \mathbb{R}^{\frac{n(n-1)}{2}}\) is a slack variable, penalized in the objective function via an Augmented Lagrangian method. 
-In the first iteration, or whenever conditions are met, the reference QR matrices are updated:
+where $\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix, and \( \xi_k \in \mathbb{R}^{\frac{n(n+1)}{2}}\) is a slack variable, penalized in the objective function via an Augmented Lagrangian method. 
+
+The reference QR matrices $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\}$ are computed at initialization and updated whenever a step is accepted:
 \begin{equation} \label{eq:reference_update}
 	\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix}),  k \in \N_{0}^{N-1}
 \end{equation}
@@ -292,76 +294,71 @@ where \( r > 0 \) is the trust region radius, and \( D_S \) and \( D_L \) are di
 Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only appear in the convex constraints.
 
 
-
-% A notable difference from typical trust region constraints is that the variable \( S_k \) is defined on a manifold. As described in \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the Riemannian metric is used to define the trust region constraint. 
-
-% \subsection{Riemannian geometry on Cholesky spaces}
-% Let \( L \in \mathcal{L}_+^n \).
-% For \( X, Y \) in the tangent space of \( \mathcal{L}_+^n \) at \( L \), the Riemannian metric is given by \cite{linRiemannianGeometrySymmetric2019}:
-% \begin{equation}
-% 	g_L(X,Y)
-%  = \sum_{i>j} X_{ij} Y_{ij} + \sum_{jj} X_{jj} Y_{jj} L_{jj}^{-2}
-%  \end{equation}
-
-%  Then, as described in \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the trust region constraint is given by:
-%  \begin{equation} \label{eq:trust_region_constraint}
-%  	g_{\bar{S}_k}(S_k - \bar{S}_k, S_k - \bar{S}_k) \leq r^2
-%  \end{equation}
-%  where \( r > 0 \) is the trust region radius. This is a quadratic convex constraint.
-
-%  For \(L_k\), we simply impose a Euclidean trust region constraint:
-%  \begin{equation} \label{eq:trust_region_constraint_L}
-%  	\|L_k - \bar{L}_k\|_F \leq r_L
-%  \end{equation}
-
-% \begin{equation} \label{eq:trust_region_constraint}
-% 	\mathrm{vectril}(S_k - \bar{S}_k) \leq r \quad k=0,\cdots, N
-% \end{equation}
-% where \( r > 0 \) is the trust region radius. 
-
-The objective function is augmented with a penalty term as follows:
-\begin{equation} \label{eq:objective_augmented}
-	J_{\mathrm{aug}}(\bm{v}, \bm{L}, \bm{\mu}, \bm{S}, \bm{\xi}) = J(\bm{v}, \bm{L}, \bm{\mu}, \bm{S}) + \sum_{k=0}^{N-1} (\lambda_k^\top \xi_k + \frac{w}{2} \|\xi_k\|_2^2)
+The objective function is augmented with a penalty term using the augmented Lagrangian method. The penalty function for the constraint violations is defined as:
+\begin{equation} \label{eq:penalty_function}
+	P(\bm{\xi}; w, \bm{\lambda}) = \sum_{k=0}^{N-1} \left( \lambda_k^\top \xi_k + \frac{w}{2} \|\xi_k\|_2^2 \right)
 \end{equation}
-where \( \lambda_k \) are Lagrange multipliers, \( w > 0\) is the penalty weight, and \(\bm{\xi} := \{\xi_k\}_{k=0}^{N-1}\). In the \texttt{SCvx*} algorithm, the Lagrange multipliers and penalty weights are updated throughout the iterations.
+where \( \lambda_k \in \mathbb{R}^{\frac{n(n+1)}{2}} \) are Lagrange multipliers, \( w > 0\) is the penalty weight, and \(\bm{\xi} := \{\xi_k\}_{k=0}^{N-1}\) with \(\xi_k \in \mathbb{R}^{\frac{n(n+1)}{2}}\) are the slack variables from \cref{eq:linearized_dynamics}. The augmented objective function is then:
+\begin{equation} \label{eq:objective_augmented}
+	J_{\mathrm{aug}}(\bm{v}, \bm{L}, \bm{\mu}, \bm{S}, \bm{\xi}; w, \bm{\lambda}) = 
+	J(\bm{v}, \bm{L}, \bm{\mu}, \bm{S}) + P(\bm{\xi}; w, \bm{\lambda})
+\end{equation}
+where \( \bm{\lambda} := \{\lambda_k\}_{k=0}^{N-1} \). In the \texttt{SCvx*} algorithm, the Lagrange multipliers and penalty weights are updated throughout the iterations to ensure convergence to a feasible and locally optimal solution.
 
 The subproblem is then given by:
 \begin{equation} \label{eq:subproblem}
-	\min_{\bm{v}, \bm{L}, \bm{\mu}, \bm{S}, \bm{\xi}} \cref{eq:objective_augmented} \quad \text{s.t.} \quad 
-	\cref{eq:S_structure_constraint,eq:mean_dynamics,eq:linearized_dynamics,eq:initial_distributional_constraint,eq:terminal_distributional_constraint,eq:linear_chance_constraint_deterministic,eq:norm_chance_constraint_deterministic,eq:trust_region_constraint}.
+	\minimize_{\bm{v}, \bm{L}, \bm{\mu}, \bm{S}, \bm{\xi}} \cref{eq:objective_augmented} \quad \text{s.t.} \quad 
+	\text{\cref{eq:S_structure_constraint,eq:mean_dynamics,eq:linearized_dynamics,eq:initial_distributional_constraint,eq:terminal_distributional_constraint,eq:linear_chance_constraint_deterministic,eq:norm_chance_constraint_deterministic,eq:trust_region_constraint}}.
 \end{equation}
 
-The complete solution process is summarized in Algorithm \ref{alg:sqrt_qr_covariance_steering}.
-At each iteration, the difference between the augmented objective, evaluated at the current versus the reference variables ($\Delta J$) is calculated. The violation of the nonlinear dynamics ($\chi$) is also calculated:
+The complete solution process is summarized in Algorithm \ref{alg:sqrt_qr_covariance_steering}. At each iteration, the algorithm solves the convex subproblem \cref{eq:subproblem} to obtain a candidate solution. The algorithm then evaluates the following quantities to determine step acceptance and parameter updates:
+
 \begin{align}
-	\Delta J &:= J_{\mathrm{aug}}(\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*, \bm{\xi}^*) - J_{\mathrm{aug}}(\bar{\bm{v}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{S}}, \bar{\bm{\xi}}) \\
-	\chi &:= \norm{\begin{bmatrix}
+	\Delta J^{(i)} &:= J_{\mathrm{aug}}(\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*, \bm{\xi}^*, w^{(i)}, \bm{\lambda}^{(i)}) - J_{\mathrm{aug}}(\bar{\bm{v}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{S}}, \bar{\bm{\xi}}, w^{(i)}, \bm{\lambda}^{(i)}) \label{eq:delta_J} \\
+	\Delta L^{(i)} &:= J_{\mathrm{aug}}(\bar{\bm{v}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{S}}, \bar{\bm{\xi}}, w^{(i)}, \bm{\lambda}^{(i)}) - J_{\mathrm{aug}}(\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*, \bm{\xi}^*, w^{(i)}, \bm{\lambda}^{(i)}) \label{eq:delta_L} \\
+	\chi^{(i)} &:= \norm{\begin{bmatrix}
 		\mathrm{vectril}(S_1^* - (\mathrm{qr}(X_1^{*\top}))^\top) \\
 		\vdots \\
 		\mathrm{vectril}(S_N^* - (\mathrm{qr}(X_N^{*\top}))^\top)
-	\end{bmatrix}}_2
+	\end{bmatrix}}_2 \label{eq:chi}
 \end{align}
-where the superscript $^*$ denotes the solution obtained at the current iteration.
-The algorithm terminates when \(\Delta J\) and \(\chi\) are below their respective tolerances. Readers are referred to \cite{oguriSuccessiveConvexificationFeasibility2023a} for more details of the $\texttt{SCvx*}$ algorithm, including its proof of convergence to a local minimum.
+where the superscript $(i)$ denotes the SCP iteration number, and $^*$ denotes the solution obtained at the current iteration. Here, $\Delta J^{(i)}$ is the actual cost reduction, $\Delta L^{(i)}$ is the predicted cost reduction from the linearized subproblem, and $\chi^{(i)}$ measures the violation of the nonlinear dynamics constraints. The step acceptance ratio $\rho^{(i)} = \Delta J^{(i)} / \Delta L^{(i)}$ is computed, where $\Delta L^{(i)} \geq 0$ is guaranteed by the convexity of the subproblem \cite{oguriSuccessiveConvexificationFeasibility2023a}. The step is accepted if $\rho^{(i)} \geq \rho_0$ for some $\rho_0 \in (0,1)$.
+
+When the step is accepted and $|\Delta J^{(i)}| < \delta^{(i)}$ for a stationarity tolerance $\delta^{(i)} > 0$, the Lagrange multipliers and stationarity tolerance are updated. The trust region radius and penalty weight are updated based on the step acceptance ratio, where $\alpha_1 > 1$, $\alpha_2 > 1$, $\beta > 1$, and $0 < \rho_1 < \rho_0 < \rho_2 < 1$ are algorithm parameters.
+
+The algorithm terminates when both $|\Delta J^{(i)}| \leq \epsilon_{\mathrm{opt}}$ and $\chi^{(i)} \leq \epsilon_{\mathrm{feas}}$ are satisfied, where $\epsilon_{\mathrm{opt}} > 0$ and $\epsilon_{\mathrm{feas}} > 0$ are user-specified tolerances. Ref. \cite{oguriSuccessiveConvexificationFeasibility2023a} provides more details of the $\texttt{SCvx*}$ algorithm, including its proof of convergence to a local minimum.
 
 \begin{algorithm}[th]
 \caption{Square Root QR Covariance Steering via \texttt{SCvx*}}
 \label{alg:sqrt_qr_covariance_steering}
 \begin{algorithmic}[1]
-\Require Initial guess $\bar{\bm{S}}, \bar{\bm{L}}$
-\Require SCP parameters \(\epsilon_{\mathrm{feas}} > 0, \epsilon_{\mathrm{opt}} > 0\) among others.
-\State Initialize SCP parameters
-\State Compute the reference QR matrices: \cref{eq:reference_update}
-\While{$|\Delta J| > \epsilon_{\mathrm{opt}}$ or $\chi > \epsilon_{\mathrm{feas}}$}
-	\State $(\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*, \bm{\xi}^*) \gets \arg\min$ \cref{eq:subproblem}
-	\If{step acceptance conditions are met}
-		\State $(\bar{\bm{S}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{v}}) \gets (\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*)$ 
-		\State Compute the reference QR matrices: \cref{eq:reference_update}
-		\If{(15) of \cite{oguriSuccessiveConvexificationFeasibility2023a} is met}
-			\State Update Lagrange multipliers \(\{\lambda_k\}_{k=0}^{N-1}\) and stationarity tolerance \( \delta \)
+\Require Initial guess $\bar{\bm{S}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{v}}$
+\Require SCP parameters: $\epsilon_{\mathrm{feas}} > 0$, $\epsilon_{\mathrm{opt}} > 0$, $0 < \rho_1 < \rho_0 < \rho_2 < 1$, $\alpha_1 > 1$, $\alpha_2 > 1$, $\beta > 1$, $0 < \gamma < 1$, $ 0 < r_{\mathrm{min}} < r_{\mathrm{max}} $
+\State Initialize: $i \gets 1$, $r^{(1)} > 0$, $w^{(1)} > 0$, $\delta^{(1)} = \infty$, $\bm{\lambda}^{(1)} = \bm{0}$
+\State Compute reference QR matrices using \cref{eq:reference_update}
+\While{$|\Delta J^{(i)}| > \epsilon_{\mathrm{opt}}$ or $\chi^{(i)} > \epsilon_{\mathrm{feas}}$}
+	\State $(\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*, \bm{\xi}^*) \gets \arg\min$ \cref{eq:subproblem} \Comment{Solve convex subproblem}
+	\State Compute $\Delta J^{(i)}$, $\Delta L^{(i)}$, and $\chi^{(i)}$ using \cref{eq:delta_J,eq:delta_L,eq:chi}
+	\State Compute step acceptance ratio: $\rho^{(i)} \gets \Delta J^{(i)} / \Delta L^{(i)}$
+	\If{$\rho^{(i)} \geq \rho_0$} \Comment{Accept step}
+		\State $(\bar{\bm{S}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{v}}) \gets (\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*)$
+		\State Update reference QR matrices using \cref{eq:reference_update}
+		\If{$|\Delta J^{(i)}| < \delta^{(i)}$}
+			\State $\lambda_k^{(i+1)} \gets \lambda_k^{(i)} + w^{(i)} \xi_k^*$ for $k \in \N_{0}^{N-1}$
+			\State $\delta^{(i+1)} \gets \begin{cases}
+				|\Delta J^{(i)}| & \text{if } \delta^{(i)} = \infty \\
+				\gamma \delta^{(i)} & \text{otherwise}
+			\end{cases}$
+			\State $w^{(i+1)} \gets \beta w^{(i)}$
+		\Else
+			\State $\bm{\lambda}^{(i+1)} \gets \bm{\lambda}^{(i)}$, $\delta^{(i+1)} \gets \delta^{(i)}$, $w^{(i+1)} \gets w^{(i)}$
 		\EndIf
+	\Else
+		\State $\bm{\lambda}^{(i+1)} \gets \bm{\lambda}^{(i)}$, $\delta^{(i+1)} \gets \delta^{(i)}$, $w^{(i+1)} \gets w^{(i)}$
 	\EndIf
-	\State Update trust region radius \(r\) and penalty weight \(w\)
+	\State Update trust region radius: 
+	\State \quad $r^{(i+1)} \gets \begin{cases} \max(r^{(i)} / \alpha_1, r_{\mathrm{min}}) & \text{if } \rho^{(i)} < \rho_1 \\ r^{(i)} & \text{elseif } \rho^{(i)} < \rho_2 \\  \min(\alpha_2 r^{(i)}, r_{\mathrm{max}}) & \text{otherwise} \end{cases}$
+	\State $i \gets i + 1$
 \EndWhile
 \State Recover feedback gains: $K_k^* \gets L_k^* (S_k^*)^{-1}$ for $k \in \N_{0}^{N-1}$
 \State \Return $\bm{v}^*, \bm{\mu}^*, \bm{S}^*, \bm{K}^*$
@@ -428,8 +425,22 @@ Next, we apply this result to our specific problem. The following proposition is
 
 
 \section{Numerical Examples}
-The convex optimization problems are solved in MATLAB using YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} on a MacBook Pro with an M4 Max processor with 24GB of RAM. We use the same SCP parameters as in \cite{oguriSuccessiveConvexificationFeasibility2023a}.
-% \footnote{The code is available at \url{https://github.com/naoya-kumagai/sqrt_covariance_steering/}.}
+The convex optimization problems are solved in MATLAB using YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} on a MacBook Pro with an M4 Max processor with 24GB of RAM. We use the same SCP parameters as in \cite{oguriSuccessiveConvexificationFeasibility2023a}, which are summarized in \cref{tab:scp_parameters}.
+% \footnote{The code is available at \url{https://github.com/naoya-kumagai/
+% sqrt_covariance_steering/}.}
+\begin{table}[ht]
+\centering
+\caption{SCvx* parameters}
+\label{tab:scp_parameters}
+\begin{tabular}{cccc}
+\toprule
+$\{\epsilon_{\mathrm{opt}}, \epsilon_{\mathrm{feas}}\}$ & $\{\rho_0, \rho_1, \rho_2\}$ & $\{\alpha_1, \alpha_2, \beta, \gamma\}$ & $\{r^{(1)}, r_{\mathrm{min}}, r_{\mathrm{max}}\}$ \\
+\midrule
+$\{10^{-4}, 10^{-4}\}$ & $\{0, 0.25, 0.7\}$ & $\{2, 3, 2, 0.9\}$ & $\{0.1, 10^{-10}, 10\}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 Some practical implementation tips are:
 \begin{itemize}
 	\item Since the algorithm requires iterative linearization, an initial guess is required for each of the variables. The initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) can be obtained, for example, by calculating feedback gains \(K_{k,\mathrm{LQR}} \) via the Riccati equation, and then setting \( \bar{L}_k = K_{k,\mathrm{LQR}} \bar{S}_k \).
@@ -472,9 +483,51 @@ For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers f
 
 
 \subsection{Numerical Reliability}
-Here, we demonstrate the numerical reliability of the proposed method when the variance of some state components are small. We consider the problem from \cite{oguriChanceConstrainedControlSafe2024a} which considers covariance steering for a spacecraft rendezvous setting. We greatly simplify the problem, using the same system dynamics and boundary condition; we also consider finite-thrust control compared to an impulsive control. The problem considers a 2-norm type objective function \cref{eq:objective_function} which is common for minimizing spacecraft fuel consumption. We emphasize that the parameters of uncertainty are rather realistic for a spacecraft rendezvous setting, and is not an artificial example. For the specific parameters, see the arXiv version of \cite{oguriChanceConstrainedControlSafe2024a}.
+Here, we demonstrate the numerical reliability of the proposed method when the variance of some state components are small. We consider the problem from \cite{oguriChanceConstrainedControlSafe2024a} which considers covariance steering for a spacecraft rendezvous setting. We greatly simplify the problem, using the same system dynamics and boundary condition; we also consider finite-thrust control compared to an impulsive control. The problem considers a 2-norm type objective function \cref{eq:objective_function} which is common for minimizing spacecraft fuel consumption. We emphasize that the parameters of uncertainty are rather realistic for a spacecraft rendezvous setting, and is not an artificial example. The problem parameters are summarized in \cref{tab:cwh_parameters} for completeness.
 
-The solution is obtained using the proposed method. The results are shown in \cref{fig:example_cwh_trajectory,fig:example_cwh_control_history}. The convergence history is shown in \cref{fig:example_cwh_scp_iter_history}. The result shows that the covariance is steered to the terminal covariance. The infeasibility \(\chi\) reduces almost monotonically during the solution process.
+\begin{table}[ht]
+\centering
+\caption{Problem parameters for the spacecraft rendezvous example}
+\label{tab:cwh_parameters}
+\begin{tabular}{llll}
+\toprule
+Parameter & Symbol & Value & Unit \\
+\midrule
+mean pos. at $t_0$ & $\bar{r}_0$ & $[-3.0, 0.126, 0]^\top$ & km \\
+mean vel. at $t_0$ & $\bar{v}_0$ & $\mathbf{0}_{3 \times 1}$ & km/s \\
+initial dispersion (pos.) & $\sigma_{r_0}$ & $100$ & m \\
+initial dispersion (vel.) & $\sigma_{v_0}$ & $1.0$ & m/s \\
+mean pos. at $t_N$ & $\bar{r}_f$ & $[0.0, 0.05, 0]^\top$ & km \\
+mean vel. at $t_N$ & $\bar{v}_f$ & $\mathbf{0}_{3 \times 1}$ & km/s \\
+pos. std. dev. at $t_f$ & $\sigma_{r_f}$ & $10.0$ & m \\
+vel. std. dev. at $t_f$ & $\sigma_{v_f}$ & $0.1$ & m/s \\
+stochastic acceleration & $\sigma_a$ & $1.0$ & mm/s$^{3/2}$ \\
+horizon length & $N$ & $14$ & - \\
+time step & $\Delta t$ & $30$ & s \\
+chief orbit radius & $r_0$ & $7228$ & km \\
+gravitational parameter & $\mu$ & $3.986004418 \times 10^{5}$ & km$^3$/s$^2$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The continuous-time CWH dynamics are discretized using zero-order hold on the control input. The discrete-time state transition matrix \(A_k\) is obtained via the matrix exponential:
+\begin{equation}
+	A_k = \exp(A \Delta t)
+\end{equation}
+where \(A\) is the continuous-time state matrix \cite{schaubAnalyticalMechanicsSpace2003} and \(\Delta t = t_{k+1} - t_k\) is the time step. The discrete-time control input matrix \(B_k\) is given by:
+\begin{equation}
+	B_k = A_k \int_{t_k}^{t_{k+1}} \Phi^{-1}(t, t_k) \begin{bmatrix} 0_{3 \times 3} \\ I_3 \end{bmatrix} \dd t
+\end{equation}
+where \(\Phi(t, t_k) = \exp(A (t - t_k))\) is the state transition matrix. The discrete-time process noise matrix \(G_k\) is any matrix such that \(G_k w_k\) has covariance:
+\begin{equation}
+	A_k \left\{ \int_{t_k}^{t_{k+1}} \Phi^{-1}(t, t_k) G(t) \left[\Phi^{-1}(t, t_k) G(t)\right]^\top \dd t \right\} A_k^\top
+\end{equation}
+where \(G(t)\) is the continuous-time process noise matrix:
+\begin{equation}
+	G(t) = \begin{bmatrix} 0_{3 \times 3} \\ \sigma_a I_3 \end{bmatrix}.
+\end{equation}
+
+The solution is obtained using the proposed method. The results are shown in \cref{fig:example_cwh_trajectory,fig:example_cwh_control_history}. The convergence history is shown in \cref{fig:example_cwh_scp_iter_history}. The result shows that the covariance is steered to the terminal covariance. The infeasibility \(\chi\) reduces steadily during the solution process.
 
 For the full covariance approach, since it cannot directly handle the ``square-root of maximum eigenvalue'' term, we linearize it around a reference covariance matrix, as in the chance constraint handling described in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. In this case, a small term \(\epsilon \trace(Y_k)\) is added to the objective function to ensure valid convexification \cite{kumagaiRobustCislunarLowThrust2025a}, with \(\epsilon = 10^{-3}\) chosen. The full covariance approach is not able to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues, and the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. For this problem, we checked that the covariance dynamics are largely violated. This supports our hypothesis that working with the covariance matrix squares the units of the optimization variables, and can introduce numerical issues for conic solvers. We also tested with alternative objective functions, such as the quadratic cost function, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. We measured the loss in covariance propagation as follows:
 \begin{equation}
@@ -520,6 +573,32 @@ The concept of using the QR decomposition and its derivative can be used in othe
 
 
 % \section{Appendix}
+
+% A notable difference from typical trust region constraints is that the variable \( S_k \) is defined on a manifold. As described in \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the Riemannian metric is used to define the trust region constraint. 
+
+% \subsection{Riemannian geometry on Cholesky spaces}
+% Let \( L \in \mathcal{L}_+^n \).
+% For \( X, Y \) in the tangent space of \( \mathcal{L}_+^n \) at \( L \), the Riemannian metric is given by \cite{linRiemannianGeometrySymmetric2019}:
+% \begin{equation}
+% 	g_L(X,Y)
+%  = \sum_{i>j} X_{ij} Y_{ij} + \sum_{jj} X_{jj} Y_{jj} L_{jj}^{-2}
+%  \end{equation}
+
+%  Then, as described in \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the trust region constraint is given by:
+%  \begin{equation} \label{eq:trust_region_constraint}
+%  	g_{\bar{S}_k}(S_k - \bar{S}_k, S_k - \bar{S}_k) \leq r^2
+%  \end{equation}
+%  where \( r > 0 \) is the trust region radius. This is a quadratic convex constraint.
+
+%  For \(L_k\), we simply impose a Euclidean trust region constraint:
+%  \begin{equation} \label{eq:trust_region_constraint_L}
+%  	\|L_k - \bar{L}_k\|_F \leq r_L
+%  \end{equation}
+
+% \begin{equation} \label{eq:trust_region_constraint}
+% 	\mathrm{vectril}(S_k - \bar{S}_k) \leq r \quad k=0,\cdots, N
+% \end{equation}
+% where \( r > 0 \) is the trust region radius. 
 
 % \subsection{Scaling}
 % For problems where the covariance matrices have small numerical values, a numerical rescaling of the problem can improve numerical stability for the underlying conic solver. First, 
