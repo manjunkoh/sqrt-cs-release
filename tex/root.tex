@@ -43,7 +43,7 @@ We propose a novel method for solving the chance-constrained covariance steering
 
 \subsection{Notation and Preliminaries}
 $\mathbb{L}^n$ denotes the space of $n \times n$ lower triangular matrices.
-$\mathbb{L}_+^n$ denotes the space of $n \times n$ lower triangular matrices with positive diagonal entries. $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric positive definite matrices. The Cholesky factor of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \). The linear matrix inequality $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \(\N_{a}^{b}\) denotes the set of integers from \( a \) to \( b \).
+$\mathbb{L}_+^n$ denotes the space of $n \times n$ lower triangular matrices with positive diagonal entries. $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric positive definite matrices. The Cholesky factor of a positive definite matrix \( P \in \mathbb{R}^{n \times n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \), and $\mathrm{diag}(a,b,c, \cdots)$ denotes the diagonal matrices with $a,b,c,\cdots$ on the diagonals. The linear matrix inequality $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \(\N_{a}^{b}\) denotes the set of integers from \( a \) to \( b \).
 We refer to the ``square root" of the covariance \(P \) to refer to (not necessarily square) matrices \(L\) that satisfy \(P = L L^\top\).
 
 
@@ -59,8 +59,8 @@ We address the finite-horizon discrete-time covariance steering problem for a li
 	& x_0 \sim \mathcal{N}(\mu_{\mathrm{init}}, P_{\mathrm{init}}) \\
 	& x_N \sim \mathcal{N}(\mu_{\mathrm{fin}}, P_{\mathrm{fin}}) \\
 	& P_{\mathrm{fin}} \succeq \E{(x_N - \E{x_N})(x_N - \E{x_N})^\top} \\
-	& \mathbb{P}(x_k \in \mathcal{X}_k) \geq 1 - \epsilon_k, \quad k \in \N_{0}^{N} \label{eq:state_chance_constraint}\\ 
-	& \mathbb{P}(u_k \in \mathcal{U}_k) \geq 1 - \delta_k, \quad k \in \N_{0}^{N-1} \label{eq:control_chance_constraint}
+	& \mathbb{P}(x_k \in \mathcal{X}) \geq 1 - \epsilon_x, \quad k \in \N_{0}^{N} \label{eq:state_chance_constraint}\\ 
+	& \mathbb{P}(u_k \in \mathcal{U}) \geq 1 - \epsilon_u, \quad k \in \N_{0}^{N-1} \label{eq:control_chance_constraint}
 \end{align}
 \end{subequations}
 where \( x_k \in \mathbb{R}^n \) is the state vector, \( u_k \in \mathbb{R}^m \) is the control input, and \( w_k \in \mathbb{R}^n \) is standard Gaussian process noise. \( \bm{v} := \{v_k\}_{k=0}^{N-1}\) and \(\bm{K} := \{K_k\}_{k=0}^{N-1}\) are respectively the nominal control input and the state feedback gain to be designed, with \( v_k \in \mathbb{R}^m \) and \( K_k \in \mathbb{R}^{m \times n} \). We restrict the form of feedback control to \cref{eq:feedback_control_law} since it is shown to be optimal for the covariance steering problem without chance constraints \cite{liuOptimalCovarianceSteering2025} (i.e. \cref{eq:problem_statement} without \cref{eq:state_chance_constraint} and \cref{eq:control_chance_constraint}). Note that due to the affine feedback control law, the state and the control input are Gaussian at each time step.
@@ -79,7 +79,7 @@ We consider two types of cost functions:
 \end{equation}
 with \( Q_k \succeq 0 \) and \( R_k \succ 0 \), and \( \mathcal{Q}_{\norm{u_k}_2}(p_J) \) is $p_J$-quantile of the 2-norm of the control input $u_k$. THe latter cost is used in scenarios where the probabilistically worst-case control effort is of more interest than the expected value, such as in spacecraft mission design \cite{oguriChanceConstrainedControlSafe2024a}.
 
-The sets \( \mathcal{X}_k \) and \( \mathcal{U}_k \) represent state and control feasible sets, respectively, with associated violation probabilities \( \epsilon_k \) and \( \delta_k \). We assume that the chance constraints are given in one of two forms: a linear constraint or a norm constraint. For the linear constraint form, the chance constraint is given by:
+The sets \( \mathcal{X} \) and \( \mathcal{U} \) represent state and control feasible sets, respectively, with associated violation probabilities \( \epsilon_x \) and \( \epsilon_u \). Through some risk allocation procedure between each node, we assume that the chance constraints are given in one of two forms: a linear constraint or a norm constraint. For the linear constraint form, the chance constraint is given by:
 \begin{equation} \label{eq:linear_chance_constraint}
 	\mathbb{P}(\alpha_j ^\top x_k \leq \beta_j) \geq 1 - p_j
 \end{equation}
@@ -129,14 +129,14 @@ The QR decomposition is a key element of propagating the square root of the cova
 
 % \subsubsection{Existence and Uniqueness}
 \begin{lemma}[Existence and uniqueness of economy-size QR decomposition, \cite{ipsenNumericalMatrixAnalysis2009}]\label{lemma:existence_and_uniqueness_of_economy_size_qr_decomposition}
-	Let \( M \in \mathbb{R}^{p \times q} \), \(p \geq q\). 
+	Let \( M \in \mathbb{R}^{p \times q} \), \(p \geq q\).
 	\begin{itemize}
 		\item (Existence) There exist \(Q \in \mathbb{R}^{p \times q}\) and \(R \in \mathbb{R}^{q \times q}\) such that \(Q Q^\top = I\), \(R\) is upper triangular, and \(M = QR\).
 		\item (Uniqueness) If \(M\) has full rank, i.e. \(\mathrm{rank}(M) = q\), then the matrices \(Q\) and \(R\) are unique up to a sign change of the diagonal entries of \(R\). If we require the diagonal entries of \( R \) to be positive, then the decomposition is unique.
 	\end{itemize}
 \end{lemma}
 From here on, we will use the phrase ``QR decomposition'' to refer to the economy-size QR decomposition with positive diagonal entries.
-\footnote{In MATLAB, this requires using $\mathrm{qr}(M, \text{``econ"})$. In addition, to ensure uniqueness of the square root, if the function returns an \( R \) matrix with negative diagonal entries, multiply the corresponding columns of \( Q \) and rows of \( R \) by -1 to ensure positive diagonals.}
+\footnote{In MATLAB, this requires using $\mathrm{qr}(M, \text{``econ"})$. Then, to ensure uniqueness of the square root, if the function returns an \( R \) matrix with negative diagonal entries, multiply the corresponding columns of \( Q \) and rows of \( R \) by -1 to ensure positive diagonals.}
 
 \begin{remark}
 	If \(M\) has full rank, then so does \(R\), hence \(R\) is invertible.
@@ -298,10 +298,10 @@ The objective function is augmented with a penalty term using the augmented Lagr
 \begin{equation} \label{eq:penalty_function}
 	P(\bm{\xi}; w, \bm{\lambda}) = \sum_{k=0}^{N-1} \left( \lambda_k^\top \xi_k + \frac{w}{2} \|\xi_k\|_2^2 \right)
 \end{equation}
-where \( \lambda_k \in \mathbb{R}^{\frac{n(n+1)}{2}} \) are Lagrange multipliers, \( w > 0\) is the penalty weight, and \(\bm{\xi} := \{\xi_k\}_{k=0}^{N-1}\) with \(\xi_k \in \mathbb{R}^{\frac{n(n+1)}{2}}\) are the slack variables from \cref{eq:linearized_dynamics}. The augmented objective function is then:
+where \( \lambda_k \in \mathbb{R}^{\frac{n(n+1)}{2}} \) are Lagrange multipliers, \( w > 0\) is the penalty weight, and \(\bm{\xi} := \{\xi_k\}_{k=0}^{N-1}\) with \(\xi_k \in \mathbb{R}^{\frac{n(n+1)}{2}}\) are the slack variables from \cref{eq:linearized_dynamics}. For convenience, define \(\bm{z} := \{\bm{v}, \bm{L}, \bm{\mu}, \bm{S} \} \). The augmented objective function is then:
 \begin{equation} \label{eq:objective_augmented}
-	J_{\mathrm{aug}}(\bm{v}, \bm{L}, \bm{\mu}, \bm{S}, \bm{\xi}; w, \bm{\lambda}) = 
-	J(\bm{v}, \bm{L}, \bm{\mu}, \bm{S}) + P(\bm{\xi}; w, \bm{\lambda})
+	\mathcal{L}(\bm{z}, \bm{\xi}; w, \bm{\lambda}) := 
+	J(\bm{z}) + P(\bm{\xi}; w, \bm{\lambda})
 \end{equation}
 where \( \bm{\lambda} := \{\lambda_k\}_{k=0}^{N-1} \). In the \texttt{SCvx*} algorithm, the Lagrange multipliers and penalty weights are updated throughout the iterations to ensure convergence to a feasible and locally optimal solution.
 
@@ -311,18 +311,20 @@ The subproblem is then given by:
 	\text{\cref{eq:S_structure_constraint,eq:mean_dynamics,eq:linearized_dynamics,eq:initial_distributional_constraint,eq:terminal_distributional_constraint,eq:linear_chance_constraint_deterministic,eq:norm_chance_constraint_deterministic,eq:trust_region_constraint}}.
 \end{equation}
 
-The complete solution process is summarized in Algorithm \ref{alg:sqrt_qr_covariance_steering}. At each iteration, the algorithm solves the convex subproblem \cref{eq:subproblem} to obtain a candidate solution. The algorithm then evaluates the following quantities to determine step acceptance and parameter updates:
-
+The complete solution process is summarized in Algorithm \ref{alg:sqrt_qr_covariance_steering}. At each iteration, the algorithm solves the convex subproblem \cref{eq:subproblem} to obtain a candidate solution. 
+The algorithm then evaluates the following quantities to determine step acceptance and parameter updates:
 \begin{align}
-	\Delta J^{(i)} &:= J_{\mathrm{aug}}(\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*, \bm{\xi}^*, w^{(i)}, \bm{\lambda}^{(i)}) - J_{\mathrm{aug}}(\bar{\bm{v}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{S}}, \bar{\bm{\xi}}, w^{(i)}, \bm{\lambda}^{(i)}) \label{eq:delta_J} \\
-	\Delta L^{(i)} &:= J_{\mathrm{aug}}(\bar{\bm{v}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{S}}, \bar{\bm{\xi}}, w^{(i)}, \bm{\lambda}^{(i)}) - J_{\mathrm{aug}}(\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*, \bm{\xi}^*, w^{(i)}, \bm{\lambda}^{(i)}) \label{eq:delta_L} \\
-	\chi^{(i)} &:= \norm{\begin{bmatrix}
-		\mathrm{vectril}(S_1^* - (\mathrm{qr}(X_1^{*\top}))^\top) \\
+	\widetilde{\bm{\xi}}(\bm{z}) & := \begin{bmatrix}
+		\mathrm{vectril}(S_1 - (\mathrm{qr}(X_1^{\top}))^\top) \\
 		\vdots \\
-		\mathrm{vectril}(S_N^* - (\mathrm{qr}(X_N^{*\top}))^\top)
-	\end{bmatrix}}_2 \label{eq:chi}
+		\mathrm{vectril}(S_N - (\mathrm{qr}(X_N^{\top}))^\top)
+	\end{bmatrix} \\
+	\mathcal{J}(\bm{z}, w, \bm{\lambda}) &:= J(\bm{z}) + P({\widetilde{\bm{\xi}}}(\bm{z}); w, \bm{\lambda}) \\
+	\Delta J^{(i)} &:= \mathcal{J}(\bar{\bm{z}}; w^{(i)}, \bm{\lambda}^{(i)}) - \mathcal{J}(\bm{z}^*; w^{(i)}, \bm{\lambda}^{(i)}) \label{eq:delta_J} \\
+	\Delta L^{(i)} &:= \mathcal{J}(\bar{\bm{z}}; w^{(i)}, \bm{\lambda}^{(i)}) - \mathcal{L}(\bm{z}^*, \bm{\xi}^*; w^{(i)}, \bm{\lambda}^{(i)}) \label{eq:delta_L} \\
+	\chi^{(i)} &:= \norm{\widetilde{\bm{\xi}}(\bm{z})}_2 \label{eq:chi}
 \end{align}
-where the superscript $(i)$ denotes the SCP iteration number, and $^*$ denotes the solution obtained at the current iteration. Here, $\Delta J^{(i)}$ is the actual cost reduction, $\Delta L^{(i)}$ is the predicted cost reduction from the linearized subproblem, and $\chi^{(i)}$ measures the violation of the nonlinear dynamics constraints. The step acceptance ratio $\rho^{(i)} = \Delta J^{(i)} / \Delta L^{(i)}$ is computed, where $\Delta L^{(i)} \geq 0$ is guaranteed by the convexity of the subproblem \cite{oguriSuccessiveConvexificationFeasibility2023a}. The step is accepted if $\rho^{(i)} \geq \rho_0$ for some $\rho_0 \in (0,1)$.
+where the superscript $(i)$ denotes the SCP iteration number, and $^*$ denotes the solution obtained at the current iteration. Here, $\widetilde{\bm{\xi}}$ is the vector of infeasibility of the nonlinear square root covariance dynamics, $\mathcal{J}$ is the augmented cost penalizing the nonlinear infeasibility,  $\Delta J^{(i)}$ is the actual cost reduction, $\Delta L^{(i)}$ is the predicted cost reduction from the linearized subproblem, and $\chi^{(i)}$ measures the norm of nonlinear infeasibility. The step acceptance ratio $\rho^{(i)} = \Delta J^{(i)} / \Delta L^{(i)}$ is computed, where $\Delta L^{(i)} \geq 0$ is guaranteed by the convexity of the subproblem \cite{oguriSuccessiveConvexificationFeasibility2023a}. If $\Delta L = 0$, one can set $\rho^{(i)} = 1$. The step is accepted if $\rho^{(i)} \geq \rho_0$ for some $\rho_0 \in (0,1)$.
 
 When the step is accepted and $|\Delta J^{(i)}| < \delta^{(i)}$ for a stationarity tolerance $\delta^{(i)} > 0$, the Lagrange multipliers and stationarity tolerance are updated. The trust region radius and penalty weight are updated based on the step acceptance ratio, where $\alpha_1 > 1$, $\alpha_2 > 1$, $\beta > 1$, and $0 < \rho_1 < \rho_0 < \rho_2 < 1$ are algorithm parameters.
 
@@ -337,7 +339,7 @@ The algorithm terminates when both $|\Delta J^{(i)}| \leq \epsilon_{\mathrm{opt}
 \State Initialize: $i \gets 1$, $r^{(1)} > 0$, $w^{(1)} > 0$, $\delta^{(1)} = \infty$, $\bm{\lambda}^{(1)} = \bm{0}$
 \State Compute reference QR matrices using \cref{eq:reference_update}
 \While{$|\Delta J^{(i)}| > \epsilon_{\mathrm{opt}}$ or $\chi^{(i)} > \epsilon_{\mathrm{feas}}$}
-	\State $(\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*, \bm{\xi}^*) \gets \arg\min$ \cref{eq:subproblem} \Comment{Solve convex subproblem}
+	\State Solve convex subproblem: $(\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*, \bm{\xi}^*) \gets \arg\min$ \cref{eq:subproblem}
 	\State Compute $\Delta J^{(i)}$, $\Delta L^{(i)}$, and $\chi^{(i)}$ using \cref{eq:delta_J,eq:delta_L,eq:chi}
 	\State Compute step acceptance ratio: $\rho^{(i)} \gets \Delta J^{(i)} / \Delta L^{(i)}$
 	\If{$\rho^{(i)} \geq \rho_0$} \Comment{Accept step}
@@ -426,17 +428,17 @@ Next, we apply this result to our specific problem. The following proposition is
 
 \section{Numerical Examples}
 The convex optimization problems are solved in MATLAB using YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} on a MacBook Pro with an M4 Max processor with 24GB of RAM. We use the same SCP parameters as in \cite{oguriSuccessiveConvexificationFeasibility2023a}, which are summarized in \cref{tab:scp_parameters}.
-% \footnote{The code is available at \url{https://github.com/naoya-kumagai/
-% sqrt_covariance_steering/}.}
+\footnote{\textr{Make code available at \url{https://github.com/naoya-kumagai/
+sqrt_covariance_steering/}}.}
 \begin{table}[ht]
 \centering
-\caption{SCvx* parameters}
+\caption{\texttt{SCvx*} parameters}
 \label{tab:scp_parameters}
-\begin{tabular}{cccc}
+\begin{tabular}{ccccc}
 \toprule
-$\{\epsilon_{\mathrm{opt}}, \epsilon_{\mathrm{feas}}\}$ & $\{\rho_0, \rho_1, \rho_2\}$ & $\{\alpha_1, \alpha_2, \beta, \gamma\}$ & $\{r^{(1)}, r_{\mathrm{min}}, r_{\mathrm{max}}\}$ \\
+$\{\epsilon_{\mathrm{opt}}, \epsilon_{\mathrm{feas}}\}$ & $\{\rho_0, \rho_1, \rho_2\}$ & $\{\alpha_1, \alpha_2, \beta, \gamma\}$ & $\{r^{(1)}, r_{\mathrm{min}}, r_{\mathrm{max}}\}$ & $w^{(1)}$\\
 \midrule
-$\{10^{-4}, 10^{-4}\}$ & $\{0, 0.25, 0.7\}$ & $\{2, 3, 2, 0.9\}$ & $\{0.1, 10^{-10}, 10\}$ \\
+$\{10^{-4}, 10^{-4}\}$ & $\{0, 0.25, 0.7\}$ & $\{2, 3, 2, 0.9\}$ & $\{0.1, 10^{-10}, 10\}$ & $0.1$\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -448,7 +450,7 @@ Some practical implementation tips are:
 \end{itemize}
 
 \subsection{Optimality and Scalability}
-Here, we perform a horizon-length scalability analysis, and also compare the solutions costs between Liu et al. \cite{liuOptimalCovarianceSteering2025}, Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019}, and the proposed method. We consider a three-dimensional double integrator system with a total horizon time of \(T = 3\) seconds, and vary the horizon length from 10 to 80 (so the step size is \(\Delta t = T / N\)). 
+Here, we perform a horizon-length scalability analysis, and also compare the solution costs between Liu et al. \cite{liuOptimalCovarianceSteering2025}, Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019}, and the proposed method. We consider a three-dimensional double integrator system with a total horizon time of \(T = 3\) seconds, and vary the horizon length from 10 to 80 (so the step size is \(\Delta t = T / N\)). 
 The time-invariant dynamics are given by
 \begin{equation}
 	A = \begin{bmatrix}
@@ -494,13 +496,13 @@ Here, we demonstrate the numerical reliability of the proposed method when the v
 Parameter & Symbol & Value & Unit \\
 \midrule
 mean pos. at $t_0$ & $\bar{r}_0$ & $[-3.0, 0.126, 0]^\top$ & km \\
-mean vel. at $t_0$ & $\bar{v}_0$ & $\mathbf{0}_{3 \times 1}$ & km/s \\
-initial dispersion (pos.) & $\sigma_{r_0}$ & $100$ & m \\
-initial dispersion (vel.) & $\sigma_{v_0}$ & $1.0$ & m/s \\
+mean vel. at $t_0$ & $\bar{v}_0$ & $0_{3 \times 1}$ & km/s \\
+pos. std. dev. at $t_0$ & $\sigma_{r_0}$ & $100$ & m \\
+vel. std. dev. at $t_0$ & $\sigma_{v_0}$ & $1.0$ & m/s \\
 mean pos. at $t_N$ & $\bar{r}_f$ & $[0.0, 0.05, 0]^\top$ & km \\
-mean vel. at $t_N$ & $\bar{v}_f$ & $\mathbf{0}_{3 \times 1}$ & km/s \\
-pos. std. dev. at $t_f$ & $\sigma_{r_f}$ & $10.0$ & m \\
-vel. std. dev. at $t_f$ & $\sigma_{v_f}$ & $0.1$ & m/s \\
+mean vel. at $t_N$ & $\bar{v}_f$ & $0_{3 \times 1}$ & km/s \\
+pos. std. dev. at $t_N$ & $\sigma_{r_f}$ & $10.0$ & m \\
+vel. std. dev. at $t_N$ & $\sigma_{v_f}$ & $0.1$ & m/s \\
 stochastic acceleration & $\sigma_a$ & $1.0$ & mm/s$^{3/2}$ \\
 horizon length & $N$ & $14$ & - \\
 time step & $\Delta t$ & $30$ & s \\
@@ -514,7 +516,7 @@ The continuous-time CWH dynamics are discretized using zero-order hold on the co
 \begin{equation}
 	A_k = \exp(A \Delta t)
 \end{equation}
-where \(A\) is the continuous-time state matrix \cite{schaubAnalyticalMechanicsSpace2003} and \(\Delta t = t_{k+1} - t_k\) is the time step. The discrete-time control input matrix \(B_k\) is given by:
+where \(A\) is the continuous-time state matrix for the CWH dynamics \cite{schaubAnalyticalMechanicsSpace2003} and \(\Delta t = t_{k+1} - t_k\) is the time step. The discrete-time control input matrix \(B_k\) is given by:
 \begin{equation}
 	B_k = A_k \int_{t_k}^{t_{k+1}} \Phi^{-1}(t, t_k) \begin{bmatrix} 0_{3 \times 3} \\ I_3 \end{bmatrix} \dd t
 \end{equation}
@@ -526,8 +528,8 @@ where \(G(t)\) is the continuous-time process noise matrix:
 \begin{equation}
 	G(t) = \begin{bmatrix} 0_{3 \times 3} \\ \sigma_a I_3 \end{bmatrix}.
 \end{equation}
-
-The solution is obtained using the proposed method. The results are shown in \cref{fig:example_cwh_trajectory,fig:example_cwh_control_history}. The convergence history is shown in \cref{fig:example_cwh_scp_iter_history}. The result shows that the covariance is steered to the terminal covariance. The infeasibility \(\chi\) reduces steadily during the solution process.
+We use $D_S = \mathrm{diag}(10, 10, 10, 10^3, 10^3, 10^3)$ and $D_L = 10^3 I_3$ for the trust region scaling.
+The proposed method solves the problem in 45 iterations in about 8 seconds. The results are shown in \cref{fig:example_cwh_trajectory,fig:example_cwh_control_history}. The convergence history is shown in \cref{fig:example_cwh_scp_iter_history}. The result shows that the covariance is steered to the terminal covariance. The infeasibility \(\chi\) reduces steadily during the solution process.
 
 For the full covariance approach, since it cannot directly handle the ``square-root of maximum eigenvalue'' term, we linearize it around a reference covariance matrix, as in the chance constraint handling described in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. In this case, a small term \(\epsilon \trace(Y_k)\) is added to the objective function to ensure valid convexification \cite{kumagaiRobustCislunarLowThrust2025a}, with \(\epsilon = 10^{-3}\) chosen. The full covariance approach is not able to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues, and the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. For this problem, we checked that the covariance dynamics are largely violated. This supports our hypothesis that working with the covariance matrix squares the units of the optimization variables, and can introduce numerical issues for conic solvers. We also tested with alternative objective functions, such as the quadratic cost function, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. We measured the loss in covariance propagation as follows:
 \begin{equation}
