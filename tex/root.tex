@@ -23,7 +23,7 @@
 % set path for figures
 \graphicspath{{../figures/}}
 
-\title{QR Decomposition-based Covariance Steering}
+\title{Square Root QR Covariance Steering}
 \author{Naoya Kumagai
 \thanks{N. Kumagai is with the School of Aeronautics and Astronautics, Purdue University, IN 47907 (e-mail: nkumagai@purdue.edu).}}
 
@@ -142,7 +142,7 @@ From here on, we will use the phrase ``QR decomposition'' to refer to the econom
 	If \(M\) has full rank, then so does \(R\), hence \(R\) is invertible.
 \end{remark}
 
-\subsection{Square Root Covariance Propagation}% In the 1960s, 
+\subsection{Square Root Covariance Propagation}
 Let the system dynamics be given by:
 \begin{equation}
 	x_{k+1} = \Phi_k x_k + G_k w_k
@@ -153,7 +153,7 @@ By defining $P_k := \E{(x_k - \E{x_k})(x_k - \E{x_k})^\top}$, the covariance pro
 	P_{k+1} = \Phi_k P_k \Phi_k^T + G_k G_k^\top.
 \end{equation}
 If we define \( S_k \in \mathbb{L}_+^n \) as \( S_k = P_k^{1/2} \), the covariance propagation can be expressed as:
-\begin{equation}
+\begin{equation} \label{eq:covariance_propagation}
 	S_{k+1} S_{k+1}^T = \Phi_k S_k S_k^T \Phi_k^T + G_k G_k^\top = X_{k+1} X_{k+1}^T
 \end{equation}
 where $S_{k+1} \in \mathbb{L}_+^n$ is the next step square root covariance, and we define
@@ -173,7 +173,7 @@ In other words, the square root covariance propagation can be expressed as a non
 \begin{equation} \label{eq:square_root_covariance_propagation_nonlinear}
 	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top = (\mathrm{qr}( \begin{bmatrix} \Phi_k S_k & G_k \end{bmatrix} ^\top))^\top
 \end{equation}
-where \( \mathrm{qr}(\cdot) \) denotes the operation of extracting the upper triangular factor \( R \) from the QR decomposition. Since the column space of \(X_{k+1}\) includes the column space of \(G_k\), and by \cref{assump:full_rank_G}, \(G_k\) is full rank, it follows that \(X_{k+1}\) is full rank. Then, it follows that this QR decomposition is unique.
+where \( \mathrm{qr}(\cdot) \) denotes the operation of extracting the upper triangular factor \( R \) from the QR decomposition. Since the column space of \(X_{k+1}\) includes the column space of \(G_k\), and by \cref{assump:full_rank_G}, \(G_k\) is full rank, it follows that \(X_{k+1}\) is full rank. Then, it follows that this QR decomposition is unique. In other words, $S_{k+1}$ obtained from \cref{eq:square_root_covariance_propagation_nonlinear} provides a unique matrix in $\mathbb{L}_n^+$ such that \cref{eq:covariance_propagation} is satisfied.
 
 
 \subsection{QR Decomposition Derivative}
@@ -330,20 +330,20 @@ When the step is accepted and $|\Delta J^{(i)}| < \delta^{(i)}$ for a stationari
 
 The algorithm terminates when both $|\Delta J^{(i)}| \leq \epsilon_{\mathrm{opt}}$ and $\chi^{(i)} \leq \epsilon_{\mathrm{feas}}$ are satisfied, where $\epsilon_{\mathrm{opt}} > 0$ and $\epsilon_{\mathrm{feas}} > 0$ are user-specified tolerances. Ref. \cite{oguriSuccessiveConvexificationFeasibility2023a} provides more details of the $\texttt{SCvx*}$ algorithm, including its proof of convergence to a local minimum.
 
-\begin{algorithm}[th]
+\begin{algorithm}[thbp]
 \caption{Square Root QR Covariance Steering via \texttt{SCvx*}}
 \label{alg:sqrt_qr_covariance_steering}
 \begin{algorithmic}[1]
-\Require Initial guess $\bar{\bm{S}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{v}}$
+\Require Initial guess $\bar{\bm{L}}, \bar{\bm{S}}$
 \Require SCP parameters: $\epsilon_{\mathrm{feas}} > 0$, $\epsilon_{\mathrm{opt}} > 0$, $0 < \rho_1 < \rho_0 < \rho_2 < 1$, $\alpha_1 > 1$, $\alpha_2 > 1$, $\beta > 1$, $0 < \gamma < 1$, $ 0 < r_{\mathrm{min}} < r_{\mathrm{max}} $
 \State Initialize: $i \gets 1$, $r^{(1)} > 0$, $w^{(1)} > 0$, $\delta^{(1)} = \infty$, $\bm{\lambda}^{(1)} = \bm{0}$
 \State Compute reference QR matrices using \cref{eq:reference_update}
 \While{$|\Delta J^{(i)}| > \epsilon_{\mathrm{opt}}$ or $\chi^{(i)} > \epsilon_{\mathrm{feas}}$}
-	\State Solve convex subproblem: $(\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*, \bm{\xi}^*) \gets \arg\min$ \cref{eq:subproblem}
+	\State Solve convex subproblem: $(\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*, \bm{\xi}^*) \gets \arg\min$ \cref{eq:subproblem}
 	\State Compute $\Delta J^{(i)}$, $\Delta L^{(i)}$, and $\chi^{(i)}$ using \cref{eq:delta_J,eq:delta_L,eq:chi}
 	\State Compute step acceptance ratio: $\rho^{(i)} \gets \Delta J^{(i)} / \Delta L^{(i)}$
 	\If{$\rho^{(i)} \geq \rho_0$} \Comment{Accept step}
-		\State $(\bar{\bm{S}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{v}}) \gets (\bm{S}^*, \bm{L}^*, \bm{\mu}^*, \bm{v}^*)$
+		\State $(\bar{\bm{v}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{S}}) \gets (\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*)$
 		\State Update reference QR matrices using \cref{eq:reference_update}
 		\If{$|\Delta J^{(i)}| < \delta^{(i)}$}
 			\State $\lambda_k^{(i+1)} \gets \lambda_k^{(i)} + w^{(i)} \xi_k^*$ for $k \in \N_{0}^{N-1}$
@@ -363,49 +363,50 @@ The algorithm terminates when both $|\Delta J^{(i)}| \leq \epsilon_{\mathrm{opt}
 	\State $i \gets i + 1$
 \EndWhile
 \State Recover feedback gains: $K_k^* \gets L_k^* (S_k^*)^{-1}$ for $k \in \N_{0}^{N-1}$
-\State \Return $\bm{v}^*, \bm{\mu}^*, \bm{S}^*, \bm{K}^*$
+\State \Return $\bm{v}^*, \bm{K}^*, \bm{\mu}^*, \bm{S}^*$
 \end{algorithmic}
 \end{algorithm}
 
 \section{Local and Global Optimality of the Converged Solution}
 
-In this section, we provide a result regarding the optimality of solutions to optimization problems over manifolds where the manifolds are related through a diffeomorphism. 
-Consider two optimization problems:
-\begin{subequations}
+In this section, we connect the optimality of the solution obtained from \cref{alg:sqrt_qr_covariance_steering} (in the $\mathbb{L}_+^n$ coordinates) to that obtained from solving it defining using the covariance matrix as variables, as in \cite{liuOptimalCovarianceSteering2025} (in the $\mathbb{S}_+^n$ coordinates).
+
+ Consider two constrained optimization problems on manifolds $\mathcal{M}_A$ and $\mathcal{M}_B$ with variables $x \in \mathcal{M}_A$ and $y \in \mathcal{M}_B$:%
 \begin{align*}
-\text{(A)} \quad & \minimize_{x} \quad f(x) 
-\quad \text{s.t.} \quad x \in \mathcal{F}_A \\
-\text{(B)} \quad & \minimize_{y} \quad g(y) = f(T(y)) \quad \text{s.t.} \quad y \in \mathcal{F}_B
+\text{(A)} \quad & \minimize_{x \in \mathcal{X}} \ f(x)\\
+\text{(B)} \quad & \minimize_{y \in \mathcal{Y}} \ f(T(y))
 \end{align*}
-\end{subequations}
-where $T: \mathcal{F}_B \rightarrow \mathcal{F}_A$ is a diffeomorphism such that $T(\mathcal{F}_B) = \mathcal{F}_A$. (A) is convex, i.e. \(f(x)\) is a convex function and $\mathcal{F}_A$ is a convex set. (B) is nonconvex, i.e. without loss of generality, \(\mathcal{F}_B\) is a nonconvex set.
+where $T: \mathcal{M}_B \rightarrow \mathcal{M}_A$ is a diffeomorphism such that $T(\mathcal{M}_B) = \mathcal{M}_A$, with equality constraints $g_i, i \in \mathcal{I}$ and inequality constraints $h_j, j \in \mathcal{J}$:
+\begin{align}
+	\mathcal{X} &:= \{ x \in \mathcal{M}_A \ |\  g_i(x) = 0, i \in \mathcal{I}; \ h_j(x) \leq 0 \in \mathcal{J} \} \\ 
+	\mathcal{Y} &:= \{ y \in \mathcal{M}_B \ |\  g_i(T(y)) = 0, i \in \mathcal{I}; \ h_j(T(y)) \leq 0\in \mathcal{J} \} 
+\end{align}
+From the definition, $\mathcal{X} = T(\mathcal{Y})$.
 
 \begin{proposition}[Invariance of Local Optimality via a Diffeomorphism]
 \label{prop:global_optimality_diffeomorphism}
-Let $T: \mathcal{F}_B \rightarrow \mathcal{F}_A$ be a diffeomorphism such that $T(\mathcal{F}_B) = \mathcal{F}_A$, and let $y^*$ be a local minimum of (B). Then $x^* = T(y^*)$ is a local minimum of (A).
+Let $y^*$ be a local minimum of (B). Then $x^* = T(y^*)$ is a local minimum of (A).
 \end{proposition}
 
 \begin{proof}
-Since $y^*$ is a local minimum of (B), by definition \cite[Chapter 12]{nocedalNumericalOptimization2006}, there exists a neighborhood $\mathcal{N}$ around $y^*$ such that
+Since $y^*$ is a local minimum of (B), there exists a neighborhood $\mathcal{N}$ around $y^*$ such that
 \begin{equation}
 \label{eq:local_minimum}
-g(y) \geq g(y^*) \quad \forall y \in \mathcal{S}_B := \mathcal{N} \cap \mathcal{F}_B.
+f(T(y)) \geq f(T(y^*)) \quad \forall y \in \mathcal{S}_B
 \end{equation}
+where $\mathcal{S}_B := N \cap \mathcal{Y}$ \cite[Chapter 12]{nocedalNumericalOptimization2006}.
 
 Since $T$ is a diffeomorphism, it is in particular a homeomorphism. Therefore, $T$ maps the open neighborhood $\mathcal{N}$ to an open set $T(\mathcal{N})$ which contains $T(y^*) = x^*$ \cite[Chapter 12]{munkresTopology2014}.
-
-Define $\mathcal{M} = T(\mathcal{N})$ and $\mathcal{S}_A = \mathcal{M} \cap \mathcal{F}_A$. Then,
+Defining $\mathcal{S}_A := T(N) \cap \mathcal{X}$,
 \begin{equation}
-\mathcal{S}_A = T(\mathcal{N}) \cap T(\mathcal{F}_B) 
-= T(\mathcal{N} \cap \mathcal{F}_B) 
+\mathcal{S}_A = T(\mathcal{N}) \cap T(\mathcal{Y}) 
+= T(\mathcal{N} \cap \mathcal{Y}) 
 = T(\mathcal{S}_B)
 \end{equation}
 where the second equality follows from the fact that $T$ is in particular a bijection.
-
 Therefore, for any $x \in \mathcal{S}_A$, there exists a unique pre-image $y = T^{-1}(x) \in \mathcal{S}_B$. From \cref{eq:local_minimum}, we have:
 \begin{align}
-g(y) &\geq g(y^*) \quad \forall y \in \mathcal{S}_B \nonumber \\
-\Rightarrow \quad f(T(y)) &\geq f(T(y^*)) \quad \forall y \in \mathcal{S}_B \nonumber \\
+\quad f(T(y)) &\geq f(T(y^*)) \quad \forall y \in \mathcal{S}_B \nonumber \\
 \Rightarrow \quad f(x) &\geq f(x^*) \quad \forall x \in \mathcal{S}_A. \label{eq:local_optimality_x}
 \end{align}
 Hence, \(x^*\) is a local minimum of (A).
@@ -418,10 +419,15 @@ Next, we apply this result to our specific problem. The following proposition is
 \end{proposition}
 
 \begin{theorem} \label{th:global_optimality}
-	\cref{alg:sqrt_qr_covariance_steering} converges to a locally optimal solution of the chance-constrained covariance steering problem. When the chance constraints are not present and the objective takes the quadratic form of \cref{eq:objective_function}, the solution is globally optimal.
+	\cref{alg:sqrt_qr_covariance_steering} converges to a locally optimal solution of the chance-constrained covariance steering problem, and its local optimality is invariant to whether the solution method uses the full covariance matrix. When the chance constraints are not present and the objective takes the quadratic form of \cref{eq:objective_function}, the solution is globally optimal.
 \end{theorem}
 \begin{proof}
-	The first part of the proof follows from the local optimality of the \texttt{SCvx*} algorithm \cite[Theorem 3]{oguriSuccessiveConvexificationFeasibility2023a}, \cref{prop:global_optimality_diffeomorphism,prop:cholesky_diffeomorphism}. The second part of the proof follows from the fact that the unconstrained covariance steering problem is shown to be a convex optimization problem \cite{liuOptimalCovarianceSteering2025}. Since a local optimum of a convex problem is also a global optimum, the locally optimal solution obtained from \cref{alg:sqrt_qr_covariance_steering} is also globally optimal.
+	In this specific scenario, (A) from \cref{prop:global_optimality_diffeomorphism} is obtained by the method in \cite{liuOptimalCovarianceSteering2025} with variable $x \in \mathcal{M}_A = \mathbb{S}_+^n \times \cdots \times \mathbb{S}_+^n \times \R^{n\times m} \times \cdots \times \R^{n \times m}$ where the first $N+1$ spaces are the positive definite matrices $P_k$ and the next $N$ spaces are the feedback gains $K_k$. (B) from \cref{prop:global_optimality_diffeomorphism} is \cref{eq:nonconvex_problem_statement} before the change of variables $L_k = K_k S_k$, with variable $y \in \mathcal{M}_B = 
+	\mathbb{L}_+^n \times \cdots \times \mathbb{L}_+^n \times \R^{n\times m} \times \cdots \times \R^{n \times m}$, where the first $N+1$ spaces are $S_k$ and the next $N$ spaces are the feedback gains $K_k$. (We can ignore the mean variables $\bm{v}, \bm{\mu}$ as they appear exactly in the same way in either problem.)
+	(B) is solved via \cref{alg:sqrt_qr_covariance_steering}, and the diffeomorphism $T: \mathcal{M}_B \rightarrow \mathcal{M}_A$ maps each of the matrices $\mathbb{S}_+^n$ to $\mathbb{L}_+^n$ via the inverse of the Cholesky map \(\mathcal{L} : \mathbb{S}^n_+ \rightarrow \mathbb{L}_+^n\) and does not modify the feedback gains $K_k$. The inverse of a diffeomorphism is also a diffeomorphism.
+	Then, first part of the proof follows from the local optimality of the \texttt{SCvx*} algorithm \cite[Theorem 3]{oguriSuccessiveConvexificationFeasibility2023a}. 
+	
+	The second part of the proof follows from the fact that the unconstrained covariance steering problem with quadratic cost is shown to be a convex optimization problem \cite{liuOptimalCovarianceSteering2025}. Since a local optimum of a convex problem is also a global optimum, the locally optimal solution obtained from \cref{alg:sqrt_qr_covariance_steering} is also globally optimal.
 \end{proof}
 
 
@@ -432,20 +438,21 @@ The convex optimization problems are solved in MATLAB using YALMIP \cite{lofberg
 sqrt_covariance_steering/}}.}
 \begin{table}[ht]
 \centering
-\caption{\texttt{SCvx*} parameters}
+\caption{\texttt{SCvx*} parameters ($\epsilon_{\mathrm{opt}}, \epsilon_{\mathrm{feas}}$ defined in text)}
 \label{tab:scp_parameters}
-\begin{tabular}{ccccc}
+\begin{tabular}{cccc}
 \toprule
-$\{\epsilon_{\mathrm{opt}}, \epsilon_{\mathrm{feas}}\}$ & $\{\rho_0, \rho_1, \rho_2\}$ & $\{\alpha_1, \alpha_2, \beta, \gamma\}$ & $\{r^{(1)}, r_{\mathrm{min}}, r_{\mathrm{max}}\}$ & $w^{(1)}$\\
+ $\{\rho_0, \rho_1, \rho_2\}$ & $\{\alpha_1, \alpha_2, \beta, \gamma\}$ & $\{r^{(1)}, r_{\mathrm{min}}, r_{\mathrm{max}}\}$ & $w^{(1)}$\\
 \midrule
-$\{10^{-4}, 10^{-4}\}$ & $\{0, 0.25, 0.7\}$ & $\{2, 3, 2, 0.9\}$ & $\{0.1, 10^{-10}, 10\}$ & $0.1$\\
+ $\{0, 0.25, 0.7\}$ & $\{2, 3, 2, 0.9\}$ & $\{0.1, 10^{-10}, 10\}$ & $0.1$\\
 \bottomrule
 \end{tabular}
 \end{table}
 
 Some practical implementation tips are:
 \begin{itemize}
-	\item Since the algorithm requires iterative linearization, an initial guess is required for each of the variables. The initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) can be obtained, for example, by calculating feedback gains \(K_{k,\mathrm{LQR}} \) via the Riccati equation, and then setting \( \bar{L}_k = K_{k,\mathrm{LQR}} \bar{S}_k \).
+	\item Since the algorithm requires iterative linearization, an initial guess is required for each of the variables. The initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) can be obtained, for example, by calculating feedback gains \(K_{k,\mathrm{LQR}} \) via the Riccati equation, and then setting \( \bar{L}_k = K_{k,\mathrm{LQR}} \bar{S}_k \). 
+	% Although $\bm{v}$ or $\bm{\mu}$ only appear in a convex form throughout the problem, the calculation of $\Delta J$ and $\Delta L$ requires their reference values at the first iteration.
 	\item In some cases, a trust region on \( L_k\) is not necessary, and causes chattering close to the solution. 
 \end{itemize}
 
@@ -528,7 +535,7 @@ where \(G(t)\) is the continuous-time process noise matrix:
 \begin{equation}
 	G(t) = \begin{bmatrix} 0_{3 \times 3} \\ \sigma_a I_3 \end{bmatrix}.
 \end{equation}
-We use $D_S = \mathrm{diag}(10, 10, 10, 10^3, 10^3, 10^3)$ and $D_L = 10^3 I_3$ for the trust region scaling.
+We use $D_S = \mathrm{diag}(10, 10, 10, 10^3, 10^3, 10^3)$ and $D_L = 10^3 I_3$ for the trust region scaling. We set the convergence and feasibility tolerance to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-5}\).
 The proposed method solves the problem in 45 iterations in about 8 seconds. The results are shown in \cref{fig:example_cwh_trajectory,fig:example_cwh_control_history}. The convergence history is shown in \cref{fig:example_cwh_scp_iter_history}. The result shows that the covariance is steered to the terminal covariance. The infeasibility \(\chi\) reduces steadily during the solution process.
 
 For the full covariance approach, since it cannot directly handle the ``square-root of maximum eigenvalue'' term, we linearize it around a reference covariance matrix, as in the chance constraint handling described in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. In this case, a small term \(\epsilon \trace(Y_k)\) is added to the objective function to ensure valid convexification \cite{kumagaiRobustCislunarLowThrust2025a}, with \(\epsilon = 10^{-3}\) chosen. The full covariance approach is not able to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues, and the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. For this problem, we checked that the covariance dynamics are largely violated. This supports our hypothesis that working with the covariance matrix squares the units of the optimization variables, and can introduce numerical issues for conic solvers. We also tested with alternative objective functions, such as the quadratic cost function, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. We measured the loss in covariance propagation as follows:
@@ -547,7 +554,7 @@ A loss larger than 0.1 was observed in all cases.
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\linewidth]{example_cwh_trajectory.pdf}
-	\caption{Trajectory for the spacecraft rendezvous problem}
+	\caption{Projection of trajectory onto the $x$-$y$ plane for the spacecraft rendezvous problem, with $3\sigma$ covariance ellipses around the mean trajectory}
 	\label{fig:example_cwh_trajectory}
 \end{figure}
 
