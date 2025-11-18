@@ -121,13 +121,7 @@ We also note that this work is not the first to propagate the square root of the
 
 \subsection{QR Decomposition}
 The QR decomposition is a key element of propagating the square root of the covariance matrix, \textit{while keeping the covariance square root to be in \(\mathbb{L}^n\)}. Various algorithms have been proposed for the time update of the square root Kalman filter, but many can be expressed as a QR decomposition \cite{tapleyStatisticalOrbitDetermination2004}.
-% \begin{lemma}[Existence of Full-size QR decomposition, Thm 3.3.3 in (cite)]
-% 	Let \( M \in \mathbb{R}^{m \times n} \), \(m > n\). Then there exist \(Q \in \mathbb{R}^{m \times m}\) and \(\tilde{R} \in \mathbb{R}^{m \times n}\) such that \(Q\) is orthogonal, \( \tilde{R} = \begin{bmatrix}
-% 	R \\ 0_{(m-n) \times n}
-% 	\end{bmatrix}\), where \( R \in \mathbb{R}^{n \times n} \) is upper triangular, and \( M = QR \).
-% \end{lemma}
 
-% \subsubsection{Existence and Uniqueness}
 \begin{lemma}[Existence and uniqueness of economy-size QR decomposition, \cite{ipsenNumericalMatrixAnalysis2009}]\label{lemma:existence_and_uniqueness_of_economy_size_qr_decomposition}
 	Let \( M \in \mathbb{R}^{p \times q} \), \(p \geq q\).
 	\begin{itemize}
@@ -178,15 +172,6 @@ where \( \mathrm{qr}(\cdot) \) denotes the operation of extracting the upper tri
 
 \subsection{QR Decomposition Derivative}
 In order to use this square root covariance propagation in an optimization framework, we utilize the derivative of the QR decomposition operation (i.e. the sensitivity of the $Q$ and $R$ matrices with respect to perturbations in the $M$ matrix). $\dd R$ is written as a function of \(Q\), \( R\), and  $\dd M$ \cite{deleeuwDifferentiatingQRDecomposition2023}:
-% \begin{equation}
-% 	A + (\dd R) R^{-1} = Q^\top (\dd M) R^{-1}
-% \end{equation}
-% where \( A \) is a skew-symmetric matrix such that 
-% \begin{equation}
-% 	\mathrm{tril}(A) = \mathrm{tril}(Q^\top (\dd M) R^{-1}).
-% \end{equation}
-% \( \mathrm{tril}(A) \) replaces the upper triangular part of \( A \) with zeros.
-% Organizing the above, we have:
 \begin{equation}
 	\dd R = \dd R(\dd M, Q, R) = Q^\top (\dd M) - \mathrm{tril}(Q^\top (\dd M) R^{-1}) R.
 \end{equation}
@@ -550,7 +535,6 @@ A loss larger than 0.1 was observed in all cases.
 
 % For this problem, the short horizon length enables the block-based approach to also solve this problem with reasonable computational cost.
 
-
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\linewidth]{example_cwh_trajectory.pdf}
@@ -579,64 +563,6 @@ We proposed a novel method for solving the chance-constrained covariance steerin
 A seemingly weak point of the proposed method, requiring an initial guess for the reference variables, can be mitigated especially when it is used repeatedly, for example when the state matrices are updated in a nonlinear dynamics setting \cite{kumagaiRobustCislunarLowThrust2025a}; the initial guess and the Lagrange multipliers of the converged solution can be used to warm-start the next solution process.
 
 The concept of using the QR decomposition and its derivative can be used in other trajectory optimization methods that involve covariance propagation. Furthermore, as in the intrinsic SCvx framework \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the proposed method can be extended to use geodesic distance between matrices in \( \mathbb{L}_+^n \) \cite{linRiemannianGeometrySymmetric2019} to define the trust region and the augmented penalty.
-
-
-% \section{Appendix}
-
-% A notable difference from typical trust region constraints is that the variable \( S_k \) is defined on a manifold. As described in \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the Riemannian metric is used to define the trust region constraint. 
-
-% \subsection{Riemannian geometry on Cholesky spaces}
-% Let \( L \in \mathcal{L}_+^n \).
-% For \( X, Y \) in the tangent space of \( \mathcal{L}_+^n \) at \( L \), the Riemannian metric is given by \cite{linRiemannianGeometrySymmetric2019}:
-% \begin{equation}
-% 	g_L(X,Y)
-%  = \sum_{i>j} X_{ij} Y_{ij} + \sum_{jj} X_{jj} Y_{jj} L_{jj}^{-2}
-%  \end{equation}
-
-%  Then, as described in \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the trust region constraint is given by:
-%  \begin{equation} \label{eq:trust_region_constraint}
-%  	g_{\bar{S}_k}(S_k - \bar{S}_k, S_k - \bar{S}_k) \leq r^2
-%  \end{equation}
-%  where \( r > 0 \) is the trust region radius. This is a quadratic convex constraint.
-
-%  For \(L_k\), we simply impose a Euclidean trust region constraint:
-%  \begin{equation} \label{eq:trust_region_constraint_L}
-%  	\|L_k - \bar{L}_k\|_F \leq r_L
-%  \end{equation}
-
-% \begin{equation} \label{eq:trust_region_constraint}
-% 	\mathrm{vectril}(S_k - \bar{S}_k) \leq r \quad k=0,\cdots, N
-% \end{equation}
-% where \( r > 0 \) is the trust region radius. 
-
-% \subsection{Scaling}
-% For problems where the covariance matrices have small numerical values, a numerical rescaling of the problem can improve numerical stability for the underlying conic solver. First, 
-% \begin{lemma}
-% 	The QR decomposition $X=QR$ is invariant to the diagonal scaling of the matrix. In other words, for a diagonal matrix $D$, we have $XD = Q (RD)$.
-% \end{lemma}
-% \begin{proof}
-% 	\(X=QR \implies XD = Q (RD)\). Since post-multiplication by $D$ does not change the rank of a matrix, from the uniqueness of the QR decomposition, the result follows.
-% \end{proof}
-
-% \subsection{Scaling for Covariance Steering}
-% From the previous lemma, a scaled version of \cref{eq:square_root_covariance_propagation} can be written as follows:
-% \begin{align*}
-% 	\bar{S}_{k+1} = D S_{k+1} &= \mathrm{qr}( \begin{bmatrix} A_k S_k + B_k K_k S_k & G_k \end{bmatrix}^\top D)^\top \\
-% 	&= \mathrm{qr}(\begin{bmatrix} D A_k D^{-1} D S_k + D B_k K_k D^{-1} D S_k & D G_k \end{bmatrix}^\top)^\top \\
-% 	&= \mathrm{qr}(\begin{bmatrix} \bar{A}_k \bar{S}_k + \bar{B}_k \bar{K}_k \bar{S}_k & \bar{G}_k \end{bmatrix}^\top)^\top \\
-% 	&= \mathrm{qr}(\begin{bmatrix} \bar{A}_k \bar{S}_k + \bar{B}_k \bar{L}_k & \bar{G}_k \end{bmatrix}^\top)^\top
-% \end{align*}
-% where $\bar{A}_k = D A_k D^{-1}$, $\bar{B}_k = D B_k$, $\bar{G}_k = D G_k$, $\bar{K}_k = K_k D^{-1}$, $\bar{L}_k = \bar{K}_k \bar{S}_k = K_k D^{-1} D S_k = K_k S_k = L_k$ and $\bar{S}_k = D S_k$.
-
-% The objective function can written in terms of the scaled variables as follows:
-% \begin{align*}
-% 	J = \sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k + \mathrm{trace} (\bar{Q}_k \bar{S}_k \bar{S}_k^\top + R_k \bar{L}_k \bar{L}_k^\top) \quad \text{(quadratic cost)}
-% \end{align*}
-% where $\bar{Q}_k = D^{-1} Q_k D^{-1}$. For the quantile 2-norm cost, the cost function is the same.
-
-% \section{Acknowledgments}
-% Acknowledge AI use
-% This material is based upon work supported by the Air Force Office of Scientific Research under award number FA9550-23-10512. N. Kumagai acknowledges support for his graduate studies from the Shigeta Education Fund.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
