@@ -262,7 +262,7 @@ end
 
 %% Plot Results
 % Define flags for which solutions to plot
-use_fc = exist('prob_fc', 'var') && ~isempty(prob_fc) && (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4);
+use_fc = exist('prob_fc', 'var') && ~isempty(prob_fc) && (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) && prob_fc.check_lossless();
 use_qr = exist('prob_qr', 'var') && flag_solved_qr && ~isempty(prob_qr);
 
 if use_fc || use_qr
@@ -288,12 +288,12 @@ if use_fc || use_qr
         % Plot covariance ellipses in XY plane (every 3rd step)
         for k = 1:N+1
             P_pos_qr = prob_qr.P([1,2], [1,2], k);
-            plot3sigmaEllipse(prob_qr.mu([1,2], k), P_pos_qr, 'k', 'HandleVisibility', 'off');
+            plot3sigmaEllipse(prob_qr.mu([1,2], k), P_pos_qr, 'Color', [.6, .6, .6], 'HandleVisibility', 'off');
         end
         % Plot mean trajectory (XY plane)
-        plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'k+-', 'LineWidth', 1.5, 'MarkerSize', 6, 'DisplayName', '($\mu_k, P_k$)');
+        plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'Color', [.6, .6, .6], 'Marker', '+', 'LineWidth', 1.5, 'MarkerSize', 6, 'DisplayName', '($\mu_k, P_k$)');
         % Plot mean control vectors
-        quiver2d(prob_qr.mu(1:2,1:N), prob_qr.v(1:2,1:N), 'Color', '#0082B2', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'Nominal control $v_k$');
+        quiver2d(prob_qr.mu(1:2,1:N), prob_qr.v(1:2,1:N), 'Color', '#0082B2', 'LineWidth', 2, 'MarkerSize', 4, 'DisplayName', 'Nominal control $v_k$');
     end
     
     % Plot initial and terminal conditions
@@ -302,7 +302,7 @@ if use_fc || use_qr
     
     xlabel('$x$ (km)', 'Interpreter', 'latex')
     ylabel('$y$ (km)', 'Interpreter', 'latex')
-    legend('Location', 'south', 'NumColumns', 1, 'Box', 'off')
+    legend('Location', 'south', 'NumColumns', 1, 'EdgeColor', 'white')
     grid on
     axis equal
     
@@ -357,7 +357,7 @@ if use_fc || use_qr
         grid on
         xlim([t_his(1), t_his(end)])
         if comp_idx == 1
-            legend('Location', 'northeast')
+            legend('Location', 'northeast', 'EdgeColor', 'white')
         end
 
     end
@@ -422,5 +422,5 @@ end
 
 prob_qr.scp.plot_iter_history(fig=figure(Position=[0, 0, 20, 15]), plot_delta=false)
 
-exportgraphics(gcf, 'figures/example_cwh_scp_iter_history.png', Resolution=300)
-exportgraphics(gcf, 'figures/example_cwh_scp_iter_history.pdf', ContentType='vector')
+% exportgraphics(gcf, 'figures/example_cwh_scp_iter_history.png', Resolution=300)
+% exportgraphics(gcf, 'figures/example_cwh_scp_iter_history.pdf', ContentType='vector')
