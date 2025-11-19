@@ -269,29 +269,33 @@ end
 
 %% Plot runtime
 figure(Position=[0, 0, 20, 12]);
-loglog(N_list, avg_full, 'o-b', 'LineWidth', 2, 'MarkerSize', 8); hold on;
-loglog(N_list, avg_block, '^-g', 'LineWidth', 2, 'MarkerSize', 8); hold on;
-loglog(N_list, avg_qr, 's-r', 'LineWidth', 2, 'MarkerSize', 8);
+loglog(N_list, avg_full, 'o-', 'Color', '#0082B2', 'LineWidth', 2, 'MarkerSize', 8); hold on;
+loglog(N_list, avg_block, '^-', 'Color', '#D55E00', 'LineWidth', 2, 'MarkerSize', 8); hold on;
+loglog(N_list, avg_qr, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8);
 grid on;
 xlabel('Horizon length N');
 ylabel('Average runtime (s)');
 xticks(N_list)
-legend('Liu et al. (2025)', 'Okamoto & Tsiotras (2019)', 'Proposed method', 'Location', 'northwest');
+legend('Liu et al. (2025)', 'Okamoto \& Tsiotras (2019)', 'Proposed method', 'Location', 'northwest', 'Box', 'off');
 exportgraphics(gcf, 'figures/horizon_size_scalability.png', Resolution=300)
+% Use 'auto' instead of 'vector' to fix legend overflow in PDFs
+% 'auto' still produces vector graphics for most elements but handles legends better
+exportgraphics(gcf, 'figures/horizon_size_scalability.pdf', ContentType='vector')
 
 %% Plot objective function values
 figure(Position=[0, 0, 20, 12]);
-semilogy(N_list, avg_block_opt./avg_full_opt, '^-g', 'LineWidth', 2, 'MarkerSize', 8); hold on;
-semilogy(N_list, avg_qr_opt./avg_full_opt, 's-r', 'LineWidth', 2, 'MarkerSize', 8);
+semilogy(N_list, avg_block_opt./avg_full_opt, '^-', 'Color', '#D55E00', 'LineWidth', 2, 'MarkerSize', 8); hold on;
+semilogy(N_list, avg_qr_opt./avg_full_opt, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8);
 grid on;
 xlabel('Horizon length N');
 ylabel('Cost ratio to Liu et al.');
 xticks(N_list)
-legend('Okamoto & Tsiotras (2019)', 'Proposed method', 'Location', 'west');
+lgd = legend('Okamoto \& Tsiotras (2019)', 'Proposed method', 'Location', 'west', 'Box', 'off');
 xlim([N_list(1) N_list(end)])
+ylim([0.99, max(avg_block_opt./avg_full_opt)])
 
 exportgraphics(gcf, 'figures/horizon_size_cost_comparision.png', Resolution=300)
-
+exportgraphics(gcf, 'figures/horizon_size_cost_comparision.pdf', ContentType='vector')
 %%
 save('data/horizon_size_scalability_results.mat', 'results', 'T_total', 'N_list');
 fprintf('\nSaved results to /data/horizon_size_scalability_results.mat\n');
