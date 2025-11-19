@@ -24,8 +24,9 @@
 \graphicspath{{../figures/}}
 
 \title{Square Root QR Covariance Steering}
-\author{Naoya Kumagai
-\thanks{N. Kumagai is with the School of Aeronautics and Astronautics, Purdue University, IN 47907 (e-mail: nkumagai@purdue.edu).}}
+\author{Naoya Kumagai, \IEEEmembership{Member, IEEE}, Kenshiro Oguri, \IEEEmembership{Member, IEEE}
+\thanks{This material is based upon work supported by the Air Force Office of Scientific Research under award number FA9550-23-10512. N. Kumagai acknowledges support for his graduate studies from the Shigeta Education Fund.}
+\thanks{N. Kumagai and K. Oguri are with the School of Aeronautics and Astronautics, Purdue University, IN 47907 (e-mail: nkumagai@purdue.edu, koguri@purdue.edu).}}
 
 \begin{document}
 
@@ -114,7 +115,7 @@ At the same time, we have observed several drawbacks of \cite{liuOptimalCovarian
 \subsection{Contributions}
 We propose a novel method for solving the chance-constrained covariance steering problem. Due to the nonconvex representation of the covariance Cholesky factor propagation equations, the problem is solved iteratively via sequential convex programming. Nevertheless, the method is shown to be 1. globally optimal when chance constraints are not present, 2. more scalable for large horizon length than the block approach, and 3. numerically reliable for problems with small variance components compared to the full covariance approach. Furthermore, it is free of any proofs of convexification that rely on a specific objective function form(cf. \cite{liuOptimalCovarianceSteering2025}).
 
-We note that the concept of defining the covariance matrix Cholesky factor explicitly as an optimization variable, and performing the propagation is inspired the square root Kalman filter. Along this line of literature, a notable work is of Thornton and Bierman \cite{thorntonNumericalComparisonDiscrete1976} who in the 1970s demonstrated the numerical instability of the standard Kalman filter compared to its counterparts that propagate factorized versions of the covariance matrix, such as the Cholesky and LDL factorizations. See \cite{tapleyStatisticalOrbitDetermination2004} for a summary of these methods.
+We note that the concept of defining the covariance matrix Cholesky factor explicitly as an optimization variable, and performing the propagation is inspired by the square root Kalman filter. Along this line of literature, a notable work is of Thornton and Bierman \cite{thorntonNumericalComparisonDiscrete1976} who in the 1970s demonstrated the numerical instability of the standard Kalman filter compared to its counterparts that propagate factorized versions of the covariance matrix, such as the Cholesky and LDL factorizations. See \cite{tapleyStatisticalOrbitDetermination2004} for a summary of these methods.
 We also note that this work is not the first to propagate the square root of the covariance matrix in the context of covariance steering. \cite{oguriStochasticSequentialConvex2022} addressed this with some shortcomings: the variable that represents the square root grows linearly in size with the horizon length, and the feedback gains are retrieved via a least-squares matrix inversion.
 
 \section{Preliminaries}
