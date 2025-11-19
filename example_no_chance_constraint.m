@@ -121,7 +121,7 @@ for k = 1:N
 end
 init_guess_struct.mu = zeros(nx, N+1);
 init_guess_struct.v = zeros(nu, N);
-%%
+
 sqrt_cs = SqrtQRCovarianceSteering(init_guess_struct,...
 	N=N, ...
 	A_sys=repmat(A, [1, 1, N]), ...
@@ -130,9 +130,14 @@ sqrt_cs = SqrtQRCovarianceSteering(init_guess_struct,...
 	P_0=P_0, P_f=P_f, Q=Q, R=R, ...
 	mu_0=mu_0, mu_f=mu_f);
 
+% For this example, the key to quick convergence seems to be to remove the
+% trust region on L
+sqrt_cs.impose_trust_region_struct.L = false;
+
 scp_params = SCPParams();
 scp_params.tol_opt = 1E-4;
-scp_params.tol_feas = 1E-5;
+scp_params.tol_feas = 1E-4;
+% scp_params.penalty_method = 'ALwithL1';
 
 sqrt_cs.solve(scp_params = scp_params);
 

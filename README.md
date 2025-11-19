@@ -30,3 +30,11 @@ In order to debug numerical issues in MOSEK, follow these steps:
  - `anapro`
 
  4. It is especially useful to look at the `|A|` output to see the ratio of coefficients of the lienar constraint matrix: [source](https://docs.mosek.com/11.0/toolbox/debugging-numerical.html)
+
+
+ ## 
+
+ - Plot loss for each case. 
+ - Losslessness depends on the numericals of the LMI accuracy.
+ - add note nodes and see more trend
+ - Add remark to emphasize that Liu's method requires iteration.

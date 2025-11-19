@@ -12,7 +12,7 @@ figure_settings
 % Problem parameters
 N = 30;  % Fixed time horizon
 state_sizes = [4, 8, 16];  % Different state dimensions to test
-num_trials = 10;  % Number of trials per state size for averaging
+num_trials = 1;  % Number of trials per state size for averaging
 
 % SCP parameters for the square root method
 scp_params = SCPParams();
