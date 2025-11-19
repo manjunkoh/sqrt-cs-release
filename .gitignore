@@ -3,4 +3,4 @@
 /dev/
 .DS_Store
 venv/
-/tex/root.pdf
+/tex/*.pdf
