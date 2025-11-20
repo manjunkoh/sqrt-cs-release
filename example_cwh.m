@@ -260,6 +260,87 @@ else
     prob_qr.scp.plot_iter_history()
 end
 
+%% Monte Carlo Simulation for QR Method
+if flag_solved_qr && ~isempty(prob_qr)
+    fprintf('\n=== Running Monte Carlo Simulation for SqrtQRCovarianceSteering ===\n');
+    
+    % Number of Monte Carlo samples
+    num_samples = 100;
+    
+    % Initialize storage for Monte Carlo trajectories
+    x_mc = zeros(nx, N+1, num_samples);  % State trajectories
+    u_mc = zeros(nu, N, num_samples);    % Control trajectories
+    
+    % Generate random initial states from N(mu_0, P0)
+    S0_chol = chol(P0, 'lower');
+    rng(42);  % Set seed for reproducibility
+    x0_samples = mu_0 + S0_chol * randn(nx, num_samples);
+    
+    % Simulate forward for each sample
+    for i = 1:num_samples
+        x_k = x0_samples(:, i);
+        x_mc(:, 1, i) = x_k;
+        
+        for k = 1:N
+            % Compute control: u_k = v_k + K_k * (x_k - mu_k)
+            u_k = prob_qr.v(:, k) + prob_qr.K(:,:,k) * (x_k - prob_qr.mu(:, k));
+            u_mc(:, k, i) = u_k;
+            
+            % Generate process noise: w_k ~ N(0, I)
+            w_k = randn(nx, 1);
+            
+            % Forward dynamics: x_{k+1} = A_k * x_k + B_k * u_k + G_k * w_k
+            A_k = A_sys(:,:,k);
+            B_k = B_sys(:,:,k);
+            G_k = G_sys(:,:,k);
+            x_k = A_k * x_k + B_k * u_k + G_k * w_k;
+            x_mc(:, k+1, i) = x_k;
+        end
+    end
+    
+    % Compute Monte Carlo statistics
+    mu_mc = mean(x_mc, 3);  % Mean trajectory
+    P_mc = zeros(nx, nx, N+1);
+    for k = 1:N+1
+        P_mc(:,:,k) = cov(squeeze(x_mc(:,k,:))');
+    end
+    
+    % Check terminal constraint satisfaction
+    x_final = squeeze(x_mc(:, N+1, :));  % Final states (nx x num_samples)
+    % Check if terminal mean is within tolerance
+    mu_final_mc = mean(x_final, 2);
+    mu_error = norm(mu_final_mc - mu_f);
+    fprintf('  Terminal mean error: %.6f km (target: %.6f km)\n', mu_error, norm(mu_f));
+    
+    % Check terminal covariance constraint: P_final <= P_f (in the sense of eigenvalues)
+    P_final_mc = cov(x_final');
+    % Check if largest eigenvalue of P_final is less than largest eigenvalue of P_f
+    lambda_max_final = max(eig(P_final_mc));
+    lambda_max_target = max(eig(P_f));
+    fprintf('  Terminal covariance: max eigenvalue = %.6e (target: %.6e)\n', lambda_max_final, lambda_max_target);
+    
+    % Check Mahalanobis distance: fraction of samples within 3-sigma of target
+    P_f_inv = inv(P_f);
+    mahal_dist = zeros(num_samples, 1);
+    for i = 1:num_samples
+        dx = x_final(:, i) - mu_f;
+        mahal_dist(i) = sqrt(dx' * P_f_inv * dx);
+    end
+    within_3sigma = sum(mahal_dist <= 3) / num_samples;
+    fprintf('  Samples within 3-sigma of target: %.1f%%\n', within_3sigma * 100);
+    
+    % Check control constraint violations (if applicable)
+    if ~isempty(control_chance_constraint)
+        u_norm_samples = vecnorm(u_mc, 2, 1);  % (N x num_samples)
+        u_norm_max = max(u_norm_samples(:)) * 1000;  % Convert to m/s
+        u_violations = sum(u_norm_samples(:) > u_max_kms) / (N * num_samples) * 100;
+        fprintf('  Control constraint violations: %.2f%% (max ||u|| = %.3f m/s, limit = %.1f m/s)\n', ...
+            u_violations, u_norm_max, u_max_ms);
+    end
+    
+    fprintf('Monte Carlo simulation completed.\n');
+end
+
 %% Plot Results
 % Define flags for which solutions to plot
 use_fc = exist('prob_fc', 'var') && ~isempty(prob_fc) && (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) && prob_fc.check_lossless();
@@ -290,10 +371,34 @@ if use_fc || use_qr
             P_pos_qr = prob_qr.P([1,2], [1,2], k);
             plot3sigmaEllipse(prob_qr.mu([1,2], k), P_pos_qr, 'Color', [.6, .6, .6], 'HandleVisibility', 'off');
         end
+
+        % Plot Monte Carlo trajectories (if available)
+        if exist('x_mc', 'var')
+            % Plot a subset of Monte Carlo trajectories (for clarity)
+            num_samples_mc = size(x_mc, 3);
+            num_traj_plot = min(100, num_samples_mc);
+            plot_indices = round(linspace(1, num_samples_mc, num_traj_plot));
+            
+            for i = plot_indices
+                plot(x_mc(1,:,i), x_mc(2,:,i), '.-', 'MarkerSize', 8, 'Color', [0.7, 0.85, 1.0], 'LineWidth', 0.5, 'DisplayName', 'MC samples');
+            end
+            
+            % Plot Monte Carlo mean trajectory
+            % if exist('mu_mc', 'var')
+            %     plot(mu_mc(1,:), mu_mc(2,:), 'b--', 'LineWidth', 1.2, 'DisplayName', 'Monte Carlo mean');
+            % end
+            
+            % Plot final Monte Carlo samples
+            % if exist('x_final', 'var')
+            %     scatter(x_final(1,:), x_final(2,:), 15, 'b', 'filled', 'MarkerFaceAlpha', 0.2, 'DisplayName', 'Final samples');
+            % end
+        end
+
         % Plot mean trajectory (XY plane)
         plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'Color', [.6, .6, .6], 'Marker', '+', 'LineWidth', 1.5, 'MarkerSize', 6, 'DisplayName', '($\mu_k, P_k$)');
         % Plot mean control vectors
         quiver2d(prob_qr.mu(1:2,1:N), prob_qr.v(1:2,1:N), 'Color', '#0082B2', 'LineWidth', 2, 'MarkerSize', 4, 'DisplayName', 'Nominal control $v_k$');
+        
     end
     
     % Plot initial and terminal conditions
@@ -302,9 +407,16 @@ if use_fc || use_qr
     
     xlabel('$x$ (km)', 'Interpreter', 'latex')
     ylabel('$y$ (km)', 'Interpreter', 'latex')
-    legend('Location', 'south', 'NumColumns', 1, 'EdgeColor', 'white')
+
+    if exist('x_mc', 'var') && use_qr
+        legend(legendUnq(), 'Location', 'south', 'NumColumns', 2, 'EdgeColor', 'white', 'IconColumnWidth', 20)
+    else
+        legend(legendUnq(), 'Location', 'south', 'NumColumns', 1, 'EdgeColor', 'white', 'IconColumnWidth', 20)
+    end
     grid on
     axis equal
+
+    add_zoomed_axis(gca, [-0.05, 0.05, 0, 0.10], [-0.6, 0.4, 0.52, 0.52])
     
     exportgraphics(gcf, 'figures/example_cwh_trajectory.png', Resolution=300)
     exportgraphics(gcf, 'figures/example_cwh_trajectory.pdf', ContentType='vector')
@@ -319,12 +431,17 @@ if use_fc || use_qr
         nexttile
         hold on
         
+        % Collect all y-values for this component to set appropriate y-limits
+        y_values = [];
+        
         if use_fc
             v_comp = prob_fc.v(comp_idx,:) * 1000;  % Convert to m/s
             % Compute 3-sigma bounds
             sigma_comp = 3 * sqrt(squeeze(prob_fc.P_u(comp_idx,comp_idx,:))) * 1000;  % Convert to m/s
             upper_comp = v_comp + sigma_comp';
             lower_comp = v_comp - sigma_comp';
+            
+            y_values = [y_values, v_comp, upper_comp, lower_comp];
             
             stairsZOH(t_his, upper_comp, 'g:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             stairsZOH(t_his, lower_comp, 'g:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
@@ -338,6 +455,8 @@ if use_fc || use_qr
             upper_comp_qr = v_comp_qr + sigma_comp_qr';
             lower_comp_qr = v_comp_qr - sigma_comp_qr';
             
+            y_values = [y_values, v_comp_qr, upper_comp_qr, lower_comp_qr];
+            
             % Get stair-step coordinates for upper and lower bounds (without plotting yet)
             [t_plot, upper_comp_qr_plot] = stairs(t_his, [upper_comp_qr, upper_comp_qr(end)]);
             [~,  lower_comp_qr_plot] = stairs(t_his, [lower_comp_qr, lower_comp_qr(end)]);
@@ -347,24 +466,76 @@ if use_fc || use_qr
             patch_y = [upper_comp_qr_plot(:); flipud(lower_comp_qr_plot(:))];
             % Plot patch first (so it's behind the lines)
             patch(patch_x, patch_y, 'k', 'FaceAlpha', 0.1, 'EdgeColor', 'none', 'DisplayName', '$3\sigma$ bounds');
+
+            % Add Monte Carlo control data if available
+            if exist('u_mc', 'var')
+                % Plot a subset of individual Monte Carlo control trajectories
+                num_samples_mc = size(u_mc, 3);
+                num_traj_plot = min(100, num_samples_mc);
+                plot_indices = round(linspace(1, num_samples_mc, num_traj_plot));
+                
+                u_mc_comp = squeeze(u_mc(comp_idx, :, :)) * 1000;  % Convert to m/s (N x num_samples)
+                
+                % Collect MC y-values
+                y_values = [y_values, u_mc_comp(:)'];
+                
+                % Plot individual trajectories first (so they appear behind other elements)
+                for i = plot_indices
+                    stairsZOH(t_his, u_mc_comp(:, i)', 'Color', [0.7, 0.85, 1.0], 'LineWidth', 0.5, 'DisplayName', 'MC samples', 'LineStyle', '-');
+                end
+                
+                % Compute mean and std of Monte Carlo controls for this component
+                % u_mc_mean = mean(u_mc_comp, 2)';  % Mean across samples (1 x N)
+                % u_mc_std = std(u_mc_comp, 0, 2)';  % Std across samples (1 x N)
+                % u_mc_upper = u_mc_mean + 3 * u_mc_std;
+                % u_mc_lower = u_mc_mean - 3 * u_mc_std;
+                % 
+                % Plot Monte Carlo mean and bounds
+                % [t_plot_mc, upper_mc_plot] = stairs(t_his, [u_mc_upper, u_mc_upper(end)]);
+                % [~, lower_mc_plot] = stairs(t_his, [u_mc_lower, u_mc_lower(end)]);
+                % patch_x_mc = [t_plot_mc(:); flipud(t_plot_mc(:))];
+                % patch_y_mc = [upper_mc_plot(:); flipud(lower_mc_plot(:))];
+                % patch(patch_x_mc, patch_y_mc, [0.7, 0.85, 1.0], 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', 'MC $3\sigma$ bounds');
+                % stairsZOH(t_his, u_mc_upper, 'Color', [0.7, 0.85, 1.0], 'LineStyle', ':', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+                % stairsZOH(t_his, u_mc_lower, 'Color', [0.7, 0.85, 1.0], 'LineStyle', ':', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+                % stairsZOH(t_his, u_mc_mean, 'Color', [0.7, 0.85, 1.0], 'LineStyle', '-', 'LineWidth', 1.5, 'DisplayName', 'MC mean');
+            end
+
             % Now plot the bounds and mean
-            stairsZOH(t_his, upper_comp_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-            stairsZOH(t_his, lower_comp_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            % stairsZOH(t_his, upper_comp_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            % stairsZOH(t_his, lower_comp_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             stairsZOH(t_his, v_comp_qr, 'k--', 'LineWidth', 1.5, 'DisplayName', 'Nominal control $v_k$');
+
+        end
+        
+        % Set y-limits with margin
+        if ~isempty(y_values)
+            y_min = min(y_values);
+            y_max = max(y_values);
+            y_range = y_max - y_min;
+            margin = 0.1 * y_range;  % 10% margin
+            if y_range == 0
+                margin = 0.1;  % Default margin if no range
+            end
+            ylim([y_min - margin, y_max + margin]);
         end
         
         ylabel([component_labels{comp_idx}, ' (m/s)'], 'Interpreter', 'latex')
         grid on
         xlim([t_his(1), t_his(end)])
-        if comp_idx == 1
-            legend('Location', 'northeast', 'EdgeColor', 'white')
-        end
+        % if comp_idx == 2
+            legend(legendUnq(), 'Location', 'north', 'EdgeColor', 'white', 'IconColumnWidth', 20)
+        % end
 
     end
     
     % Plot control norm
     nexttile
     hold on
+    
+    % Collect all y-values for control norm to set appropriate y-limits
+    y_values_norm = [];
+    
     if use_fc
         u_norm_fc = vecnorm(prob_fc.v, 2, 1) * 1000;  % Convert to m/s
         % For norm, approximate 3-sigma using largest eigenvalue of P_u
@@ -374,8 +545,21 @@ if use_fc || use_qr
             sigma_norm_fc(k) = sqrt(chi2inv(0.99, nu)) * lambda_max_k * 1000;  % Convert to m/s
         end
         upper_norm_fc = u_norm_fc + sigma_norm_fc;
+        lower_norm_fc = max(0, u_norm_fc - sigma_norm_fc);  % Norm can't be negative
         
+        y_values_norm = [y_values_norm, u_norm_fc, upper_norm_fc, lower_norm_fc];
+        
+        % Get stair-step coordinates for upper and lower bounds
+        [t_plot_fc, upper_norm_fc_plot] = stairs(t_his, [upper_norm_fc, upper_norm_fc(end)]);
+        [~, lower_norm_fc_plot] = stairs(t_his, [lower_norm_fc, lower_norm_fc(end)]);
+        % Create filled region between upper and lower bounds
+        patch_x_fc = [t_plot_fc(:); flipud(t_plot_fc(:))];
+        patch_y_fc = [upper_norm_fc_plot(:); flipud(lower_norm_fc_plot(:))];
+        % Plot patch first (so it's behind the lines)
+        patch(patch_x_fc, patch_y_fc, 'g', 'FaceAlpha', 0.1, 'EdgeColor', 'none', 'DisplayName', '$3\sigma$ bounds');
+        % Now plot the bounds and mean
         stairsZOH(t_his, upper_norm_fc, 'g:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+        stairsZOH(t_his, lower_norm_fc, 'g:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
         stairsZOH(t_his, u_norm_fc, 'g-', 'LineWidth', 1.5, 'DisplayName', 'FullCov');
         % Add constraint line
         % yline(u_max_ms, 'r--', 'LineWidth', 1.5, 'DisplayName', sprintf('Max: %.1f m/s', u_max_ms));
@@ -386,18 +570,88 @@ if use_fc || use_qr
         sigma_norm_qr = zeros(1, N);
         for k = 1:N
             lambda_max_k = lambda_max(prob_qr.P_u(:,:,k));
-            sigma_norm_qr(k) = sqrt(chi2inv(0.99, nu)) * lambda_max_k * 1000;  % Convert to m/s
+            sigma_norm_qr(k) = sqrt(chi2inv(0.99, nu)) * sqrt(lambda_max_k) * 1000;  % Convert to m/s
         end
         upper_norm_qr = u_norm_qr + sigma_norm_qr;
+        lower_norm_qr = max(0, u_norm_qr - sigma_norm_qr);  % Norm can't be negative
         
-        stairsZOH(t_his, upper_norm_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-        stairsZOH(t_his, u_norm_qr, 'k--', 'LineWidth', 1.5, 'DisplayName', 'SqrtQR');
+        y_values_norm = [y_values_norm, u_norm_qr, upper_norm_qr, lower_norm_qr];
+        
+        % Get stair-step coordinates for upper and lower bounds
+        [t_plot_qr, upper_norm_qr_plot] = stairs(t_his, [upper_norm_qr, upper_norm_qr(end)]);
+        [~, lower_norm_qr_plot] = stairs(t_his, [lower_norm_qr, lower_norm_qr(end)]);
+        % Create filled region between upper and lower bounds
+        patch_x_qr = [t_plot_qr(:); flipud(t_plot_qr(:))];
+        patch_y_qr = [upper_norm_qr_plot(:); flipud(lower_norm_qr_plot(:))];
+        % Plot patch first (so it's behind the lines)
+        patch(patch_x_qr, patch_y_qr, 'k', 'FaceAlpha', 0.1, 'EdgeColor', 'none', 'DisplayName', '$99\%$ bounds');
+
+        % Add Monte Carlo control norm if available
+        if exist('u_mc', 'var')
+            % Compute norm for each Monte Carlo sample
+            u_norm_mc = zeros(N, size(u_mc, 3));
+            for i = 1:size(u_mc, 3)
+                u_norm_mc(:, i) = vecnorm(u_mc(:, :, i), 2, 1)' * 1000;  % Convert to m/s
+            end
+            
+            % Collect MC y-values
+            y_values_norm = [y_values_norm, u_norm_mc(:)'];
+            
+            % Plot a subset of individual Monte Carlo control norm trajectories
+            num_samples_mc = size(u_mc, 3);
+            num_traj_plot = min(100, num_samples_mc);
+            plot_indices = round(linspace(1, num_samples_mc, num_traj_plot));
+            
+            % Plot individual trajectories first (so they appear behind other elements)
+            for i = plot_indices
+                stairsZOH(t_his, u_norm_mc(:, i)', 'Color', [0.7, 0.85, 1.0], 'LineWidth', 0.5, 'DisplayName', 'MC samples', 'LineStyle', '-');
+            end
+            
+            u_norm_mc_mean = mean(u_norm_mc, 2)';  % Mean across samples (1 x N)
+            % u_norm_mc_std = std(u_norm_mc, 0, 2)';  % Std across samples (1 x N)
+            % u_norm_mc_upper = u_norm_mc_mean + 3 * u_norm_mc_std;
+            % u_norm_mc_lower = max(0, u_norm_mc_mean - 3 * u_norm_mc_std);  % Norm can't be negative
+            % 
+            % % Plot Monte Carlo norm mean and bounds
+            % [t_plot_mc, upper_norm_mc_plot] = stairs(t_his, [u_norm_mc_upper, u_norm_mc_upper(end)]);
+            % [~, lower_norm_mc_plot] = stairs(t_his, [u_norm_mc_lower, u_norm_mc_lower(end)]);
+            % patch_x_mc = [t_plot_mc(:); flipud(t_plot_mc(:))];
+            % patch_y_mc = [upper_norm_mc_plot(:); flipud(lower_norm_mc_plot(:))];
+            % patch(patch_x_mc, patch_y_mc, [0.7, 0.85, 1.0], 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', 'MC $3\sigma$ bounds');
+            % stairsZOH(t_his, u_norm_mc_upper, 'Color', [0.7, 0.85, 1.0], 'LineStyle', ':', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            % stairsZOH(t_his, u_norm_mc_lower, 'Color', [0.7, 0.85, 1.0], 'LineStyle', ':', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            % stairsZOH(t_his, u_norm_mc_mean, 'Color', [0.7, 0.85, 1.0], 'LineStyle', '-', 'LineWidth', 1.5, 'DisplayName', 'MC mean');
+        end
+
+        % Now plot the bounds and mean
+        % stairsZOH(t_his, upper_norm_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+        % stairsZOH(t_his, lower_norm_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+        stairsZOH(t_his, u_norm_qr, 'k--', 'LineWidth', 1.5, 'DisplayName', '$\|v_k\|$');
+
     end
+    
+    % Set y-limits with margin for control norm
+    if ~isempty(y_values_norm)
+        y_min_norm = min(y_values_norm);
+        y_max_norm = max(y_values_norm);
+        y_range_norm = y_max_norm - y_min_norm;
+        margin_norm = 0.1 * y_range_norm;  % 10% margin
+        if y_range_norm == 0
+            margin_norm = 0.1;  % Default margin if no range
+        end
+        % Apply the same margin at both top and bottom
+        y_min_lim = y_min_norm - margin_norm;  % Same margin at bottom
+        y_max_lim = y_max_norm + margin_norm;  % Same margin at top
+        ylim([y_min_lim, y_max_lim]);
+    end
+    
     xlabel('Time (s)', 'Interpreter', 'latex')
     ylabel('$\|u\|_2$ (m/s)', 'Interpreter', 'latex')
     % legend('Location', 'southeast')
     grid on
     xlim([t_his(1), t_his(end)])
+    legend(legendUnq(), 'Location', 'north', 'EdgeColor', 'white', 'IconColumnWidth', 20)
+
 
     exportgraphics(gcf, 'figures/example_cwh_control_history.png', Resolution=300)
     exportgraphics(gcf, 'figures/example_cwh_control_history.pdf', ContentType='vector')

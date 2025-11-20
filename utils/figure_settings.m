@@ -80,7 +80,9 @@ set(groot,'defaultAxesYGrid','on')
 
 % legend settings
 % set(groot, 'defaultLegendBox', 'on')
-% set(groot, 'defaultLegendItemTokenSize', [10, 10])
+% set(groot, 'defaultLegendItemTokenSize', [10, 10]) % this is for older
+% matlab versions
+set(groot, 'defaultLegendIconColumnWidth', 20)
 
 % GUI (figure) settings
 % set(groot, 'defaultTextboxshapeEdgeColor', [1 1 1])
