@@ -2,7 +2,7 @@
 % Fixed total horizon time; dt changes with N
 clear;
 clc;
-addpath ../SCvxStar/src/
+addpath ./SCvxStar/src/
 addpath(genpath('./utils'))
 addpath('./src')
 

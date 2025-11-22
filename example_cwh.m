@@ -2,8 +2,7 @@
 % Relative orbital motion control using CWH equations
 
 clear; clc;
-addpath ../SCvxStar/src/
-addpath ../astrodynamics_base/
+addpath ./SCvxStar/src/
 addpath(genpath('./utils'))
 addpath('./src')
 

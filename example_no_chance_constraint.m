@@ -1,6 +1,6 @@
 % Square root covariance steering with QR decomposition-based covariance propagation
 clc; clear;
-addpath ../SCvxStar/src/
+addpath ./SCvxStar/src/
 addpath(genpath("./utils"))
 addpath('./src')
 yalmip("clear")

@@ -1,7 +1,7 @@
 %% Example: Quadrotor 2D path planning
 % Discrete triple integrator lateral/longitudinal dynamics
 clear; clc;
-addpath ../SCvxStar/src/
+addpath ./SCvxStar/src/
 addpath(genpath('./utils'))
 addpath('./src')
 

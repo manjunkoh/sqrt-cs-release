@@ -3,7 +3,7 @@
 % Uses BlockCholeskySteering (Okamoto et al. 2019 method)
 clear; 
 clc;
-addpath ../SCvxStar/src/
+addpath ./SCvxStar/src/
 addpath(genpath('./utils'))
 addpath('./src')
 yalmip('clear')

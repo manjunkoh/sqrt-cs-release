@@ -3,7 +3,7 @@
 % Compares nx = 4, 8, 16, 32 with nu = nx/2, nw = nx
 clear; 
 clc;
-addpath ../SCvxStar/src/
+addpath ./SCvxStar/src/
 addpath(genpath('./utils'))
 addpath('./src')
 
