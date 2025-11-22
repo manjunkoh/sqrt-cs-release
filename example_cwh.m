@@ -520,7 +520,7 @@ if use_fc || use_qr
             ylim([y_min - margin, y_max + margin]);
         end
         
-        ylabel([component_labels{comp_idx}, ' (m/s)'], 'Interpreter', 'latex')
+        ylabel([component_labels{comp_idx}, ' (m/s$^2$)'], 'Interpreter', 'latex')
         grid on
         xlim([t_his(1), t_his(end)])
         % if comp_idx == 2
@@ -646,7 +646,7 @@ if use_fc || use_qr
     end
     
     xlabel('Time (s)', 'Interpreter', 'latex')
-    ylabel('$\|u\|_2$ (m/s)', 'Interpreter', 'latex')
+    ylabel('$\|u\|_2$ (m/s$^2$)', 'Interpreter', 'latex')
     % legend('Location', 'southeast')
     grid on
     xlim([t_his(1), t_his(end)])
