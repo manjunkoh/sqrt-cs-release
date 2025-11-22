@@ -82,8 +82,9 @@ prob_bc = BlockCholeskySteering(...
     mu_0=mu_i, mu_f=mu_f, ...
     waypoints=waypoints);
 
+sdp_settings = sdpsettings('verbose', 0, 'solver', 'mosek');
 tic
-diagnostic_bc = prob_bc.solve('verbose', 0, 'solver', 'mosek');
+diagnostic_bc = prob_bc.solve(sdp_settings);
 time_bc = toc;
 
 if diagnostic_bc.problem == 0 || diagnostic_bc.problem == 4
@@ -111,7 +112,7 @@ prob_fc = FullCovarianceSteering(...
     waypoints=waypoints);
 
 tic
-diagnostic_fc = prob_fc.solve('verbose', 0, 'solver', 'mosek');
+diagnostic_fc = prob_fc.solve(sdp_settings);
 time_fc = toc;
 
 if diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4
@@ -130,7 +131,6 @@ disp('=== Solving with SqrtQRCovarianceSteering ===');
 % Initial guess for SqrtQRCovarianceSteering
 init.S = interpolate_lower_triangular(chol(Sigma_i, 'lower'), chol(Sigma_f, 'lower'), N+1, 'log-cholesky');
 init.L = zeros(nu, nx, N);
-% Initialize mean trajectory to satisfy waypoints
 init.mu = linspace_vec(mu_i, mu_f, N+1);
 init.v = zeros(nu, N);
 

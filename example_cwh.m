@@ -22,12 +22,12 @@ tof = dt*N;
 t_his = linspace(0, tof, N+1);
 
 % Create CWH dynamical system
-DS = CWH(r0, mu_earth);
+DS = astro.CWH(r0, mu_earth);
 
 % System dimensions
 nx = DS.nx;  % 6 (position + velocity in 3D)
 nu = DS.nu;  % 3 (acceleration control in 3D)
-nw = 3;      % Process noise dimension (stochastic acceleration)
+nw = nx;      % Process noise dimension after discretization
 
 % Uncertainty Parameters
 % Initial dispersion
