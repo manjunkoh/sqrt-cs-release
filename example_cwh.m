@@ -380,7 +380,7 @@ if use_fc || use_qr
             plot_indices = round(linspace(1, num_samples_mc, num_traj_plot));
             
             for i = plot_indices
-                plot(x_mc(1,:,i), x_mc(2,:,i), '.-', 'MarkerSize', 8, 'Color', [0.7, 0.85, 1.0], 'LineWidth', 0.5, 'DisplayName', 'MC samples');
+                plot(x_mc(1,:,i), x_mc(2,:,i), '.-', 'MarkerSize', 8, 'Color', [0.7, 0.85, 1.0, 0.5], 'LineWidth', 0.5, 'DisplayName', 'MC samples');
             end
             
             % Plot Monte Carlo mean trajectory
