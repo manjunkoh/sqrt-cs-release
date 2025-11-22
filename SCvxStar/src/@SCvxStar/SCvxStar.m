@@ -467,7 +467,7 @@ classdef SCvxStar < handle
                         D_S = diag([10, 10, 10, 1000, 1000, 1000]);
                         % D_S = eye(2);
                         % D_S = eye(4);
-                        for k = 1:size(vars.(field), 3)
+                        for k = 2:size(vars.(field), 3)-1
                             S_k = vars.S(:,:,k);
                             S_ref_k = obj.this_iter.ref_vars.S(:,:,k);
                             constraintLHS = [constraintLHS
