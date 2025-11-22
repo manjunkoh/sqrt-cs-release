@@ -37,7 +37,7 @@ We propose a novel method for solving the chance-constrained covariance steering
 \end{abstract}
 
 \begin{IEEEkeywords}
-	chance constraints, covariance steering, QR decomposition, sequential convex programming, square root filtering,
+	chance constraints, covariance steering, QR decomposition, sequential convex programming, square root filtering
 \end{IEEEkeywords}
 
 \section{Introduction}
@@ -50,9 +50,9 @@ We propose a novel method for solving the chance-constrained covariance steering
 
 % In addition, in many real-world applications, 1. the uncertainty has magnitudes smaller than the mean values, and 2. chance-constrained are required to ensure safety or to impose the limitations on the input. In such a case, the problem of finding the optimal feedforward sequence (mean-only steering) and that of finding the optimal feedback sequence (covariance-only steering) are coupled, and the problem is inherently ill-scaled. This means that algorithms implemented on finite-precision computers may struggle to find solutions. 
 
-Uncertainty is the fundamental reason for closed-loop control design. To explicitly address uncertainty, Covariance Steering (CS) \cite{hotzCovarianceControlTheory1987,chenOptimalSteeringLinear2016} has emerged as a promising control framework. Unlike traditional methods that treat uncertainty as a disturbance to be rejected, CS defines the system state to include both the mean and the covariance matrix within the optimal control formulation. This approach yields an optimal sequence of feedforward and feedback control policies that steer the statistical moments of the system to, or within, desired terminal values.
+Uncertainty is the fundamental reason for closed-loop control design. To explicitly address uncertainty, covariance steering (CS) \cite{hotzCovarianceControlTheory1987,chenOptimalSteeringLinear2016} has emerged as a promising control framework. Unlike traditional methods that treat uncertainty as a disturbance to be rejected, CS defines the system state to include both the mean and the covariance matrix within the optimal control formulation. This approach yields an optimal sequence of feedforward and feedback control policies that steer the statistical moments of the system to, or within, desired terminal values.
 
-However, CS possesses unique characteristics distinct from standard optimal control problems, yielding numerical difficulties. Due to the inherent objective of steering uncertainty to small values while minimizing control effort, the variance of the state often undergoes drastic changes in magnitude throughout the time horizon. This contrasts with nominal trajectory optimization, where the magnitude of the state variables typically remains within a consistent range.
+However, CS possesses unique characteristics distinct from standard optimal control problems, yielding numerical difficulties. Due to the inherent objective of steering uncertainty to small values while minimizing control effort, the variance of the state can show significantly different magnitudes throughout the time horizon. This contrasts with nominal trajectory optimization, where the magnitude of the state variables typically remains within a consistent range.
 
 This issue is amplified in real-world applications by two factors. First, the magnitude of the uncertainty is often much smaller than that of the mean state. Second, safety requirements and actuator limitations necessitate the use of chance constraints. These constraints mathematically couple the problem of finding the optimal feedforward sequence (mean-only steering) with that of finding the optimal feedback sequence (covariance-only steering). Consequently, the resulting optimization problem is inherently ill-scaled. When implemented on finite-precision computers, standard algorithms may struggle to converge, as we demonstrate in this paper.
 
@@ -65,7 +65,7 @@ At the same time, we have observed several drawbacks of \cite{liuOptimalCovarian
 \item (\textbf{Numerical Reliability}) In scenarios where the state variance is small compared to the mean values \cite{oguriChanceConstrainedControlSafe2024a,kumagaiRobustCislunarLowThrust2025a}, this can lead to difficulties for numerical solvers. We hypothesize that the numerical difficulties can be attributed to dealing with the covariance matrix directly. This necessarily squares the system units and amplifies ill-scaling, causing issues for solvers working in finite precision. 
 
 \item (\textbf{Non-convexity under Chance Constraints}) 
-It is common to encounter objective functions or chance constraints that are represented as convex in the square root form, e.g. affine chance constraints \cite{okamotoOptimalCovarianceControl2018}. Using an epigraph formulation, we can without loss of generality consider only the constraints. Due to the square root operation, these constraints are nonconvex in the covariance matrix form.
+It is common to encounter objective functions or chance constraints that are represented as convex in the square root form, e.g. quantile objective functions or affine chance constraints \cite{okamotoOptimalCovarianceControl2018}. Using an epigraph formulation, we can without loss of generality consider only the constraints. Due to the square root operation, these constraints are nonconvex in the covariance matrix.
 Thus, a reference covariance matrix for conservatively approximating the square root via linearization \cite{rapakouliasDiscreteTimeOptimalCovariance2023} or iterative algorithms \cite{pilipovskyComputationallyEfficientChance2024} are required. 
 
 \item (\textbf{Limitations of Convexification}) The proof of convexity in \cite{liuOptimalCovarianceSteering2025} requires that the partial of the the Lagrangian with respect to the control covariance matrix is positive definite (such as in the expectation-of-quadratic case). For general objective functions, theoretical work is required to ensure the convexity of new formulation; for example, when using a non-quadratic objective function \cite{kumagaiRobustCislunarLowThrust2025a}, a small quadratic term was added to the objective function to ensure convexity.
@@ -73,7 +73,7 @@ Thus, a reference covariance matrix for conservatively approximating the square 
 \item (\textbf{Numerical Accuracy of Convexification}) The convexification process is only valid up to the numerical accuracy of the LMI that is solved. We have observed that when the solver terminates due to numerical issues, the covariance propagation equations can be lossy.\\
 \end{itemize}
 
-The numerical issues encountered due to using the covariance matrix as the dependent variable can be explained by the \textit{square root filter} literature. As early as the 1960s, engineers developing the Apollo Guidance Computer (AGC) were aware of the numerical instability of the standard Kalman filter \cite{grewalApplicationsKalmanFiltering2010}. Potter's equivalent derivation of the filter which uses the Cholesky factor of the covariance matrix as the dependent variable gave rise to the square root Kalman filter; achieving the same accuracy with "half as many bits" of prevision, it was adopted for the AGC \cite{grewalApplicationsKalmanFiltering2010}. Since then, square root methods have been developed to include process noise \cite{dyerExtensionSquarerootFiltering1969}, and alternative LDL factorization-based methods have been proposed \cite{thorntonGramSchmidtAlgorithmsCovariance1975}. Thornton and Bierman later document a numerical comparison of the standard versus the square root methods, demonstrating the divergence of the former for a practical aerospace scenario \cite{thorntonNumericalComparisonDiscrete1976}. See \cite{kaminskiDiscreteSquareRoot1971,tapleyStatisticalOrbitDetermination2004} for a holistic review and comparison of these methods.
+The numerical issues encountered due to using the covariance matrix as the dependent variable can be explained by the \textit{square root filter} literature. As early as the 1960s, engineers developing the Apollo Guidance Computer (AGC) were aware of the numerical instability of the standard Kalman filter \cite{grewalApplicationsKalmanFiltering2010}. Potter's equivalent derivation of the filter which uses the Cholesky factor of the covariance matrix as the dependent variable gave rise to the square root Kalman filter; achieving the same accuracy with ``half as many bits" of precision, it was adopted for the AGC \cite{grewalApplicationsKalmanFiltering2010}. Since then, square root methods have been developed to include process noise \cite{dyerExtensionSquarerootFiltering1969}, and alternative LDL factorization-based methods have been proposed \cite{thorntonGramSchmidtAlgorithmsCovariance1975}. Thornton and Bierman later document a numerical comparison of the standard versus the square root methods, demonstrating the divergence of the former for a spacecraft orbit determination scenario \cite{thorntonNumericalComparisonDiscrete1976}. See \cite{kaminskiDiscreteSquareRoot1971,tapleyStatisticalOrbitDetermination2004} for a holistic review and comparison of these methods.
 
 Motivated by the above-mentioned background, we propose an alternative solution method for the chance-constrained CS problem which explicitly, defining the covariance matrix Cholesky factor as the dependent variable. Due to the nonconvex representation of the propagation equation of the Cholesky factor, the problem is solved iteratively via sequential convex programming (SCP), utilizing the derivative of the QR decomposition as a key element. Nevertheless, the approach has the following benefits:
 \begin{itemize}
@@ -448,7 +448,7 @@ Next, we apply this result to our specific problem. The following proposition is
 
 \section{Numerical Examples}
 The convex optimization problems are solved in MATLAB using YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} on a MacBook Pro with an M4 Max processor with 24GB of RAM. We use the same SCP parameters as in \cite{oguriSuccessiveConvexificationFeasibility2023a}, which are summarized in \cref{tab:scp_parameters}.
-\footnote{\textr{Make code available at \url{https://github.com/naoya-kumagai/
+\footnote{\textr{Code available at \url{https://github.com/naoya-kumagai/
 sqrt_covariance_steering/}}.}
 \begin{table}[ht]
 \centering
@@ -488,7 +488,7 @@ with \( q = 0.05 \) being the process noise spectral density.
 The initial and terminal state covariance are \(P_{\mathrm{init}} = I_6\) and \(P_{\mathrm{final}} = 0.5 P_{\mathrm{init}}\), respectively. We use a quadratic cost function, with \(Q = 0.1 I_6\) and \(R = I_3\).
 The results are shown in \cref{fig:horizon_size_scalability,fig:horizon_size_cost_comparision}. To time the solutions, we perform 5 trials for each method for each horizon length. Convergence and feasibility tolerance for our method are set to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-4}\). The scaling matrices \(D_S\) and \(D_L\) are set to identity matrices.
 
-For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers fast and optimal solutions. \cite{okamotoOptimalStochasticVehicle2019} shows much worse scalability, which matches the observations in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Another observation is that due to its specific feedback policy, it compromises optimality. Our approach shows scalability that is between the two, while achieving optimality, which empirically validates \cref{th:global_optimality}.
+For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers fast and optimal solutions. The computational complexity of \cite{okamotoOptimalStochasticVehicle2019} grows quickly, which matches the observations in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Another observation is that due to its specific feedback policy, it compromises optimality. Our approach shows scalability that is between the two, while achieving optimality, which empirically validates \cref{th:global_optimality}.
 
 \begin{figure}[ht]
 	\centering
@@ -537,18 +537,6 @@ The continuous-time Clohessy-Wiltshire-Hill equations \cite{schaubAnalyticalMech
 We use $D_S = \mathrm{diag}(10, 10, 10, 10^3, 10^3, 10^3)$ and $D_L = 10^3 I_3$ for the trust region scaling. We set the convergence and feasibility tolerance to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-5}\).
 The proposed method solves the problem in 45 iterations in about 8 seconds. The results are shown in \cref{fig:example_cwh_trajectory,fig:example_cwh_control_history}, along with the results of 1000 Monte Carlo simulations. We can observe that the terminal covariance constrains is satisfied with equality, and the Monte Carlo simulations are within the 3-sigma bounds.
 
-For the full covariance approach, since it cannot directly handle the ``square-root of maximum eigenvalue'' term, we linearize it around a reference covariance matrix, as in the chance constraint handling described in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. In this case, a small term \(\epsilon \trace(Y_k)\) is added to the objective function to ensure valid convexification \cite{kumagaiRobustCislunarLowThrust2025a}, with \(\epsilon = 10^{-3}\) chosen. The full covariance approach is not able to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues, and the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. For this problem, we checked that the covariance dynamics are largely violated. This supports our hypothesis: by working with the covariance matrix which necessarily squares the units of deviation, numerical solvers are more likely to encounter problems. We also tested with alternative objective functions, such as the quadratic cost function, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. We measured the loss in covariance propagation as follows:
-\begin{equation}
-	\text{Loss} = \norm{\phi(K_k, P_k) - P_{k+1}}_F / \norm{P_{k+1}}_F
-\end{equation}
-where \( K_k, P_k \) are the solution of the optimization, and
-\begin{equation}
-	\phi(K_k, P_k) := (A_k + B_k K_k) P_k (A_k + B_k K_k)^\top + G_k G_k^\top.
-\end{equation}
-A loss larger than 0.1 was observed in all cases.
-
-% For this problem, the short horizon length enables the block-based approach to also solve this problem with reasonable computational cost.
-
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\linewidth]{example_cwh_trajectory.pdf}
@@ -563,6 +551,22 @@ A loss larger than 0.1 was observed in all cases.
 	\label{fig:example_cwh_control_history}
 \end{figure}
 
+For the full covariance approach, since it cannot directly handle the ``square-root of maximum eigenvalue'' term, we linearize it around a reference covariance matrix, as in the chance constraint handling described in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. In this case, a small term \(\epsilon \trace(Y_k)\) is added to the objective function to ensure valid convexification \cite{kumagaiRobustCislunarLowThrust2025a}, with \(\epsilon = 10^{-3}\) chosen. The full covariance approach is not able to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues, and the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. For this problem, we checked that the covariance dynamics are largely violated. This supports our hypothesis: by working with the covariance matrix which necessarily squares the units of deviation, numerical solvers are more likely to encounter problems. We also tested with alternative objective functions, such as the expectation-of-quadratic, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. We measure the loss in covariance propagation as follows:
+\begin{equation}
+	\text{Loss}_k = \norm{\phi(K_k, P_k) - P_{k+1}}_F / \norm{P_{k+1}}_F
+\end{equation}
+where \( K_k, P_k \) are the solution of the optimization, and
+\begin{equation}
+	\phi(K_k, P_k) := (A_k + B_k K_k) P_k (A_k + B_k K_k)^\top + G_k G_k^\top.
+\end{equation}
+\cref{fig:example_cwh_covariance_propagation_loss} shows the covariance propagation loss for the two methods, showing the accuracy of the proposed method's covariance propagation.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.8\linewidth]{example_cwh_covariance_propagation_loss.pdf}
+	\caption{Covariance propagation loss for the spacecraft rendezvous problem}
+	\label{fig:example_cwh_covariance_propagation_loss}
+\end{figure}
 
 \section{Conclusions}
 We proposed a novel method for solving the chance-constrained covariance steering problem. Due to the nonconvex representation of the square root covariance propagation equations, the problem is solved iteratively via sequential convex programming. Nevertheless, the method is shown to be 1. globally optimal when chance constraints are not present, 2. more scalable for large horizon length than the block approach, and 3. numerically reliable for problems with small variance components compared to the full covariance approach. Furthermore, it is free of any proofs of convexification that rely on a specific objective function form.
