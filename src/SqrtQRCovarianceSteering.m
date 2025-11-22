@@ -481,6 +481,56 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			dR = (V - A) * Rx;
 
 		end
+
+		function loss = compute_covariance_propagation_loss(obj)
+			% Compute loss in covariance propagation according to:
+			% Loss_k = ||φ(Kk, Pk) - Pk+1||F / ||Pk+1||F
+			% where φ(Kk, Pk) := (Ak + Bk*Kk)*Pk*(Ak + Bk*Kk)' + Gk*Gk'
+			%
+			% Returns:
+			%   loss: (N x 1) vector of losses for each time step k = 1, ..., N
+			
+			if isempty(obj.P) || isempty(obj.K)
+				error('SqrtQRCovarianceSteering: P and K must be set. Solve the problem first.');
+			end
+			
+			N = obj.N;
+			loss = zeros(N, 1);
+			
+			for k = 1:N
+				% Get system matrices for time step k
+				if size(obj.A_sys, 3) == 1
+					A_k = obj.A_sys;
+				else
+					A_k = obj.A_sys(:,:,k);
+				end
+				
+				if size(obj.B_sys, 3) == 1
+					B_k = obj.B_sys;
+				else
+					B_k = obj.B_sys(:,:,k);
+				end
+				
+				if size(obj.G_sys, 3) == 1
+					G_k = obj.G_sys;
+				else
+					G_k = obj.G_sys(:,:,k);
+				end
+				
+				% Get feedback gain and covariance
+				K_k = obj.K(:,:,k);
+				P_k = obj.P(:,:,k);
+				P_kp1 = obj.P(:,:,k+1);
+				
+				% Compute φ(Kk, Pk) = (Ak + Bk*Kk)*Pk*(Ak + Bk*Kk)' + Gk*Gk'
+				A_closed = A_k + B_k * K_k;
+				phi_Kk_Pk = A_closed * P_k * A_closed' + G_k * G_k';
+				
+				% Compute loss: ||φ(Kk, Pk) - Pk+1||F / ||Pk+1||F
+				diff = phi_Kk_Pk - P_kp1;
+				loss(k) = norm(diff, 'fro') / norm(P_kp1, 'fro');
+			end
+		end
 				
 	end
 

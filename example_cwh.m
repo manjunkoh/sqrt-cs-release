@@ -345,6 +345,7 @@ end
 use_fc = exist('prob_fc', 'var') && ~isempty(prob_fc) && (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) && prob_fc.check_lossless();
 use_qr = exist('prob_qr', 'var') && flag_solved_qr && ~isempty(prob_qr);
 
+%%
 if use_fc || use_qr
     
     figure(Position=[0, 0, 20, 10])
@@ -669,6 +670,61 @@ if flag_solved_qr && ~isempty(prob_qr)
     fprintf('SqrtQRCovarianceSteering: Time = %.3f s, Objective = %.6f, Iterations = %d\n', time_qr, J_qr, prob_qr.scp.report.iters);
 else
     fprintf('SqrtQRCovarianceSteering: Failed\n');
+end
+
+%% Compare Covariance Propagation Loss
+fprintf('\n=== Covariance Propagation Loss Comparison ===\n');
+if diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4
+    try
+        loss_fc = prob_fc.compute_covariance_propagation_loss();
+        fprintf('FullCovarianceSteering:\n');
+        fprintf('  Mean loss: %.6e\n', mean(loss_fc));
+        fprintf('  Max loss:  %.6e\n', max(loss_fc));
+        fprintf('  Min loss:  %.6e\n', min(loss_fc));
+    catch ME
+        fprintf('FullCovarianceSteering: Error computing loss - %s\n', ME.message);
+        loss_fc = [];
+    end
+else
+    loss_fc = [];
+end
+
+if use_qr
+    try
+        loss_qr = prob_qr.compute_covariance_propagation_loss();
+        fprintf('SqrtQRCovarianceSteering:\n');
+        fprintf('  Mean loss: %.6e\n', mean(loss_qr));
+        fprintf('  Max loss:  %.6e\n', max(loss_qr));
+        fprintf('  Min loss:  %.6e\n', min(loss_qr));
+    catch ME
+        fprintf('SqrtQRCovarianceSteering: Error computing loss - %s\n', ME.message);
+        loss_qr = [];
+    end
+else
+    loss_qr = [];
+end
+
+% Plot comparison if both are availableCLose asdfasdfadf
+if ~isempty(loss_fc) && ~isempty(loss_qr)
+    figure(Position=[0, 0, 18, 8])
+    hold on
+    plot(0:N-1, loss_fc, 'o-', 'Color', '#0082B2', 'LineWidth', 2, 'MarkerSize', 8, 'DisplayName', 'Liu et al. (2025)');
+    plot(0:N-1, loss_qr, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8, 'DisplayName', 'Proposed method');
+    xlabel('Time step $k$', 'Interpreter', 'latex')
+    ylabel('Loss')
+    legend('Location', 'none', 'EdgeColor', 'white')
+    yscale log
+
+    ax = gca;
+    ylims = ylim(ax);
+    % Generate ticks at powers of 10 and intermediate values
+    log_min = floor(log10(ylims(1)));
+    log_max = ceil(log10(ylims(2)));
+    yticks_val = 10.^(log_min:log_max);
+    yticks(ax, yticks_val)
+
+    exportgraphics(gcf, 'figures/example_cwh_covariance_propagation_loss.png', Resolution=300)
+    exportgraphics(gcf, 'figures/example_cwh_covariance_propagation_loss.pdf', ContentType='vector')
 end
 
 %% Plot iteration history for QR method
