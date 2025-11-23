@@ -4,8 +4,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 
 	properties
 		init_guess_struct
-		% imposing trust region on L is not recommended, as it causes chattering
-		% near the solution and slower convergence.
 		impose_trust_region_struct = struct('S', true, 'L', true, 'mu', false, 'v', false);
 	end
 
@@ -37,8 +35,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 		waypoints = {}  % cell array of waypoint structs with fields: 'node' (scalar, 1:N+1) and 'mu' (nx x 1 vector)
 		mu % state mean trajectory, set after solving
 		v  % control mean trajectory, set after solving
-		% vec_Rchol_L % auxiliary variable for control cost
-		% vec_Qchol_S % auxiliary variable for state cost
 
 		mean_trust_region_radius = 0.1;
 		impose_mean_trust_region = false;
@@ -55,8 +51,8 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				options.G_sys
 				options.P_0
 				options.P_f
-				options.Q
-				options.R
+				options.Q = []
+				options.R = []
 				options.objective_type = 'LQG';
 				options.chance_constraints_state = {}
 				options.chance_constraints_control = {}
@@ -96,9 +92,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			obj.D = options.D;
 
 			yalmip('clear');
-			% obj.vec_Rchol_L = sdpvar(obj.nu * obj.nx, obj.N, 'full');
-			% obj.vec_Qchol_S = sdpvar(obj.nx^2, obj.N, 'full');
-
 			obj.initialize();
 
 		end
@@ -128,24 +121,14 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			switch obj.objective_type
 				case {'LQG', 'LQR', 'LQ'}
 
-					% R_chol = chol(obj.R, 'lower');
 					% Add control cost
 					for k = 1:obj.N
-						% J0 = J0 + obj.vec_Rchol_L(:,k)' * obj.vec_Rchol_L(:,k);
-   
-						% M = R_chol' * vars.L(:,:,k);
 						J0 = J0 + trace(vars.L(:,:,k) * vars.L(:,:,k)' * obj.R);
-						% J0 = J0 + norm(vars.L(:,:,k), 'fro');
-						% J0 = J0 + trace(norm(M, 'fro')^2);
 					end
 					
 					% Add state covariance cost
-					% Q_chol = chol(obj.Q, 'lower');
 					for k = 1:obj.N
-						% J0 = J0 + obj.vec_Qchol_S(:,k)' * obj.vec_Qchol_S(:,k);
 						J0 = J0 + trace(vars.S(:,:,k) * vars.S(:,:,k)' * obj.Q);
-						% M = Q_chol' * vars.S(:,:,k);
-						% J0 = J0 + trace(norm(M, 'fro')^2);
 					end
 
 					% Add mean state and control cost (if mean variables are defined)
@@ -209,15 +192,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 					end
 				end
 			end
-
-			% R_chol = chol(obj.R, 'lower');
-			% Q_chol = chol(obj.Q, 'lower');
-			% for k = 1:obj.N
-			% 	constraints = [constraints
-			% 		[obj.vec_Rchol_L(:,k) == reshape(R_chol' * vars.L(:,:,k), [], 1)]:'Control Cost Aux Variable Definition'
-			% 		[obj.vec_Qchol_S(:,k) == reshape(Q_chol' * vars.S(:,:,k), [], 1)]:'State Cost Aux Variable Definition'
-			% 	];
-			% end
 
 		end
 

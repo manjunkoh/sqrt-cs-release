@@ -3,7 +3,6 @@
 % This defines a template class with basic methods for handling constraints
 % The user is not supposed to call this class directly, but rather
 % through defining their own class that inherits this class
-% See ExampleClass1.m for an example of how to define a new SCP problem
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 classdef SCPProblem < handle
@@ -56,6 +55,9 @@ classdef SCPProblem < handle
 
             obj.set_fixed_sdp_objects();
 
+            % Automatically handle auxiliary variables: exclude them from trust regions
+            obj.setup_auxiliary_variables();
+
             if ~obj.use_optimizer
                 obj.update_parameters(obj.init_guess_struct);
                 obj.update_constraints(obj.init_guess_struct);
@@ -68,6 +70,11 @@ classdef SCPProblem < handle
                     % Get the field name
                     field = fields{i};
 
+                    % Skip auxiliary variables
+                    if obj.is_auxiliary_variable(field)
+                        continue;
+                    end
+
                     if obj.impose_trust_region_struct.(field)
                         obj.trust_region_scaling.(field) = 1;
                     end
@@ -78,6 +85,11 @@ classdef SCPProblem < handle
                 for i = 1:length(fields)
                     % Get the field name
                     field = fields{i};
+
+                    % Skip auxiliary variables
+                    if obj.is_auxiliary_variable(field)
+                        continue;
+                    end
 
                     if ~obj.impose_trust_region_struct.(field)
                         continue;
@@ -94,6 +106,9 @@ classdef SCPProblem < handle
                 end
                 
             end
+
+            % Initialize auxiliary variables if needed
+            obj.initialize_auxiliary_variables();
         end
 
         function set_fixed_sdp_objects(obj)
@@ -252,6 +267,41 @@ classdef SCPProblem < handle
 
         function update_parameters(obj, ref_vars)
             % Update the parameters that depend on the reference variables
+        end
+
+        %% Auxiliary variable handling methods
+        function setup_auxiliary_variables(obj)
+            % Automatically set impose_trust_region_struct to false for auxiliary variables
+            % This ensures auxiliary variables are excluded from trust regions
+            fields = fieldnames(obj.sdp_vars);
+            for i = 1:length(fields)
+                field = fields{i};
+                if obj.is_auxiliary_variable(field)
+                    % Ensure the field exists in impose_trust_region_struct
+                    obj.impose_trust_region_struct.(field) = false;
+                end
+            end
+        end
+
+        function is_aux = is_auxiliary_variable(obj, field_name)
+            % Determine if a variable field is an auxiliary variable
+            % Override this method in subclasses to identify auxiliary variables
+            % Default implementation: returns false (no auxiliary variables by default)
+            %
+            % Auxiliary variables are typically:
+            % - Variables introduced to reformulate objectives (e.g., SOC reformulations)
+            % - Variables that should not have trust regions
+            % - Variables that are determined by primary variables through constraints
+            is_aux = false;
+        end
+
+        function initialize_auxiliary_variables(obj)
+            % Initialize auxiliary variables in init_guess_struct if needed
+            % Override this method in subclasses to set initial values for auxiliary variables
+            % based on primary variables
+            %
+            % This is called after set_fixed_sdp_objects() but before trust region setup
+            % Default implementation: does nothing
         end
 
     end

@@ -57,8 +57,8 @@ classdef CovarianceSteeringBase < handle
 				options.G
 				options.P_0
 				options.P_f
-				options.Q
-				options.R
+				options.Q = []
+				options.R = []
 				options.N
 				options.covariance_scaling = 1
 				options.chance_constraints_state = {}
