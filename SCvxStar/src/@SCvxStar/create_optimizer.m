@@ -16,6 +16,7 @@ function opt = create_optimizer(obj)
         % See Problem 4.26 in Boyd's book
         constraints = [constraints
             norm([2 * xi; xi_norm_squared - 1]) <= xi_norm_squared + 1
+            xi_norm_squared >= 0
         ];
     else
         lambda = [];
