@@ -1,4 +1,4 @@
-%% Example: Cone-shaped path planning problem
+%% Constrained covariance steering from Okamoto 2018
 % Solves with both BlockCholeskySteering (Okamoto et al. 2019) and 
 % SqrtQRCovarianceSteering methods
 clc; clear;

@@ -1,10 +1,10 @@
-%% Example: Quadrotor 2D path planning
-% Discrete triple integrator lateral/longitudinal dynamics
+% Discrete triple integrator lateral/longitudinal dynamics from Rapakoulias 2023
 clear; clc;
 addpath ./SCvxStar/src/
 addpath(genpath('./utils'))
 addpath('./src')
 
+%% Parameters
 % Time horizon and discretization (60 nodes in original paper)
 tof = 6.0;
 N = 60;
@@ -41,7 +41,6 @@ mu_f = zeros(nx,1);
 % Waypoint constraints: intermediate mean positions
 % At node 20: position [13, 5], at node 40: position [7, -5]
 % State is [x, y, vx, vy, ax, ay], so we only specify position (first 2 elements)
-% Use NaN for unconstrained components (velocity and acceleration will be free)
 waypoints = {
     struct('node', 20, 'mu', [13; 5; NaN; NaN; NaN; NaN]);  % Waypoint at node 20
     struct('node', 40, 'mu', [7; -5; NaN; NaN; NaN; NaN]);  % Waypoint at node 40
@@ -66,36 +65,38 @@ state_cc = {
 };
 
 % Objective weights
-Q = 0.001 * eye(nx);
-R = 0.01 * eye(nu);
+Q = 0.01 * eye(nx);
+R = 0.1 * eye(nu);
 
 sdp_settings = sdpsettings('verbose', 0, 'solver', 'mosek');
-skip_block = false;
+
+% block method take a lot of time and becomes infeasible. Change to false to try it.
+skip_block = true;
 
 %% Solve with BlockCholeskySteering
 if ~skip_block
-disp('=== Solving with BlockCholeskySteering ===');
-prob_bc = BlockCholeskySteering(...
-    A=A_sys, B=B_sys, G=G_sys, ...
-    P_0=Sigma_i, P_f=Sigma_f, ...
-    Q=Q, R=R, ...
-    N=N, ...
-    chance_constraints_state=state_cc, ...
-    mu_0=mu_i, mu_f=mu_f, ...
-    waypoints=waypoints);
-
-tic
-diagnostic_bc = prob_bc.solve(sdp_settings);
-time_bc = toc;
-
-if diagnostic_bc.problem == 0 || diagnostic_bc.problem == 4
-    P_bc = prob_bc.P;
-    fprintf('BlockCholeskySteering solved successfully in %.3f seconds\n', time_bc);
-    fprintf('  Objective value: %.6f\n', prob_bc.optimal_objective);
-else
-    disp('BlockCholeskySteering solver failed.');
-    disp(yalmiperror(diagnostic_bc.problem));
-end
+    disp('=== Solving with BlockCholeskySteering ===');
+    prob_bc = BlockCholeskySteering(...
+        A=A_sys, B=B_sys, G=G_sys, ...
+        P_0=Sigma_i, P_f=Sigma_f, ...
+        Q=Q, R=R, ...
+        N=N, ...
+        chance_constraints_state=state_cc, ...
+        mu_0=mu_i, mu_f=mu_f, ...
+        waypoints=waypoints);
+    
+    tic
+    diagnostic_bc = prob_bc.solve(sdp_settings);
+    time_bc = toc;
+    
+    if diagnostic_bc.problem == 0 || diagnostic_bc.problem == 4
+        P_bc = prob_bc.P;
+        fprintf('BlockCholeskySteering solved successfully in %.3f seconds\n', time_bc);
+        fprintf('  Objective value: %.6f\n', prob_bc.optimal_objective);
+    else
+        disp('BlockCholeskySteering solver failed.');
+        disp(yalmiperror(diagnostic_bc.problem));
+    end
 end
 %% Solve with FullCovarianceSteering
 disp('=== Solving with FullCovarianceSteering ===');
@@ -130,6 +131,7 @@ end
 disp('=== Solving with SqrtQRCovarianceSteering ===');
 
 % Initial guess for SqrtQRCovarianceSteering
+init = struct();
 init.S = interpolate_lower_triangular(chol(Sigma_i, 'lower'), chol(Sigma_f, 'lower'), N+1, 'log-cholesky');
 init.L = zeros(nu, nx, N);
 init.mu = linspace_vec(mu_i, mu_f, N+1);
@@ -139,16 +141,17 @@ prob_qr = SqrtQRCovarianceSteering(init, ...
     N=N, ...
     A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
     P_0=Sigma_i, P_f=Sigma_f, Q=Q, R=R, ...
-    objective_type='LQG', ...
     chance_constraints_state=state_cc, ...
     waypoints=waypoints, ...
     mu_0=mu_i, mu_f=mu_f);
 
 scp_params = SCPParams();
-scp_params.tol_opt = 1E-4;
+scp_params.tol_opt = 1E-3;
 scp_params.tol_feas = 1E-4;
 
-flag_solved_qr = prob_qr.solve(save_bool=false, scp_params=scp_params);
+prob_qr.D = 0.1 * eye(6);
+
+flag_solved_qr = prob_qr.solve(scp_params=scp_params);
 time_qr = seconds(prob_qr.scp.report.time);
 J_qr = NaN;
 
@@ -171,7 +174,7 @@ end
 %% Plot results
 if (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) || flag_solved_qr
     
-    figure
+    figure(Position=[0, 0, 15, 15])
     hold on
     
     % Plot constraint boundaries (box constraints: x in [-3, 25], y in [-7, 7])
@@ -209,10 +212,10 @@ if (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) || flag_solved_qr
     if ~isempty(prob_qr) && flag_solved_qr
         % Plot covariance ellipses (every 5th step to avoid clutter)
         for k = 1:5:N+1
-            plot3sigmaEllipse(prob_qr.mu(idx_pos, k), prob_qr.P(idx_pos, idx_pos, k), 'm', 'HandleVisibility', 'off');
+            plot3sigmaEllipse(prob_qr.mu(idx_pos, k), prob_qr.P(idx_pos, idx_pos, k), 'm--', 'HandleVisibility', 'off');
         end
         % Plot mean trajectory
-        plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'm+-', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'SqrtQR');
+        plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'm+--', 'LineWidth', 1.5, 'MarkerSize', 4, 'DisplayName', 'SqrtQR');
     end
     
     % Plot initial and terminal conditions

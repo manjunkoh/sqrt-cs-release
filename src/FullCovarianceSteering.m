@@ -217,6 +217,12 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 									else
 										P_ref_k = obj.P_ref(:,:,k);
 									end
+									try 
+										chol(P_ref_k);
+									catch
+										P_ref_k = nearestSPD(P_ref_k);
+									end
+
 									sqrt_ref = sqrt(alpha' * P_ref_k * alpha);
 									constraints = [constraints
 										z / (2 * sqrt_ref) * (alpha' * obj.sdpvars.P(:,:,k) * alpha) ...
@@ -304,6 +310,11 @@ classdef FullCovarianceSteering < CovarianceSteeringBase
 										Y_ref_k = obj.Y_ref;
 									else
 										Y_ref_k = obj.Y_ref(:,:,k);
+									end
+									try 
+										chol(Y_ref_k);
+									catch
+										Y_ref_k = nearestSPD(Y_ref_k);
 									end
 									sqrt_lambda_max_ref = sqrt(lambda_max(Y_ref_k));
 									constraints = [constraints

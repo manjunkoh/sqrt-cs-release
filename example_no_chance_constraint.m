@@ -1,4 +1,5 @@
-% Square root covariance steering with QR decomposition-based covariance propagation
+% Very simple comparison of FullCovarianceSteering and SqrtQRCovarianceSteering
+% using the unconstrained example from Liu 2025
 clc; clear;
 addpath ./SCvxStar/src/
 addpath(genpath("./utils"))
@@ -52,21 +53,6 @@ else
 	return
 end
 
-%% Plot
-figure
-hold on
-for k = 1:N+1
-	plot3sigmaEllipse(full_cs.mu(:,k), full_cs.P(:,:,k), 'b')
-end
-plot3sigmaEllipse(mu_0, P_0, 'r')
-plot3sigmaEllipse(mu_f, P_f, 'r--')
-axis equal
-xlabel("$x_1$")
-ylabel("$x_2$")
-% exportgraphics(gcf, './figures/full_covariance_steering_result.png');
-
-disp("Covariance part of objective: " + J_cov)
-
 %% Perform interpolation of covariances to generate initial guess
 % try changing between 'log-cholesky' and 'cholesky'
 init_guess_struct.S = interpolate_lower_triangular(chol(P_0, 'lower'), chol(P_f, 'lower'), N+1, 'log-cholesky');
@@ -92,7 +78,22 @@ sqrt_cs.solve(scp_params = scp_params);
 sqrt_cs.postprocess();
 
 %% Plot the results
-figure(Position=[0, 0, 15, 15])
+figure(Position=[0, 0, 30, 15])
+
+tiledlayout(1, 2)
+
+nexttile
+hold on
+for k = 1:N+1
+	plot3sigmaEllipse(full_cs.mu(:,k), full_cs.P(:,:,k), 'b')
+end
+plot3sigmaEllipse(mu_0, P_0, 'r')
+plot3sigmaEllipse(mu_f, P_f, 'r--')
+axis equal
+xlabel("$x_1$")
+ylabel("$x_2$")
+
+nexttile
 hold on
 for k = 1:N
 	plot3sigmaEllipse(sqrt_cs.mu(:,k), sqrt_cs.P(:,:,k), 'b')
@@ -102,6 +103,7 @@ plot3sigmaEllipse(mu_f, P_f, 'r--')
 axis equal
 xlabel("$x_1$")
 ylabel("$x_2$")
+
 % exportgraphics(gcf, './figures/sqrt_covariance_steering_result.png');
 
 %%

@@ -115,16 +115,9 @@ classdef CovarianceSteeringBase < handle
 			diagnostic = optimize(obj.sdpvars.constraints, obj.sdpvars.J, settings);
 
 			switch diagnostic.problem
-				case 0
+				case {0, 4}
 					obj.set_feedback_gains();
 					obj.optimal_objective = value(obj.sdpvars.J);
-				case 1
-					warning('YALMIP:Infeasible', 'Problem infeasible');
-				case 4
-					obj.set_feedback_gains();
-					obj.optimal_objective = value(obj.sdpvars.J);
-				otherwise
-					warning('YALMIP:Failed', 'Solver failed with code %d', diagnostic.problem);
 			end
 		end
 

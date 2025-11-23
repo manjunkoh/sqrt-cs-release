@@ -212,8 +212,20 @@ classdef FullCovarianceSteeringIterative < handle
 					fprintf('  Exit status: %s\n', yalmiperror(diagnostic.problem));
 				end
 				
+				% Exit if subproblem failed
 				if diagnostic.problem ~= 0 && diagnostic.problem ~= 4
-					error('Iteration %d failed: %s', iter, yalmiperror(diagnostic.problem));
+					if obj.verbose
+						fprintf('Iteration %d failed: %s. Exiting iterative loop.\n', iter, yalmiperror(diagnostic.problem));
+					end
+					% Store failed iteration in history
+					obj.iter_history(iter+1).iter = iter;
+					obj.iter_history(iter+1).P_ref = P_ref;
+					obj.iter_history(iter+1).Y_ref = Y_ref;
+					obj.iter_history(iter+1).objective = NaN;
+					obj.iter_history(iter+1).diagnostic = diagnostic;
+					obj.iter_history(iter+1).change_objective = NaN;
+					obj.iter_history(iter+1).max_violation = NaN;
+					break;
 				end
 				
 				% Compute objective function change
