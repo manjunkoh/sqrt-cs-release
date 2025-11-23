@@ -42,15 +42,7 @@ function opt = create_optimizer(obj)
 
     r = sdpvar(1);
 
-    trust_region_constraint = [];
-    for i = 1:length(obj.var_names)
-        field = obj.var_names{i};
-        if obj.scp_prob.impose_trust_region_struct.(field)
-            trust_region_constraint = [trust_region_constraint
-                [obj.scp_prob.trust_region_scaling.(field) * norm(vec(obj.scp_prob.sdp_vars.(field) - sdp_ref_vars.(field)), obj.constParams.trust_region_norm) <= r];
-            ];
-        end
-    end
+    trust_region_constraint = [obj.get_trust_region_constraint_lhs(obj.scp_prob.sdp_vars, sdp_ref_vars, r) <= 0];
     
     constraints = [constraints; trust_region_constraint];
 
@@ -97,8 +89,4 @@ function opt = create_optimizer(obj)
     end
     fprintf('Done!\n')
 
-end
-
-function out = vec(x)
-    out = x(:);
 end

@@ -457,8 +457,15 @@ classdef SCvxStar < handle
             obj.report.code = code;
         end
 
-        function constraintLHS = get_trust_region_constraint_lhs(obj, vars)
+        function constraintLHS = get_trust_region_constraint_lhs(obj, vars, ref_vars, r)
+            arguments
+                obj
+                vars
+                ref_vars = obj.this_iter.ref_vars
+                r = obj.this_iter.r
+            end
             constraintLHS = [];
+            
             if isempty(obj.scp_prob.D)
                 D = 1;
             else
@@ -470,13 +477,13 @@ classdef SCvxStar < handle
                 B = obj.scp_prob.B_sys(:,:,k);
                 S = vars.S(:,:,k);
                 L = vars.L(:,:,k);
-                S_ref = obj.this_iter.ref_vars.S(:,:,k);
-                L_ref = obj.this_iter.ref_vars.L(:,:,k);
+                S_ref = ref_vars.S(:,:,k);
+                L_ref = ref_vars.L(:,:,k);
                 F = A*S + B*L;
                 F_ref = A*S_ref + B*L_ref;
 
                 constraintLHS = [constraintLHS
-                    norm(vec(D * (F - F_ref)), obj.constParams.trust_region_norm) - obj.this_iter.r
+                    norm(vec(D * (F - F_ref)), obj.constParams.trust_region_norm) - r
                     ];
             end
         end
