@@ -100,6 +100,8 @@ state_chance_constraint = {};
 Q = 0.01 * eye(nx);  % State cost (small since we care mainly about terminal covariance)
 R = 1 * eye(nu);   % Control cost
 
+objective_type = 'DV99';
+
 %% Solve with FullCovarianceSteering
 disp('=== Solving CWH Problem with FullCovarianceSteering ===');
 
@@ -115,19 +117,16 @@ prob_fc = FullCovarianceSteering(...
     P_0=P0, P_f=P_f, ...
     Q=Q, R=R, ...
     N=N, ...
-    objective_type='LQG',...
+    objective_type=objective_type,...
     chance_constraints_control=control_chance_constraint, ...
     Y_ref = Y_ref, ...
     covariance_scaling = d, ...
     mu_0=mu_0, mu_f=mu_f);
 
-tic
-
 sdp_settings = sdpsettings('verbose', 2, 'solver', 'mosek', 'savesolveroutput',1, 'savesolverinput', 1);
 
 % dump MOSEK data as a text file 
 % sdp_settings.mosektaskfile = 'data/mosek_dump.ptf';
-
 
 % sdp_settings.mosek.MSK_IPAR_LOG_INTPNT = 10;
 
@@ -145,6 +144,7 @@ sdp_settings = sdpsettings('verbose', 2, 'solver', 'mosek', 'savesolveroutput',1
 % Manually set the number of threads.
 % sdp_settings.mosek.MSK_IPAR_NUM_THREADS = 1;
 
+tic
 diagnostic_fc = prob_fc.solve(sdp_settings);
 time_fc = toc;
 
@@ -179,63 +179,18 @@ init_guess.L = zeros(nu, nx, N);
 init_guess.mu = linspace_vec(mu_0, mu_f, N+1);
 init_guess.v = zeros(nu, N);
 
-% K_init = - dlqr(A_sys(:,:,1), B_sys(:,:,1), Q, R);
-% 
-% for k = 1:N
-%     init_guess.L(:,:,k) = K_init * init_guess.S(:,:,k);
-% end
-
-% Forward propagation of initial covariance
-% P_k = P0;
-% init_guess.S(:,:,1) = chol(P_k, 'lower');
-% for k = 1:N
-%     A = A_sys(:,:,k);
-%     B = B_sys(:,:,k);
-%     G = G_sys(:,:,k);
-% 
-%     P_k = (A+B*K_init) * P_k * (A+B*K_init)' + G * G';
-%     init_guess.S(:,:,k+1) = chol(P_k, 'lower');
-%     init_guess.L(:,:,k) = K_init * init_guess.S(:,:,k);
-% end
-
-% P_k = P_f;
-% init_guess.S(:,:,N+1) = chol(P_k, 'lower');
-% for k = (N+1):-1:floor(N/2)+1 
-%     A = A_sys(:,:,k-1);
-%     B = B_sys(:,:,k-1);
-%     G = G_sys(:,:,k-1);
-% 
-%     P_k = inv(A+B*K_init) * (P_k - G * G') * inv(A+B*K_init)';
-%     init_guess.S(:,:,k-1) = chol(P_k, 'lower');
-%     init_guess.L(:,:,k-1) = K_init * init_guess.S(:,:,k-1);
-% end
-
-% for k = 1:N
-%     init_guess.L(:,:,k) = K_init * init_guess.S(:,:,k);
-% end
-% figure
-% plot_traj_with_cov_ellipses(init_guess.mu, init_guess.S, init_guess=true);
-
+scp_params = SCPParams();
+scp_params.tol_opt = 1E-5;
+scp_params.tol_feas = 1E-5;
 
 prob_qr = SqrtQRCovarianceSteering(init_guess, ...
     N=N, ...
     A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
     P_0=P0, P_f=P_f, Q=Q, R=R, ...
-    objective_type='DV99', ...
+    objective_type=objective_type, ...
     mu_0=mu_0, mu_f=mu_f);
 
 prob_qr.D = diag([10, 10, 10, 1000, 1000, 1000]);
-
-scp_params = SCPParams();
-scp_params.tol_opt = 1E-5;
-scp_params.tol_feas = 1E-5;
-scp_params.w_init = 0.1;
-% scp_params.alpha1 = 1.5;
-% scp_params.alpha2 = 2;
-% scp_params.penalty_method = 'AL_p-norm';
-% scp_params.w_init = 10;
-% scp_params.r_min = 1E-10;
-% scp_params.r_init = 1.0;
 
 flag_solved_qr = prob_qr.solve(save_bool=false, scp_params=scp_params);
 time_qr = seconds(prob_qr.scp.report.time);
@@ -243,12 +198,6 @@ J_qr = NaN;
 
 if flag_solved_qr
     prob_qr.postprocess();
-    % Compute objective value (LQG objective)
-    J_qr = 0;
-    for k = 1:prob_qr.N
-        J_qr = J_qr + trace(Q * prob_qr.P(:,:,k)) + trace(R * prob_qr.P_u(:,:,k)) ...
-            + prob_qr.mu(:,k)' * Q * prob_qr.mu(:,k) + prob_qr.v(:,k)' * R * prob_qr.v(:,k);
-    end
     fprintf('SqrtQRCovarianceSteering solved successfully in %.3f seconds\n', time_qr);
     fprintf('  Number of iterations: %d\n', prob_qr.scp.report.iters);
     fprintf('  Objective value: %.6f\n', J_qr);
@@ -257,6 +206,49 @@ else
     disp(prob_qr.scp.this_iter)
     prob_qr.scp.plot_iter_history()
 end
+
+%% Run the SqrtQRCovarianceSteering 10 times to get the average time
+fprintf('\n=== Running SqrtQRCovarianceSteering 10 times for timing ===\n');
+
+num_runs = 10;
+times_qr_runs = zeros(num_runs, 1);
+flags_solved = false(num_runs, 1);
+
+for run_idx = 1:num_runs
+    % Create a fresh problem instance for each run
+    prob_qr_run = SqrtQRCovarianceSteering(init_guess, ...
+        N=N, ...
+        A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
+        P_0=P0, P_f=P_f, Q=Q, R=R, ...
+        objective_type=objective_type, ...
+        mu_0=mu_0, mu_f=mu_f);
+    
+    prob_qr_run.D = diag([10, 10, 10, 1000, 1000, 1000]);
+    
+    % Time the solve
+    flag_solved_run = prob_qr_run.solve(save_bool=false, scp_params=scp_params, verbose=false);
+    time_run = seconds(prob_qr_run.scp.report.time);
+    
+    times_qr_runs(run_idx) = time_run;
+    flags_solved(run_idx) = flag_solved_run;
+    
+    fprintf('  Run %d/%d: %.3f seconds (solved: %d)\n', run_idx, num_runs, time_run, flag_solved_run);
+end
+
+% Compute statistics
+time_qr_avg = mean(times_qr_runs);
+time_qr_min = min(times_qr_runs);
+time_qr_max = max(times_qr_runs);
+time_qr_std = std(times_qr_runs);
+
+fprintf('\nTiming Statistics (10 runs):\n');
+fprintf('  Average: %.3f seconds\n', time_qr_avg);
+fprintf('  Min:     %.3f seconds\n', time_qr_min);
+fprintf('  Max:     %.3f seconds\n', time_qr_max);
+fprintf('  Std Dev: %.3f seconds\n', time_qr_std);
+
+% Use the average time for reporting
+time_qr = time_qr_avg;
 
 %% Monte Carlo Simulation for QR Method
 if flag_solved_qr && ~isempty(prob_qr)
@@ -294,13 +286,6 @@ if flag_solved_qr && ~isempty(prob_qr)
             x_k = A_k * x_k + B_k * u_k + G_k * w_k;
             x_mc(:, k+1, i) = x_k;
         end
-    end
-    
-    % Compute Monte Carlo statistics
-    mu_mc = mean(x_mc, 3);  % Mean trajectory
-    P_mc = zeros(nx, nx, N+1);
-    for k = 1:N+1
-        P_mc(:,:,k) = cov(squeeze(x_mc(:,k,:))');
     end
     
     % Check terminal constraint satisfaction
@@ -382,15 +367,6 @@ if use_fc || use_qr
                 plot(x_mc(1,:,i), x_mc(2,:,i), '.-', 'MarkerSize', 8, 'Color', [0.7, 0.85, 1.0, 0.5], 'LineWidth', 0.5, 'DisplayName', 'MC samples');
             end
             
-            % Plot Monte Carlo mean trajectory
-            % if exist('mu_mc', 'var')
-            %     plot(mu_mc(1,:), mu_mc(2,:), 'b--', 'LineWidth', 1.2, 'DisplayName', 'Monte Carlo mean');
-            % end
-            
-            % Plot final Monte Carlo samples
-            % if exist('x_final', 'var')
-            %     scatter(x_final(1,:), x_final(2,:), 15, 'b', 'filled', 'MarkerFaceAlpha', 0.2, 'DisplayName', 'Final samples');
-            % end
         end
 
         % Plot mean trajectory (XY plane)
@@ -401,7 +377,6 @@ if use_fc || use_qr
     end
     
     % Plot initial and terminal conditions
-    % plot3sigmaEllipse(mu_0([1,2]), P0([1,2], [1,2]), 'b', 'LineWidth', 2, 'DisplayName', 'Initial ($\mu_{\mathrm{init}}, P_{\mathrm{init}}$)');
     plot3sigmaEllipse(mu_f([1,2]), P_f([1,2], [1,2]), '--', 'Color', '#D55E00', 'LineWidth', 2, 'DisplayName', 'Terminal ($\mu_{\mathrm{fin}}, P_{\mathrm{fin}}$)');
     
     xlabel('$x$ (km)', 'Interpreter', 'latex')
@@ -417,8 +392,8 @@ if use_fc || use_qr
 
     add_zoomed_axis(gca, [-0.05, 0.05, 0, 0.10], [-0.6, 0.4, 0.52, 0.52])
     
-    % exportgraphics(gcf, 'figures/example_cwh_trajectory.png', Resolution=300)
-    % exportgraphics(gcf, 'figures/example_cwh_trajectory.pdf', ContentType='vector')
+    exportgraphics(gcf, 'figures/example_cwh_trajectory.png', Resolution=300)
+    exportgraphics(gcf, 'figures/example_cwh_trajectory.pdf', ContentType='vector')
     
     %% Plot Control History
     figure(Position=[0, 0, 15, 17])
@@ -482,27 +457,9 @@ if use_fc || use_qr
                 for i = plot_indices
                     stairsZOH(t_his, u_mc_comp(:, i)', 'Color', [0.7, 0.85, 1.0], 'LineWidth', 0.5, 'DisplayName', 'MC samples', 'LineStyle', '-');
                 end
-                
-                % Compute mean and std of Monte Carlo controls for this component
-                % u_mc_mean = mean(u_mc_comp, 2)';  % Mean across samples (1 x N)
-                % u_mc_std = std(u_mc_comp, 0, 2)';  % Std across samples (1 x N)
-                % u_mc_upper = u_mc_mean + 3 * u_mc_std;
-                % u_mc_lower = u_mc_mean - 3 * u_mc_std;
-                % 
-                % Plot Monte Carlo mean and bounds
-                % [t_plot_mc, upper_mc_plot] = stairs(t_his, [u_mc_upper, u_mc_upper(end)]);
-                % [~, lower_mc_plot] = stairs(t_his, [u_mc_lower, u_mc_lower(end)]);
-                % patch_x_mc = [t_plot_mc(:); flipud(t_plot_mc(:))];
-                % patch_y_mc = [upper_mc_plot(:); flipud(lower_mc_plot(:))];
-                % patch(patch_x_mc, patch_y_mc, [0.7, 0.85, 1.0], 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', 'MC $3\sigma$ bounds');
-                % stairsZOH(t_his, u_mc_upper, 'Color', [0.7, 0.85, 1.0], 'LineStyle', ':', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-                % stairsZOH(t_his, u_mc_lower, 'Color', [0.7, 0.85, 1.0], 'LineStyle', ':', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-                % stairsZOH(t_his, u_mc_mean, 'Color', [0.7, 0.85, 1.0], 'LineStyle', '-', 'LineWidth', 1.5, 'DisplayName', 'MC mean');
+
             end
 
-            % Now plot the bounds and mean
-            % stairsZOH(t_his, upper_comp_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-            % stairsZOH(t_his, lower_comp_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             stairsZOH(t_his, v_comp_qr, 'k--', 'LineWidth', 1.5, 'DisplayName', 'Nominal control $v_k$');
 
         end
@@ -560,8 +517,7 @@ if use_fc || use_qr
         stairsZOH(t_his, upper_norm_fc, 'g:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
         stairsZOH(t_his, lower_norm_fc, 'g:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
         stairsZOH(t_his, u_norm_fc, 'g-', 'LineWidth', 1.5, 'DisplayName', 'FullCov');
-        % Add constraint line
-        % yline(u_max_ms, 'r--', 'LineWidth', 1.5, 'DisplayName', sprintf('Max: %.1f m/s', u_max_ms));
+       
     end
     if use_qr
         u_norm_qr = vecnorm(prob_qr.v, 2, 1) * 1000;  % Convert to m/s
@@ -607,24 +563,9 @@ if use_fc || use_qr
             end
             
             u_norm_mc_mean = mean(u_norm_mc, 2)';  % Mean across samples (1 x N)
-            % u_norm_mc_std = std(u_norm_mc, 0, 2)';  % Std across samples (1 x N)
-            % u_norm_mc_upper = u_norm_mc_mean + 3 * u_norm_mc_std;
-            % u_norm_mc_lower = max(0, u_norm_mc_mean - 3 * u_norm_mc_std);  % Norm can't be negative
-            % 
-            % % Plot Monte Carlo norm mean and bounds
-            % [t_plot_mc, upper_norm_mc_plot] = stairs(t_his, [u_norm_mc_upper, u_norm_mc_upper(end)]);
-            % [~, lower_norm_mc_plot] = stairs(t_his, [u_norm_mc_lower, u_norm_mc_lower(end)]);
-            % patch_x_mc = [t_plot_mc(:); flipud(t_plot_mc(:))];
-            % patch_y_mc = [upper_norm_mc_plot(:); flipud(lower_norm_mc_plot(:))];
-            % patch(patch_x_mc, patch_y_mc, [0.7, 0.85, 1.0], 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'DisplayName', 'MC $3\sigma$ bounds');
-            % stairsZOH(t_his, u_norm_mc_upper, 'Color', [0.7, 0.85, 1.0], 'LineStyle', ':', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-            % stairsZOH(t_his, u_norm_mc_lower, 'Color', [0.7, 0.85, 1.0], 'LineStyle', ':', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-            % stairsZOH(t_his, u_norm_mc_mean, 'Color', [0.7, 0.85, 1.0], 'LineStyle', '-', 'LineWidth', 1.5, 'DisplayName', 'MC mean');
+           
         end
 
-        % Now plot the bounds and mean
-        % stairsZOH(t_his, upper_norm_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
-        % stairsZOH(t_his, lower_norm_qr, 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
         stairsZOH(t_his, u_norm_qr, 'k--', 'LineWidth', 1.5, 'DisplayName', '$\|v_k\|$');
 
     end
@@ -646,14 +587,12 @@ if use_fc || use_qr
     
     xlabel('Time (s)', 'Interpreter', 'latex')
     ylabel('$\|u\|_2$ (m/s$^2$)', 'Interpreter', 'latex')
-    % legend('Location', 'southeast')
     grid on
     xlim([t_his(1), t_his(end)])
     legend(legendUnq(), 'Location', 'north', 'EdgeColor', 'white', 'IconColumnWidth', 20)
 
-
-    % exportgraphics(gcf, 'figures/example_cwh_control_history.png', Resolution=300)
-    % exportgraphics(gcf, 'figures/example_cwh_control_history.pdf', ContentType='vector')
+    exportgraphics(gcf, 'figures/example_cwh_control_history.png', Resolution=300)
+    exportgraphics(gcf, 'figures/example_cwh_control_history.pdf', ContentType='vector')
     
 end
 
@@ -711,7 +650,7 @@ if ~isempty(loss_fc) && ~isempty(loss_qr)
     plot(0:N-1, loss_qr, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8, 'DisplayName', 'Proposed method');
     xlabel('Time step $k$', 'Interpreter', 'latex')
     ylabel('Loss')
-    legend('Location', 'none', 'EdgeColor', 'white')
+    legend('Location', 'north', 'EdgeColor', 'white')
     yscale log
 
     ax = gca;
