@@ -42,14 +42,6 @@ We propose a novel method for solving the chance-constrained covariance steering
 
 \section{Introduction}
 
-% Uncertainty is the fundamental reason for control design.
-
-% Covariance steering is a control method that defines the state to include both the mean and covariance matrix in the optimal control problem, providing an optimal sequence of feedforward and feedback control policies that steers the statistical moments to, or within, desired values. 
-
-% Due to the inherent desire to steer the uncertainty to small values while minimizing control effort, the variance of the state will undergo large changes in magnitude throughout the horizon. This is in contrast to solving for optimal feedforward control inputs, where the magnitude of the state variable will stay similar. 
-
-% In addition, in many real-world applications, 1. the uncertainty has magnitudes smaller than the mean values, and 2. chance-constrained are required to ensure safety or to impose the limitations on the input. In such a case, the problem of finding the optimal feedforward sequence (mean-only steering) and that of finding the optimal feedback sequence (covariance-only steering) are coupled, and the problem is inherently ill-scaled. This means that algorithms implemented on finite-precision computers may struggle to find solutions. 
-
 Uncertainty is the fundamental reason for closed-loop control design. To explicitly address uncertainty, covariance steering (CS) \cite{hotzCovarianceControlTheory1987,chenOptimalSteeringLinear2016} has emerged as a promising control framework. Unlike traditional methods that treat uncertainty as a disturbance to be rejected, CS defines the system state to include both the mean and the covariance matrix within the optimal control formulation. This approach yields an optimal sequence of feedforward and feedback control policies that steer the statistical moments of the system to, or within, desired terminal values.
 
 However, CS possesses unique characteristics distinct from standard optimal control problems, yielding numerical difficulties. Due to the inherent objective of steering uncertainty to small values while minimizing control effort, the variance of the state can show significantly different magnitudes throughout the time horizon. This contrasts with nominal trajectory optimization, where the magnitude of the state variables typically remains within a consistent range.
@@ -90,6 +82,7 @@ We note that this work is not the first to propagate the square root of the cova
 \subsection{Notation}
 $\mathbb{L}^n$ ($\mathbb{L}_+^n$) denotes the space of $n \times n$ lower triangular matrices (with positive diagonal entries). $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric positive definite matrices. The Cholesky factor of a matrix \( P \in \mathbb{S}_+^{n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \), and $\mathrm{diag}(a,b, \cdots)$ denotes the diagonal matrix with $a,b, \cdots$ on the diagonals. The linear matrix inequality $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \(\N_{a}^{b}\) denotes the set of integers from \( a \) to \( b \).
 We refer to the ``square root" of the covariance matrix \(P\) to refer to (not necessarily square) matrices \(L\) that satisfy \(P = L L^\top\). 
+$\mathrm{vec}(\cdot)$ vectorizes a matrix.
 $\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix.
 
 \subsection{Problem Formulation}
@@ -118,11 +111,17 @@ This assumption is reasonable as the process noise is usually discretized from a
 We consider two types of cost functions:
 \begin{equation} \label{eq:objective_function}
 	J_k (x_k, u_k) = \begin{cases}
-	\E{x_k^\top Q_k x_k + u_k^\top R_k u_k} & \text{(quadratic)} \\
-	\mathcal{Q}_{\norm{u_k}_2}(p_J) & \text{(quantile 2-norm)}
+	\E{x_k^\top Q_k x_k + u_k^\top R_k u_k} \\
+	\mathcal{Q}_{\norm{W_{k}^x x_k}_2}(p_J) +
+	\mathcal{Q}_{\norm{W_{k}^u u_k}_2}(p_J)
 	\end{cases}
 \end{equation}
-with \( Q_k \succeq 0 \) and \( R_k \succ 0 \), and \( \mathcal{Q}_{\norm{u_k}_2}(p_J) \) is $p_J$-quantile of the 2-norm of the control input $u_k$. The latter cost is for risk sensitive scenarios where the worst-case scenario (up to a specified probability) is of more interest than the expected value, such as in finance \cite{rockafellarOptimizationConditionalValueatrisk2000}, statistical machine learning \cite{eastwoodProbableDomainGeneralization2022}, and spacecraft mission design \cite{oguriChanceConstrainedControlSafe2024a}.
+The former is a standard \textbf{expectation-of-quadratic} (EoQ) cost with \( Q_k \succeq 0 \) and \( R_k \succ 0 \).
+The latter is a \textbf{quantile-of-norm} (QoN) cost, where the quantile function is defined as:
+\begin{equation}
+	\mathcal{Q}_{T}(\gamma) = \inf \{ t > 0 : \mathbb{P}(T \leq t) \geq \gamma \}.
+\end{equation}
+$W_k^x \in \mathbb{R}^{w_x \times n}$ and $W_k^u \in \mathbb{R}^{w_u \times m}$ are weighting matrices for the state and control, respectively. Such a cost formulation is useful for risk sensitive scenarios where the worst-case scenario (up to a specified probability) is of more interest than the expected value, such as in finance \cite{rockafellarOptimizationConditionalValueatrisk2000}, statistical machine learning \cite{eastwoodProbableDomainGeneralization2022}, and spacecraft mission design \cite{oguriChanceConstrainedControlSafe2024a}.
 
 The sets \( \mathcal{X} \) and \( \mathcal{U} \) represent state and control feasible sets, respectively, with associated violation probabilities \( \epsilon_x \) and \( \epsilon_u \). Through some risk allocation procedure between each node, we assume that the chance constraints are given in one of two forms: a linear constraint or a norm constraint. For the linear constraint form, the chance constraint is given by:
 \begin{equation} \label{eq:linear_chance_constraint}
@@ -195,7 +194,7 @@ the covariance propagation equation is given by:
 \begin{lemma}[Equivalent Square Root Covariance Propagation]
 	The covariance propagation equation \cref{eq:full_covariance_propagation} is equivalently expressed in its Cholesky factor form using $S_k = P_k^{1/2} \in \mathbb{L}_+^n$ as:
 	\begin{equation} \label{eq:square_root_covariance_propagation_nonlinear_feedback_control}
-		S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad
+		S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \
 		X_{k+1} := \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix}.
 	\end{equation}
 \end{lemma}
@@ -226,7 +225,7 @@ In other words, $S_{k+1}$ obtained from \cref{eq:square_root_covariance_propagat
 Since both $P_k$ and $K_k$ in \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control} are unknowns, there is a bilinear term \( K_k S_k \) in \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control}; for the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is positive definite by \cref{assump:positive_definite_state}.
 So we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
-	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix}
+	S_{k+1} = (\mathrm{qr}(X_{k+1}^\top))^\top, \ X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix}
 \end{equation}
 with its first-order approximation given by:
 \begin{equation} \label{eq:square_root_covariance_propagation_linearized}
@@ -239,11 +238,13 @@ After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and performing some s
 \begin{equation} \label{eq:objective_deterministic}
 	J = \begin{cases}
 	\sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k & \\
-	\quad + \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(quadratic)} \\
-	\sum_{k=0}^{N-1} \norm{v_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_m}(p_J)} \ \norm{L_k}_2 & \text{(quantile 2-norm)}.
+	\quad + \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(EoQ)} \\
+	\sum_{k=0}^{N-1} 
+	\norm{W_k^x x_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_{w_x}}(p_J)} \ \norm{W_k^x S_k}_2 \\
+	\quad + \norm{W_k^u v_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_{w_u}}(p_J)} \ \norm{W_k^x L_k}_2 & \text{(QoN)}.
 	\end{cases}
 \end{equation}
-The 2-norm cost is a conservative approximation \cite{oguriChanceConstrainedControlSafe2024a}; \( \mathcal{Q}_{\chi^2_m}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( m \) degrees of freedom.
+The QoN cost is a conservative approximation based on the triangle inequality \cite{oguriChanceConstrainedControlSafe2024a}; \( \mathcal{Q}_{\chi^2_d}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( d \) degrees of freedom.
 \subsection{Constraints}
 Thanks to the square root representation, we can also rewrite the constraints as convex functions of the variables.
 
@@ -267,7 +268,7 @@ For the linear constraint form \cref{eq:linear_chance_constraint}, the chance co
 	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0, \quad k \in \N_{0}^{N}
 \end{equation}
 where \( \mathcal{Q}_{\mathcal{N}}(p_j) \) is the inverse of the standard normal cumulative distribution function.
-For the norm constraint form \cref{eq:norm_chance_constraint}, similar to the quantile 2-norm cost, the chance constraint can be conservatively imposed as \cite{oguriChanceConstrainedControlSafe2024a}:
+For the norm constraint form \cref{eq:norm_chance_constraint}, similar to the QoN cost, the chance constraint can be conservatively imposed as \cite{oguriChanceConstrainedControlSafe2024a}:
 \begin{equation} \label{eq:norm_chance_constraint_deterministic}
 	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0, \quad k \in \N_{0}^{N}
 \end{equation}
@@ -293,15 +294,14 @@ where \( \xi_k \in \mathbb{R}^{\frac{n(n+1)}{2}}\) is a slack variable, penalize
 
 The reference QR matrices $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\}$ are computed at initialization and updated whenever a step is accepted:
 \begin{equation} \label{eq:reference_update}
-	\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix}),  k \in \N_{0}^{N-1}
+	\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix}), \ k \in \N_{0}^{N-1}
 \end{equation}
 
 To ensure that the linearization process does not cause artificial infeasibility/unboundedness \cite{maoSuccessiveConvexificationNonconvex2016}, we impose a trust region constraint:
 \begin{align} \label{eq:trust_region_constraint}
-	\norm{\mathrm{vectril}(D_S(S_k - \bar{S}_k))}_\infty &\leq r, \quad k \in \N_{1}^{N-1}, \\
-	\norm{\mathrm{vec}(D_L(L_k - \bar{L}_k))}_\infty &\leq r, \quad k \in \N_{0}^{N-1}
+	\norm{\mathrm{vec}(D_X(X_k - \bar{X}_k))}_\infty &\leq r, \quad k \in \N_{0}^{N-1}
 \end{align}
-where \( r > 0 \) is the trust region radius, and \( D_S \) and \( D_L \) are diagonal matrices for scaling.
+where \( r > 0 \) is the trust region radius, and \( D_X \) is a scaling matrix for the variables.
 Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only appear in the convex constraints.
 
 
@@ -447,7 +447,7 @@ Next, we apply this result to our specific problem. The following proposition is
 \end{proof}
 
 \section{Numerical Examples}
-The convex optimization problems are solved in MATLAB using YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} on a MacBook Pro with an M4 Max processor with 24GB of RAM. We use the same SCP parameters as in \cite{oguriSuccessiveConvexificationFeasibility2023a}, which are summarized in \cref{tab:scp_parameters}.
+We use MATLAB with YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} to solve the SDPs. All experiments are performed on a MacBook Pro with an M4 Max processor with 24GB of RAM. The SCP parameters are from \cite{oguriSuccessiveConvexificationFeasibility2023a}, summarized in \cref{tab:scp_parameters}.
 \footnote{\textr{Code available at \url{https://github.com/naoya-kumagai/
 sqrt_covariance_steering/}}.}
 \begin{table}[ht]
@@ -458,17 +458,12 @@ sqrt_covariance_steering/}}.}
 \toprule
  $\{\rho_0, \rho_1, \rho_2\}$ & $\{\alpha_1, \alpha_2, \beta, \gamma\}$ & $\{r_{\mathrm{init}}, r_{\mathrm{min}}, r_{\mathrm{max}}\}$ & $w_{\mathrm{init}}$\\
 \midrule
- $\{0, 0.25, 0.7\}$ & $\{2, 3, 2, 0.9\}$ & $\{0.1, 10^{-10}, 10\}$ & $0.1$\\
+ $\{0, 0.25, 0.7\}$ & $\{2, 3, 2, 0.9\}$ & $\{0.1, 10^{-10}, 10\}$ & $100$\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Some practical implementation tips are:
-\begin{itemize}
-	\item Since the algorithm requires iterative linearization, an initial guess is required for each of the variables. The initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) can be obtained, for example, by calculating feedback gains \(K_{k,\mathrm{LQR}} \) via the Riccati equation, and then setting \( \bar{L}_k = K_{k,\mathrm{LQR}} \bar{S}_k \). 
-	% Although $\bm{v}$ or $\bm{\mu}$ only appear in a convex form throughout the problem, the calculation of $\Delta J$ and $\Delta L$ requires their reference values at the first iteration.
-	\item In some cases, a trust region on \( L_k\) is not necessary, and causes chattering close to the solution. 
-\end{itemize}
+The initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) is set to zero.
 
 \subsection{Optimality and Scalability}
 Here, we perform a horizon-length scalability analysis, and also compare the solution costs between Liu et al. \cite{liuOptimalCovarianceSteering2025}, Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019}, and the proposed method. We consider a three-dimensional double integrator system with a total horizon time of \(T = 3\) seconds, and vary the horizon length from 10 to 80 (so the step size is \(\Delta t = T / N\)). 
@@ -486,7 +481,7 @@ The time-invariant dynamics are given by
 \end{equation}
 with \( q = 0.05 \) being the process noise spectral density.
 The initial and terminal state covariance are \(P_{\mathrm{init}} = I_6\) and \(P_{\mathrm{final}} = 0.5 P_{\mathrm{init}}\), respectively. We use a quadratic cost function, with \(Q = 0.1 I_6\) and \(R = I_3\).
-The results are shown in \cref{fig:horizon_size_scalability,fig:horizon_size_cost_comparision}. To time the solutions, we perform 5 trials for each method for each horizon length. Convergence and feasibility tolerance for our method are set to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-4}\). The scaling matrices \(D_S\) and \(D_L\) are set to identity matrices.
+The results are shown in \cref{fig:horizon_size_scalability,fig:horizon_size_cost_comparision}. To time the solutions, we perform 5 trials for each method for each horizon length. Convergence and feasibility tolerance for our method are set to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-4}\). The scaling matrix \(D_X\) is set to identity.
 
 For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers fast and optimal solutions. The computational complexity of \cite{okamotoOptimalStochasticVehicle2019} grows quickly, which matches the observations in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Another observation is that due to its specific feedback policy, it compromises optimality. Our approach shows scalability that is between the two, while achieving optimality, which empirically validates \cref{th:global_optimality}.
 
@@ -506,7 +501,7 @@ For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers f
 
 
 \subsection{Numerical Reliability}
-Here, we demonstrate the numerical reliability of the proposed method when the variance of some state components are small. We consider the problem from \cite{oguriChanceConstrainedControlSafe2024a} which considers CS for a spacecraft rendezvous setting. We greatly simplify the problem, using the same system dynamics and boundary condition; we also consider finite-thrust control compared to an impulsive control. The problem considers a 2-norm type objective function \cref{eq:objective_function} which is common for minimizing spacecraft fuel consumption. We emphasize that the parameters of uncertainty are rather realistic for a spacecraft rendezvous setting, and is not an artificial example. The problem parameters are summarized in \cref{tab:cwh_parameters} for completeness.
+Here, we demonstrate the numerical reliability of the proposed method when the variance of some state components are small. We consider the problem from \cite{oguriChanceConstrainedControlSafe2024a} which considers CS for a spacecraft rendezvous setting. We greatly simplify the problem, using the same system dynamics and boundary condition; we also consider continuous control instead of impulsive control. The problem considers a QoN type objective function with $W_k^x = 0$ and $W_k^u = I$ for all $k$ \cref{eq:objective_function} which is common for optimizing the quantile of the spacecraft's necessary fuel. We emphasize that the parameters of uncertainty are rather realistic for a spacecraft rendezvous setting, and are not artificial. The problem parameters are summarized in \cref{tab:cwh_parameters} for completeness.
 
 \begin{table}[ht]
 \centering
@@ -534,8 +529,8 @@ gravitational parameter & $\mu$ & $3.986004418 \times 10^{5}$ & km$^3$/s$^2$ \\
 \end{table}
 
 The continuous-time Clohessy-Wiltshire-Hill equations \cite{schaubAnalyticalMechanicsSpace2003} are discretized using zero-order hold control, as described in \cite{oguriChanceConstrainedControlSafe2024a}. 
-We use $D_S = \mathrm{diag}(10, 10, 10, 10^3, 10^3, 10^3)$ and $D_L = 10^3 I_3$ for the trust region scaling. We set the convergence and feasibility tolerance to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-5}\).
-The proposed method solves the problem in 45 iterations in about 8 seconds. The results are shown in \cref{fig:example_cwh_trajectory,fig:example_cwh_control_history}, along with the results of 1000 Monte Carlo simulations. We can observe that the terminal covariance constrains is satisfied with equality, and the Monte Carlo simulations are within the 3-sigma bounds.
+We use $D_X = \mathrm{diag}(10, 10, 10, 10^3, 10^3, 10^3)$ for the trust region scaling. We set the convergence and feasibility tolerance to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-5}\).
+The proposed method solves the problem in 42 iterations in 5.0 seconds (average of 10 runs). The results are shown in \cref{fig:example_cwh_trajectory,fig:example_cwh_control_history}, along with the results of 1000 Monte Carlo simulations. We can observe that the terminal covariance constrains is satisfied with equality, and the Monte Carlo simulations are within the 3-sigma bounds.
 
 \begin{figure}[ht]
 	\centering
@@ -551,7 +546,8 @@ The proposed method solves the problem in 45 iterations in about 8 seconds. The 
 	\label{fig:example_cwh_control_history}
 \end{figure}
 
-For the full covariance approach, since it cannot directly handle the ``square-root of maximum eigenvalue'' term, we linearize it around a reference covariance matrix, as in the chance constraint handling described in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. In this case, a small term \(\epsilon \trace(Y_k)\) is added to the objective function to ensure valid convexification \cite{kumagaiRobustCislunarLowThrust2025a}, with \(\epsilon = 10^{-3}\) chosen. The full covariance approach is not able to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues, and the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. For this problem, we checked that the covariance dynamics are largely violated. This supports our hypothesis: by working with the covariance matrix which necessarily squares the units of deviation, numerical solvers are more likely to encounter problems. We also tested with alternative objective functions, such as the expectation-of-quadratic, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. We measure the loss in covariance propagation as follows:
+For the full covariance approach, since it cannot directly handle the ``square-root of maximum eigenvalue'' term, we linearize it around a reference covariance matrix, as in the chance constraint handling described in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. In this case, a small term \(\epsilon \trace(Y_k)\) is added to the objective function to ensure valid convexification \cite{kumagaiRobustCislunarLowThrust2025a}, with \(\epsilon = 10^{-3}\) chosen. The full covariance approach is not able to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues; the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. 
+For this problem, the covariance dynamics are largely violated, according to a measure of loss in covariance propagation defined as follows:
 \begin{equation}
 	\text{Loss}_k = \norm{\phi(K_k, P_k) - P_{k+1}}_F / \norm{P_{k+1}}_F
 \end{equation}
@@ -559,7 +555,7 @@ where \( K_k, P_k \) are the solution of the optimization, and
 \begin{equation}
 	\phi(K_k, P_k) := (A_k + B_k K_k) P_k (A_k + B_k K_k)^\top + G_k G_k^\top.
 \end{equation}
-\cref{fig:example_cwh_covariance_propagation_loss} shows the covariance propagation loss for the two methods, showing the accuracy of the proposed method's covariance propagation.
+\cref{fig:example_cwh_covariance_propagation_loss} shows the covariance propagation loss for the two methods, showing the superior accuracy of the proposed method's covariance propagation; using tighter convergence tolerances for the proposed method can improve the accuracy.
 
 \begin{figure}[ht]
 	\centering
@@ -568,12 +564,13 @@ where \( K_k, P_k \) are the solution of the optimization, and
 	\label{fig:example_cwh_covariance_propagation_loss}
 \end{figure}
 
+This supports our hypothesis: by working with the covariance matrix which necessarily squares the units of deviation, numerical solvers are more likely to encounter problems. We also tested with alternative objective functions, such as the expectation-of-quadratic, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. 
+
 \section{Conclusions}
 We proposed a novel method for solving the chance-constrained covariance steering problem. Due to the nonconvex representation of the square root covariance propagation equations, the problem is solved iteratively via sequential convex programming. Nevertheless, the method is shown to be 1. globally optimal when chance constraints are not present, 2. more scalable for large horizon length than the block approach, and 3. numerically reliable for problems with small variance components compared to the full covariance approach. Furthermore, it is free of any proofs of convexification that rely on a specific objective function form.
 
 A seemingly weak point of the proposed method, requiring an initial guess for the reference variables, can be mitigated especially when it is used repeatedly, for example when the state matrices are updated in a nonlinear dynamics setting \cite{kumagaiRobustCislunarLowThrust2025a}; the initial guess and the Lagrange multipliers of the converged solution can be used to warm-start the next solution process.
 
-The concept of using the QR decomposition and its derivative can be used in other trajectory optimization methods that involve covariance propagation. Furthermore, as in the intrinsic SCvx framework \cite{kraislerIntrinsicSuccessiveConvexification2025a}, the proposed method can be extended to use geodesic distance between matrices in \( \mathbb{L}_+^n \) \cite{linRiemannianGeometrySymmetric2019} to define the trust region and the augmented penalty.
 
 % \section{Appendix}
 
