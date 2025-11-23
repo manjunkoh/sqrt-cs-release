@@ -125,23 +125,38 @@ end
 
 %% Solve with SqrtQRCovarianceSteering
 disp('=== Solving with SqrtQRCovarianceSteering ===');
+
+scp_params = SCPParams();
+scp_params.tol_opt = 1E-4;
+scp_params.tol_feas = 1E-4;
+
 % Initial guess for SqrtQRCovarianceSteering
+clear init
+
 init.S = interpolate_lower_triangular(chol(Sigma0, 'lower'), chol(SigmaN, 'lower'), N+1, 'log-cholesky');
 init.L = zeros(nu, nx, N);
-init.mu = zeros(nx, N+1);
+init.mu = linspace_vec(mu0, muN, N+1);
 init.v = zeros(nu, N);
 
-prob_qr = SqrtQRCovarianceSteering(init, ...
+init.t_L = zeros(1, N);
+init.t_S = zeros(1, N);
+init.t_mu = zeros(1, N);
+init.t_v = zeros(1, N);
+
+for k = 1:N
+	init.t_L(k) = trace(init.L(:,:,k) * init.L(:,:,k)' * R);
+	init.t_S(k) = trace(init.S(:,:,k) * init.S(:,:,k)' * Q);
+	init.t_mu(k) = init.mu(:,k)' * Q * init.mu(:,k);
+	init.t_v(k) = init.v(:,k)' * R * init.v(:,k);
+end
+
+prob_qr = SqrtQRCovarianceSteeringOptimizer(init, ...
     N=N, ...
     A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
     P_0=Sigma0, P_f=SigmaN, Q=Q, R=R, ...
     objective_type='LQR', ...
     chance_constraints_state=state_cc, ...
     mu_0=mu0, mu_f=muN);
-
-scp_params = SCPParams();
-scp_params.tol_opt = 1E-4;
-scp_params.tol_feas = 1E-4;
 
 flag_solved_qr = prob_qr.solve(save_bool=false, scp_params=scp_params);
 time_qr = seconds(prob_qr.scp.report.time);
@@ -156,7 +171,7 @@ else
 end
 
 %% Plot results
-figure
+figure(Position=[0, 0, 15, 15])
 hold on
 
 % Plot constraint boundaries (cone walls)

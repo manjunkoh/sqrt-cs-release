@@ -31,7 +31,7 @@ full_cs = FullCovarianceSteering(...
 	A=A_sys, B=B_sys, G=G_sys, ...
 	P_0=P_0, P_f=P_f, ...
 	Q=Q, R=R, ...
-	 N=N);
+	N=N, mu_0=mu_0, mu_f=mu_f);
 
 diagnostic = full_cs.solve();
 
@@ -42,6 +42,7 @@ if diagnostic.problem == 0 || diagnostic.problem == 4
 	
 	% Compute covariance part of objective
 	J_cov = 0;
+    
 	for k = 1:N
 		J_cov = J_cov + trace(Q*P(:,:,k)) + trace(R * Y(:,:,k));
 	end
@@ -51,43 +52,11 @@ else
 	return
 end
 
-%% Solve mean steering separately (linear system with fixed boundary conditions)
-% mu_{k+1} = A*mu_k + B*v_k, with mu(1) = mu_0, mu(N+1) = mu_f
-mu = sdpvar(nx, N+1);
-v = sdpvar(nu, N);
-
-J_mean = 0;
-for k = 1:N
-	J_mean = J_mean + mu(:,k)'*Q*mu(:,k) + v(:,k)'*R*v(:,k);
-end
-
-mean_constraints = [mu(:,1) == mu_0, mu(:,end) == mu_f];
-for k = 1:N
-	mean_constraints = [mean_constraints, mu(:,k+1) == A*mu(:,k) + B*v(:,k)];
-end
-
-options = sdpsettings('verbose', 0, 'solver', 'mosek');
-diagnostic_mean = optimize(mean_constraints, J_mean, options);
-
-if diagnostic_mean.problem == 0
-	mu = value(mu);
-	v = value(v);
-	J_mean_val = value(J_mean);
-	J = J_cov + J_mean_val;
-else
-	warning('Mean steering solve not successful, using zero mean trajectory');
-	mu = zeros(nx, N+1);
-	v = zeros(nu, N);
-	mu(:,1) = mu_0;
-	mu(:,end) = mu_f;
-	J = J_cov;
-end
-
-% Plot
+%% Plot
 figure
 hold on
 for k = 1:N+1
-	plot3sigmaEllipse(mu(:,k), P(:,:,k), 'b')
+	plot3sigmaEllipse(full_cs.mu(:,k), full_cs.P(:,:,k), 'b')
 end
 plot3sigmaEllipse(mu_0, P_0, 'r')
 plot3sigmaEllipse(mu_f, P_f, 'r--')
@@ -96,33 +65,17 @@ xlabel("$x_1$")
 ylabel("$x_2$")
 % exportgraphics(gcf, './figures/full_covariance_steering_result.png');
 
-disp("Objective value: " + J)
 disp("Covariance part of objective: " + J_cov)
-
-%% Use the true solution as the initial guess -- just for testing
-% init_guess_struct.S = zeros(nx, nx, N+1);
-% init_guess_struct.L = zeros(nu, nx, N);
-% for k = 1:N+1
-% 	init_guess_struct.S(:,:,k) = chol(P(:,:,k), 'lower');
-% end
-% 
-% for k = 1:N
-% 	init_guess_struct.L(:,:,k) = K(:,:,k) * chol(P(:,:,k), 'lower');
-% end
 
 %% Perform interpolation of covariances to generate initial guess
 % try changing between 'log-cholesky' and 'cholesky'
 init_guess_struct.S = interpolate_lower_triangular(chol(P_0, 'lower'), chol(P_f, 'lower'), N+1, 'log-cholesky');
 init_guess_struct.L = zeros(nu, nx, N);
-K_init = - dlqr(A, B, Q, R);
-
-for k = 1:N
-    init_guess_struct.L(:,:,k) = K_init * init_guess_struct.S(:,:,k);
-end
-init_guess_struct.mu = zeros(nx, N+1);
+init_guess_struct.mu = linspace_vec(mu_0, mu_f, N+1);
 init_guess_struct.v = zeros(nu, N);
 
-sqrt_cs = SqrtQRCovarianceSteering(init_guess_struct,...
+sqrt_cs = SqrtQRCovarianceSteeringOptimizer(...
+    init_guess_struct,...
 	N=N, ...
 	A_sys=repmat(A, [1, 1, N]), ...
 	B_sys=repmat(B, [1, 1, N]), ...
@@ -130,21 +83,16 @@ sqrt_cs = SqrtQRCovarianceSteering(init_guess_struct,...
 	P_0=P_0, P_f=P_f, Q=Q, R=R, ...
 	mu_0=mu_0, mu_f=mu_f);
 
-% For this example, the key to quick convergence seems to be to remove the
-% trust region on L
-sqrt_cs.impose_trust_region_struct.L = false;
-
 scp_params = SCPParams();
 scp_params.tol_opt = 1E-4;
 scp_params.tol_feas = 1E-4;
-% scp_params.penalty_method = 'ALwithL1';
 
 sqrt_cs.solve(scp_params = scp_params);
 
 sqrt_cs.postprocess();
 
 %% Plot the results
-figure
+figure(Position=[0, 0, 15, 15])
 hold on
 for k = 1:N
 	plot3sigmaEllipse(sqrt_cs.mu(:,k), sqrt_cs.P(:,:,k), 'b')
@@ -155,6 +103,7 @@ axis equal
 xlabel("$x_1$")
 ylabel("$x_2$")
 % exportgraphics(gcf, './figures/sqrt_covariance_steering_result.png');
+
 %%
 J_cov_sqrt = 0;
 for k = 1:N

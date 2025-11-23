@@ -11,7 +11,7 @@ figure_settings
 % Fixed total time and horizon sizes to test
 T_total = 3.0;                  % total time [s]
 N_list = [10, 20, 40, 80];      % different horizon lengths to test
-num_trials = 5;                % trials per N for averaging
+num_trials = 3;                % trials per N for averaging
 
 % Problem dimensions for 3D double integrator
 nx = 6; % [px, py, pz, vx, vy, vz]
@@ -276,10 +276,8 @@ grid on;
 xlabel('Horizon length N');
 ylabel('Average runtime (s)');
 xticks(N_list)
-legend('Liu et al. (2025)', 'Okamoto \& Tsiotras (2019)', 'Proposed method', 'Location', 'northwest', 'Box', 'off');
+legend('Liu et al. (2025)', 'Okamoto \& Tsiotras (2019)', 'Proposed method', 'Location', 'northwest', 'EdgeColor', 'none');
 exportgraphics(gcf, 'figures/horizon_size_scalability.png', Resolution=300)
-% Use 'auto' instead of 'vector' to fix legend overflow in PDFs
-% 'auto' still produces vector graphics for most elements but handles legends better
 exportgraphics(gcf, 'figures/horizon_size_scalability.pdf', ContentType='vector')
 
 %% Plot objective function values
@@ -290,7 +288,7 @@ grid on;
 xlabel('Horizon length N');
 ylabel('Cost ratio to Liu et al.');
 xticks(N_list)
-lgd = legend('Okamoto \& Tsiotras (2019)', 'Proposed method', 'Location', 'west', 'Box', 'off');
+lgd = legend('Okamoto \& Tsiotras (2019)', 'Proposed method', 'Location', 'west', 'EdgeColor', 'none');
 xlim([N_list(1) N_list(end)])
 ylim([0.99, max(avg_block_opt./avg_full_opt)])
 
