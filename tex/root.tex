@@ -34,7 +34,9 @@
 
 \begin{abstract}
 We propose a novel method for solving the discrete-time chance-constrained covariance steering problem. We explicitly write the propagation equations of the covariance matrix Cholesky factor using the QR decomposition. Due to this nonconvex representation, the problem is solved iteratively via sequential convex programming. 
-Nevertheless, we prove that the local optimal solution obtained from this method corresponds to a local optimum obtained with existing methods where the covariance matrices are represented in its original form. Specifically when chance constraints are not present and the objective function is quadratic, the solution is globally optimal. Compared to methods that require large block matrix formulations, the proposed method scales much better with the growth in horizon length, and shows better optimality. Compared to methods that explicitly define the covariance matrix as variables, the proposed method is free of proofs of convexification that rely on a specific objective function form, and shows better numerical reliability due to working with the square root of the covariance matrix.
+Specifically when chance constraints are not present and the objective function is quadratic, the converged solution obtained from this method is shown to be globally optimal. 
+In general, the locally optimal solution obtained from this method corresponds to a local optimum obtained with existing methods where the covariance matrices are represented in its original form.
+Compared to methods that require large block matrix formulations, the proposed method scales much better with the growth in horizon length, shows better optimality, and employs a memoryless state feedback control law. Compared to methods that explicitly define the covariance matrix as variables, the proposed method is free of proofs of convexification that rely on a specific objective function form, and shows better numerical reliability due to working with the square root of the covariance matrix.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -69,11 +71,11 @@ The numerical issues encountered due to using the covariance matrix as the depen
 Based on these observations and literature, we propose an alternative solution method for the chance-constrained CS problem, explicitly defining the covariance matrix Cholesky factor as the dependent variable. Due to the nonconvex representation of the propagation equation of the Cholesky factor, the problem is solved iteratively via sequential convex programming (SCP), utilizing the derivative of the QR decomposition as a key element. Nevertheless, the approach has the following benefits:
 \begin{itemize}
 	\item It is globally optimal when the objective function is an expectation-of-quadratic form and chance constraints are not present.
-	\item Compared to the block-matrix type methods \cite{okamotoOptimalCovarianceControl2018,okamotoOptimalStochasticVehicle2019}, it is more computationally efficient and shows better optimality.
+	\item Compared to the block-matrix type methods \cite{okamotoOptimalCovarianceControl2018,okamotoOptimalStochasticVehicle2019}, it is more computationally efficient and shows better optimality. It is also memoryless, using only a single feedback gain matrix at each time step.
 	\item Compared to the full-covariance type methods \cite{liuOptimalCovarianceSteering2025,pilipovskyComputationallyEfficientChance2024} which can fail for problems with small variance, it can achieve solutions with better numerical reliability. It is also free of any proofs of convexification that rely on a specific objective function. 
 \end{itemize}
 
-We remark that our method uses SCP, but such an iterative approach is either way required for chance-constrained CS problems using the approach in \cite{liuOptimalCovarianceSteering2025}. Covariance steering assumes that the computation is performed \textit{offline}, and only the cheap computation of the affine controller is executed \textit{online} \cite{skafDesignAffineControllers2010,oguriChanceConstrainedControlSafe2024a}; then, we believe that in many scenarios, its flexibility in cost formulation and numerical stability outweighs the increased computational cost compared to the full-covariance type methods.
+We remark that our method uses SCP, but such an iterative approach is nevertheless required for chance-constrained CS problems using the approach in \cite{liuOptimalCovarianceSteering2025}. Covariance steering assumes that the computation is performed \textit{offline}, and only the cheap computation of the affine controller is executed \textit{online} \cite{skafDesignAffineControllers2010,oguriChanceConstrainedControlSafe2024a}; then, we believe that in many scenarios, its flexibility in cost formulation and numerical stability outweighs the increased computational cost compared to the full-covariance type methods.
 
 We note that this work is not the first to propagate the square root of the covariance matrix in the context of CS. In an earlier work by one of the authors \cite{oguriStochasticSequentialConvex2022}, this was attempted with some shortcomings: the variable that represents the square root grows linearly in size with the horizon length, yielding computational complexity similar to the block-matrix approaches. In addition, the feedback gains are retrieved inexactly via a least-squares matrix inversion.
 \section{Preliminaries}
@@ -293,9 +295,9 @@ In order to take advantage of the convex representation of the objective and con
 \end{equation}
 where \( \xi_k \in \mathbb{R}^{\frac{n(n+1)}{2}}\) is a slack variable, penalized in the objective function via an Augmented Lagrangian method in the \texttt{SCvx*} algorithm. 
 
-The reference QR matrices $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\}$ are computed at initialization and updated whenever a step is accepted:
+The reference QR matrices $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\}, k \in \N_{0}^{N-1}$ are computed at initialization and updated when a step is accepted:
 \begin{equation} \label{eq:reference_update}
-	\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix}), \ k \in \N_{0}^{N-1}
+	\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix}).
 \end{equation}
 
 To ensure that the linearization process does not cause artificial infeasibility/unboundedness \cite{maoSuccessiveConvexificationNonconvex2016}, we impose a trust region constraint:
@@ -390,8 +392,8 @@ In this section, we connect the optimality of the solution obtained from \cref{a
 \end{align*}
 where $T: \mathcal{M}_B \rightarrow \mathcal{M}_A$ is a diffeomorphism such that $T(\mathcal{M}_B) = \mathcal{M}_A$, with equality constraints $g_i, i \in \mathcal{I}$ and inequality constraints $h_j, j \in \mathcal{J}$:
 \begin{align}
-	\mathcal{X} &:= \{ x \in \mathcal{M}_A \ |\  g_i(x) = 0, i \in \mathcal{I}; \ h_j(x) \leq 0 \in \mathcal{J} \} \\ 
-	\mathcal{Y} &:= \{ y \in \mathcal{M}_B \ |\  g_i(T(y)) = 0, i \in \mathcal{I}; \ h_j(T(y)) \leq 0\in \mathcal{J} \} 
+	\mathcal{X} &:= \{ x \in \mathcal{M}_A \ |\  g_i(x) = 0, i \in \mathcal{I}; \ h_j(x) \leq 0 \in \mathcal{J} \} \nonumber \\ 
+	\mathcal{Y} &:= \{ y \in \mathcal{M}_B \ |\  g_i(T(y)) = 0, i \in \mathcal{I}; \ h_j(T(y)) \leq 0\in \mathcal{J} \} \nonumber 
 \end{align}
 From the definition, $\mathcal{X} = T(\mathcal{Y})$.
 
@@ -484,7 +486,7 @@ with \( q = 0.05 \) being the process noise spectral density.
 The initial and terminal state covariance are \(P_{\mathrm{init}} = I_6\) and \(P_{\mathrm{final}} = 0.5 P_{\mathrm{init}}\), respectively. We use a quadratic cost function, with \(Q = 0.1 I_6\) and \(R = I_3\).
 The results are shown in \cref{fig:horizon_size_scalability,fig:horizon_size_cost_comparision}. To time the solutions, we perform 5 trials for each method for each horizon length. Convergence and feasibility tolerance for our method are set to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-4}\). The scaling matrix \(D_X\) is set to identity.
 
-For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers fast and optimal solutions. The computational complexity of \cite{okamotoOptimalStochasticVehicle2019} grows quickly, which matches the observations in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Another observation is that due to its specific feedback policy, it compromises optimality. Our approach shows scalability that is between the two, while achieving optimality, which empirically validates \cref{th:global_optimality}.
+For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers fast and optimal solutions. The computational complexity of \cite{okamotoOptimalStochasticVehicle2019} grows quickly, which matches the observations in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Another observation is that due to its specific feedback policy, it compromises optimality. Our approach shows scalability that is between the two, while achieving optimality, empirically validating \cref{th:global_optimality}.
 
 \begin{figure}[ht]
 	\centering
@@ -569,7 +571,7 @@ where \( K_k, P_k \) are the solution of the optimization, and
 This supports our hypothesis: by working with the covariance matrix which necessarily squares the units of deviation, numerical solvers are more likely to encounter problems. We also tested with alternative objective functions, such as the EoQ form, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. 
 
 \section{Conclusions}
-Defining the Cholesky factor of the covariance matrix as the dependent variable in covariance steering brings two main benefits. It allows flexibility in cost formulation beyond the quadratic form, and provides numerical reliability for real-world problems with small variance components. For the unconstrained problem without chance constraints, the solution is globally optimal.
+Defining the Cholesky factor of the covariance matrix as the dependent variable in covariance steering brings several benefits. It allows flexibility in cost formulation beyond the quadratic form, and provides numerical reliability for real-world problems with small variance components. Its computational complexity with respect to horizon length shows mild growth, while achieving good optimality, all while employing a memoryless state feedback control law. For the unconstrained problem without chance constraints, the converged solution reaches the global optimum.
 
 % \section{Appendix}
 
