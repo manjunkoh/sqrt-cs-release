@@ -29,6 +29,7 @@ classdef SCPProblem < handle
         slack_noncvx_ineq = []; % yalmip objects or empty
         trust_region_scaling = []; % Trust region scaling for each field. Can be scalar or vector of the same size as the number of variables
             % trust_region_scaling can be updated iteratively if the trust region is adaptive (e.g. state-dependent)
+        D = []; % Trust region scaling matrix. If empty, defaults to scalar 1
         scp SCvxStar % SCvxStar object
         sol % SCvxStar solution
         optimal_objective double % Optimal objective value

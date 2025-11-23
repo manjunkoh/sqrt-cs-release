@@ -175,15 +175,15 @@ S0 = chol(P0, 'lower');
 S_f = chol(P_f, 'lower');
 init_guess = struct();
 init_guess.S = interpolate_lower_triangular(S0, S_f, N+1, 'log-cholesky');
-init_guess.L = NaN(nu, nx, N);
+init_guess.L = zeros(nu, nx, N);
 init_guess.mu = linspace_vec(mu_0, mu_f, N+1);
 init_guess.v = zeros(nu, N);
 
-K_init = - dlqr(A_sys(:,:,1), B_sys(:,:,1), Q, R);
-
-for k = 1:N
-    init_guess.L(:,:,k) = K_init * init_guess.S(:,:,k);
-end
+% K_init = - dlqr(A_sys(:,:,1), B_sys(:,:,1), Q, R);
+% 
+% for k = 1:N
+%     init_guess.L(:,:,k) = K_init * init_guess.S(:,:,k);
+% end
 
 % Forward propagation of initial covariance
 % P_k = P0;
@@ -224,8 +224,7 @@ prob_qr = SqrtQRCovarianceSteering(init_guess, ...
     objective_type='DV99', ...
     mu_0=mu_0, mu_f=mu_f);
 
-% prob_qr.trust_region_scaling.S = 1;
-% prob_qr.trust_region_scaling.L = 1E-1;
+prob_qr.D = diag([10, 10, 10, 1000, 1000, 1000]);
 
 scp_params = SCPParams();
 scp_params.tol_opt = 1E-5;
@@ -418,8 +417,8 @@ if use_fc || use_qr
 
     add_zoomed_axis(gca, [-0.05, 0.05, 0, 0.10], [-0.6, 0.4, 0.52, 0.52])
     
-    exportgraphics(gcf, 'figures/example_cwh_trajectory.png', Resolution=300)
-    exportgraphics(gcf, 'figures/example_cwh_trajectory.pdf', ContentType='vector')
+    % exportgraphics(gcf, 'figures/example_cwh_trajectory.png', Resolution=300)
+    % exportgraphics(gcf, 'figures/example_cwh_trajectory.pdf', ContentType='vector')
     
     %% Plot Control History
     figure(Position=[0, 0, 15, 17])
@@ -653,8 +652,8 @@ if use_fc || use_qr
     legend(legendUnq(), 'Location', 'north', 'EdgeColor', 'white', 'IconColumnWidth', 20)
 
 
-    exportgraphics(gcf, 'figures/example_cwh_control_history.png', Resolution=300)
-    exportgraphics(gcf, 'figures/example_cwh_control_history.pdf', ContentType='vector')
+    % exportgraphics(gcf, 'figures/example_cwh_control_history.png', Resolution=300)
+    % exportgraphics(gcf, 'figures/example_cwh_control_history.pdf', ContentType='vector')
     
 end
 

@@ -7,7 +7,7 @@ addpath('./src')
 
 % Time horizon and discretization (60 nodes in original paper)
 tof = 6.0;
-N = 30;
+N = 60;
 dt = tof / N;
 
 % Dimensions
@@ -69,8 +69,10 @@ state_cc = {
 Q = 0.001 * eye(nx);
 R = 0.01 * eye(nu);
 
-%% Solve with BlockCholeskySteering
+sdp_settings = sdpsettings('verbose', 0, 'solver', 'mosek');
 skip_block = false;
+
+%% Solve with BlockCholeskySteering
 if ~skip_block
 disp('=== Solving with BlockCholeskySteering ===');
 prob_bc = BlockCholeskySteering(...
@@ -82,7 +84,6 @@ prob_bc = BlockCholeskySteering(...
     mu_0=mu_i, mu_f=mu_f, ...
     waypoints=waypoints);
 
-sdp_settings = sdpsettings('verbose', 0, 'solver', 'mosek');
 tic
 diagnostic_bc = prob_bc.solve(sdp_settings);
 time_bc = toc;
@@ -144,10 +145,9 @@ prob_qr = SqrtQRCovarianceSteering(init, ...
     mu_0=mu_i, mu_f=mu_f);
 
 scp_params = SCPParams();
-scp_params.tol_opt = 1E-2;
+scp_params.tol_opt = 1E-4;
 scp_params.tol_feas = 1E-4;
 
-tic
 flag_solved_qr = prob_qr.solve(save_bool=false, scp_params=scp_params);
 time_qr = seconds(prob_qr.scp.report.time);
 J_qr = NaN;
@@ -233,7 +233,6 @@ if (diagnostic_fc.problem == 0 || diagnostic_fc.problem == 4) || flag_solved_qr
     
     xlabel('$x$ (position)', 'Interpreter', 'latex')
     ylabel('$y$ (position)', 'Interpreter', 'latex')
-    % title('Quadrotor 2D Path Planning')
     legend('Location', 'best', 'NumColumns', 2)
     grid on
     axis equal

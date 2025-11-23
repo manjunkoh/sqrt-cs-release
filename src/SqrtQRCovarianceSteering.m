@@ -66,6 +66,7 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				options.mean_trust_region_radius = 0.1;
 				options.impose_mean_trust_region = false;
 				options.mu_ref = [];
+				options.D = [] % Trust region scaling matrix. If empty, defaults to scalar 1
 			end
 			obj@SCPProblem();
 			obj.init_guess_struct = init_guess_struct;
@@ -91,6 +92,8 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			obj.mu_0 = options.mu_0;
 			obj.mu_f = options.mu_f;
 			obj.waypoints = options.waypoints;
+			% Trust region scaling matrix
+			obj.D = options.D;
 
 			yalmip('clear');
 			% obj.vec_Rchol_L = sdpvar(obj.nu * obj.nx, obj.N, 'full');

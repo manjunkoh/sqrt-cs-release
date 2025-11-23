@@ -215,11 +215,11 @@ classdef SCvxStar < handle
 
             % Solve the subproblem
             options = obj.constParams.yalmip_options;
-            if obj.this_iter.iter == 1
-                options.mosektaskfile = 'data/mosek_dump_scvx_iter_1.ptf';
-            elseif obj.this_iter.iter == 30
-                options.mosektaskfile = 'data/mosek_dump_scvx_iter_30.ptf';
-            end
+            % if obj.this_iter.iter == 1
+            %     options.mosektaskfile = 'data/mosek_dump_scvx_iter_1.ptf';
+            % elseif obj.this_iter.iter == 30
+            %     options.mosektaskfile = 'data/mosek_dump_scvx_iter_30.ptf';
+            % end
             [diagnostics, solve_flag] = obj.solve_with_yalmip(constraints_all, L, options);
 
             % Get the values of the variables
@@ -459,44 +459,25 @@ classdef SCvxStar < handle
 
         function constraintLHS = get_trust_region_constraint_lhs(obj, vars)
             constraintLHS = [];
-            for i = 1:length(obj.var_names)
-                field = obj.var_names{i};
-                if obj.scp_prob.impose_trust_region_struct.(field)
-                    if strcmp(field, 'S')
-                        % D_S = eye(6);
-                        D_S = diag([10, 10, 10, 1000, 1000, 1000]);
-                        % D_S = eye(2);
-                        % D_S = eye(4);
-                        for k = 2:size(vars.(field), 3)-1
-                            S_k = vars.S(:,:,k);
-                            S_ref_k = obj.this_iter.ref_vars.S(:,:,k);
-                            constraintLHS = [constraintLHS
-                                % obj.riemannian_metric_lowertri(D_S * (S_k - S_ref_k), D_S * S_ref_k) - obj.this_iter.r^2
-                                % norm(D_S * (S_k - S_ref_k), 'fro') - obj.this_iter.r
-                                norm(vec(D_S * (S_k - S_ref_k)), 'inf') - obj.this_iter.r
-                            ];
-                        end
-                    elseif strcmp(field, 'L')
-                        D_L = 1E3 * eye(3);
-                        % D_L = eye(3);
-                        % D_L = 1;
-                        % D_L = eye(2);
-                        for k = 1:size(vars.(field), 3)
-                            L_k = vars.L(:,:,k);
-                            L_ref_k = obj.this_iter.ref_vars.L(:,:,k);
-                            constraintLHS = [constraintLHS
-                                % norm(D_L * (L_k - L_ref_k), 'fro') - obj.this_iter.r
-                                norm(vec(D_L * (L_k - L_ref_k)), 'inf') - obj.this_iter.r
-                            ];
-                        end
-                    else
-                        constraintLHS = [constraintLHS
-                            obj.scp_prob.trust_region_scaling.(field) ...
-                            .* norm(reshape(vars.(field) - obj.this_iter.ref_vars.(field), [], 1), obj.constParams.trust_region_norm) ...
-                            - obj.this_iter.r
-                        ];
-                    end
-                end
+            if isempty(obj.scp_prob.D)
+                D = 1;
+            else
+                D = obj.scp_prob.D;
+            end
+            
+            for k = 1:size(vars.L, 3)
+                A = obj.scp_prob.A_sys(:,:,k);
+                B = obj.scp_prob.B_sys(:,:,k);
+                S = vars.S(:,:,k);
+                L = vars.L(:,:,k);
+                S_ref = obj.this_iter.ref_vars.S(:,:,k);
+                L_ref = obj.this_iter.ref_vars.L(:,:,k);
+                F = A*S + B*L;
+                F_ref = A*S_ref + B*L_ref;
+
+                constraintLHS = [constraintLHS
+                    norm(vec(D * (F - F_ref)), obj.constParams.trust_region_norm) - obj.this_iter.r
+                    ];
             end
         end
 
