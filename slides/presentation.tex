@@ -35,7 +35,7 @@
 \subtitle{A Novel Approach for Chance-Constrained Covariance Steering}
 \author{Naoya Kumagai, Kenshiro Oguri}
 \institute{School of Aeronautics and Astronautics, Purdue University}
-\date{\today}
+\date{November 24, 2025}
 
 \begin{document}
 
@@ -67,9 +67,10 @@
 \end{columns}
 \end{frame}
 \begin{frame}{Problem Statement}
-\begin{block}{Discrete-Time Covariance Steering}
+\begin{columns}
+\begin{column}{0.5\textwidth}
 \begin{align*}
-&\minimize_{\boldsymbol{v}, \boldsymbol{K}} \quad J = \sum_{k=0}^{N-1} J_k (x_k, u_k) \\
+&\minimize_{\boldsymbol{v}, \boldsymbol{K}} \quad J \\
 &\text{subject to} \\
 & x_{k+1} = A_k x_k + B_k u_k + G_k w_k \\
 & u_k = v_k + K_k (x_k - \E{x_k}) \\
@@ -79,7 +80,21 @@
 & \mathbb{P}(x_k \in \mathcal{X}) \geq 1 - \epsilon_x \\
 & \mathbb{P}(u_k \in \mathcal{U}) \geq 1 - \epsilon_u
 \end{align*}
-\end{block}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Objective Function:}
+\begin{itemize}
+    \item \textbf{EoQ (Expectation of Quadratic):}
+    \[
+    J = \sum_{k=0}^{N-1} \E{x_k^\top Q_k x_k + u_k^\top R_k u_k}
+    \]
+    \item \textbf{QoN (Quantile of Norm):}
+    \[
+    J = \sum_{k=0}^{N-1} \mathcal{Q}[\norm{W_k^x x_k}_2 + \norm{W_k^u u_k}_2]
+    \]
+\end{itemize}
+\end{column}
+\end{columns}
 \end{frame}
 
 \begin{frame}{Motivation: Review of Existing Methods}
@@ -95,6 +110,7 @@
 \textbf{Policy} & Causal/Non-state & Memoryless, State \\
 \textbf{Objective} & Flexible & Quadratic \\
 \textbf{Chance constraints} & Convex & Nonconvex \\
+\midrule
 \textbf{Bottlenecks} & Complexity & Ill-scaling\\
 \bottomrule
 \end{tabular}
