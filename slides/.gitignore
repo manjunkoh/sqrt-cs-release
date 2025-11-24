@@ -1,0 +1,35 @@
+#latex
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+
+# Beamer-specific files
+*.nav
+*.snm
+*.vrb
+
+# Compiled output (uncomment if you don't want to track PDFs)
+# *.pdf
+
+# Backup files
+*~
+*.bak
+*.backup
+
+# Editor and OS files
+.DS_Store
+*.swp
+*.swo
+*#
+.#*
+
+# Temporary files
+*.tmp
+
+*.pdf
