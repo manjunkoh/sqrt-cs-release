@@ -42,69 +42,30 @@
 % Title slide
 \frame{\titlepage}
 
-\section{Introduction}
+% \section{Introduction}
 
 \begin{frame}{Covariance Steering (CS)}
 \begin{itemize}
     \item Control framework that explicitly addresses uncertainty
     \item Steers both \textbf{mean} and \textbf{covariance} to desired values
     \item Yields optimal feedforward + feedback control policies
-    \item Applications: spacecraft rendezvous, safe navigation, etc.
+    \item Capable of handling chance constraints
+    \item Applications: TCM planning for spacecraft, etc.
 \end{itemize}
 
-\vspace{0.5cm}
-\textbf{Challenge:} Numerical issues when variance is small compared to mean
-\end{frame}
-
-\begin{frame}{Motivation: Numerical Issues}
 \begin{columns}
-\begin{column}{0.5\textwidth}
-\textbf{Existing Methods:}
-\begin{itemize}
-    \item Block-matrix approaches: poor scalability
-    \item Full-covariance methods: numerical instability
-    \item Small variance $\rightarrow$ squared units $\rightarrow$ ill-scaling
-\end{itemize}
+\begin{column}{0.45\textwidth}
+\begin{figure}
+\includegraphics[width=\textwidth]{sqrt_covariance_steering_result.png}
+\end{figure}
 \end{column}
-\begin{column}{0.5\textwidth}
-\textbf{Square Root Filtering:}
-\begin{itemize}
-    \item Used in Apollo Guidance Computer
-    \item ``Half as many bits'' of precision needed
-    \item More numerically stable
-\end{itemize}
+\begin{column}{0.45\textwidth}
+\begin{figure}
+\includegraphics[width=\textwidth]{example_cone_path.png}
+\end{figure}
 \end{column}
 \end{columns}
-
-\vspace{0.5cm}
-\textbf{Our Approach:} Use Cholesky factor (square root) of covariance matrix as optimization variable
 \end{frame}
-
-\begin{frame}{Contributions}
-\begin{enumerate}
-    \item \textbf{Square root formulation} using QR decomposition
-    \begin{itemize}
-        \item Better numerical reliability
-        \item Flexible cost formulation
-    \end{itemize}
-    
-    \item \textbf{Sequential Convex Programming (SCP)} solution
-    \begin{itemize}
-        \item Globally optimal for unconstrained quadratic case
-        \item Locally optimal in general
-    \end{itemize}
-    
-    \item \textbf{Computational advantages}
-    \begin{itemize}
-        \item Better scalability than block-matrix methods
-        \item Memoryless feedback control
-        \item Superior numerical stability
-    \end{itemize}
-\end{enumerate}
-\end{frame}
-
-\section{Problem Formulation}
-
 \begin{frame}{Problem Statement}
 \begin{block}{Discrete-Time Covariance Steering}
 \begin{align*}
@@ -121,44 +82,170 @@
 \end{block}
 \end{frame}
 
+\begin{frame}{Motivation: Review of Existing Methods}
+\begin{table}
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+& \textbf{Block-matrix}\footnote{Skaf \& Boyd 2010; Okamoto et al. 2018; Okamoto \& Tsiotras 2019} & \textbf{Full-covariance}\footnote{Liu et al. 2025; Pilipovsky \& Tsiotras 2024} \\
+\midrule
+\textbf{Covariance} & Implicit (quadratic) & Explicit\\
+\textbf{Complexity} & High (large LMI) & Good (small LMIs) \\
+\textbf{Policy} & Causal/Non-state & Memoryless, State \\
+\textbf{Objective} & Flexible & Quadratic \\
+\textbf{Chance constraints} & Convex & Nonconvex \\
+\textbf{Bottlenecks} & Complexity & Ill-scaling\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{frame}
+
+\begin{frame}{Motivation: Square Root Filtering}
+\textbf{Square Root Filtering:}
+\begin{itemize}
+    \item Used in Apollo Guidance Computer
+    \item ``Half as many bits'' of precision needed
+    \item Works with square root (Cholesky factor) of covariance
+    \item LDL version exists
+    \item Propagation equations are written as a QR decomposition
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Contributions}
+\textbf{Use the Cholesky factor explicitly as the optimization variable in covariance steering}
+\begin{enumerate}
+
+    \item \textbf{Theoretical Advantages}
+    \begin{itemize}
+        \item Flexible cost formulation
+    \end{itemize}
+    
+    \item \textbf{Computational advantages}
+    \begin{itemize}
+        \item Better scalability than block-matrix methods
+        \item Memoryless feedback control
+        \item Superior numerical stability
+    \end{itemize}
+
+    \item \textbf{Sequential Convex Programming (SCP)} solution
+    \begin{itemize}
+        \item Globally optimal for unconstrained quadratic case
+        \item Locally optimal in general
+        \item Difficulty of the problem is ``pushed to'' the SCP algorithm -- we can work with that!
+    \end{itemize}
+\end{enumerate}
+\end{frame}
+
+% \section{Problem Formulation}
+
+
+\begin{frame}{(Economy-Size) QR Decomposition}
+For $M \in \mathbb{R}^{p \times q}$ with $p \geq q$:
+\[
+M = QR
+\]
+where:
+\begin{itemize}
+    \item $Q \in \mathbb{R}^{p \times q}$: $Q Q^\top = I$ (orthonormal columns)
+    \item $R \in \mathbb{R}^{q \times q}$: upper triangular
+\end{itemize}
+
+\textbf{Existence and Uniqueness:}
+\begin{itemize}
+    \item \textbf{Existence:} $Q, R$ always exist for any matrix $M$
+    \item \textbf{Uniqueness:} If $M$ is full rank, then $Q$ and $R$ are unique up to sign of diagonal entries of $R$
+    \item With positive diagonal entries of $R$: \textbf{unique decomposition}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{QR Decomposition for Covariance Propagation}
+\textbf{Covariance propagation (no feedback, $K_k = 0$):}
+\[
+P_{k+1} = A_k P_k A_k^\top + G_k G_k^\top
+\]
+
+\textbf{Define $S_{k+1}$ and $X_{k+1}$:}
+\[
+S_{k+1} = P_k^{1/2} \in \mathbb{L}_+^n, \quad
+X_{k+1} := \begin{bmatrix} A_k S_k & G_k \end{bmatrix} \in \mathbb{R}^{n \times (n+m)}
+\]
+
+Then: $X_{k+1} X_{k+1}^\top = S_{k+1} S_{k+1}^\top$, and
+\[
+S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top
+\]
+
+\begin{itemize} 
+    \item QR ensures $S_{k+1} \in \mathbb{L}_+^n$ (lower triangular, positive diagonal)
+    \item Existence and uniqueness apply, given $X_{k+1}$ is full rank
+\end{itemize}
+\end{frame}
+
 \begin{frame}{Covariance Propagation}
-\begin{block}{Standard Form}
+\begin{block}{Standard Form (with Memoryless State Feedback)}
 \[
 P_{k+1} = (A_k + B_k K_k) P_k (A_k + B_k K_k)^T + G_k G_k^\top
 \]
 \end{block}
 
-\begin{block}{Square Root Form (Our Approach)}
+\begin{block}{Square Root Form}
 \[
 S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix}
 \]
 where $S_k = P_k^{1/2}$ is the Cholesky factor
 \end{block}
-
-\vspace{0.3cm}
-\textbf{Key Insight:} QR decomposition ensures $S_{k+1} \in \mathbb{L}_+^n$ (lower triangular with positive diagonal)
 \end{frame}
 
-\begin{frame}{Change of Variables}
+\begin{frame}{Change of Variables for Feedback Control}
 To handle bilinear term $K_k S_k$, we define:
 \[
-L_k = K_k S_k \quad \Rightarrow \quad K_k = L_k S_k^{-1}
+L_k = K_k S_k \quad \iff \quad K_k = L_k S_k^{-1}
 \]
 
 Then the square root propagation becomes:
 \[
 S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top, \quad X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix}
 \]
+The covariance of the control input is 
+\[
+K_k P_k K_k^\top = L_k L_k^\top
+\]
 
-\vspace{0.3cm}
 \textbf{Nonconvexity:} The QR operation is nonlinear, requiring iterative solution
 \end{frame}
 
-\section{Method}
+\begin{frame}{Objective Function and Chance Constraints}
+\textbf{Objective Function (Can also deal with quantile cost):}
+\[
+J = \sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k + \mathrm{trace}(Q_k S_k S_k^\top + R_k L_k L_k^\top)
+\]
 
-\begin{frame}{QR Decomposition Derivative}
+\textbf{Chance Constraints:}
+\begin{itemize}
+    \item \textbf{Affine:} $\mathbb{P}(\alpha^\top x_k \leq \beta) \geq 1-p$
+    \[
+    \alpha^\top \mu_k + z \norm{S_k^\top \alpha}_2 - \beta \leq 0, \quad z = \Phi^{-1}(1-p)
+    \]
+    \item \textbf{Norm:} $\mathbb{P}(\norm{x_k}_2 \leq \gamma) \geq 1-p$
+    \[
+    \norm{\mu_k}_2 + q \norm{S_k}_2 - \gamma \leq 0, \quad q = \sqrt{\chi^2_{n,1-p}}
+    \]
+\end{itemize}
+
+\textbf{Key advantage:} Both are \textbf{convex} in $(\mu_k, S_k, L_k)$!
+\end{frame}
+
+% \section{Method}
+
+\begin{frame}{Linearizing the QR Decomposition}
+Recall the QR decomposition:
+\[
+M = QR
+\]
 For optimization, we need the derivative of QR decomposition:
-
 \[
 \mathrm{d} R = Q^\top (\mathrm{d} M) - \mathrm{tril}(Q^\top (\mathrm{d} M) R^{-1}) R
 \]
@@ -193,7 +280,7 @@ At each iteration:
 \]
 \end{block}
 
-\begin{block}{Trust Region}
+\begin{block}{Trust Region with Scaling Matrix $D_X$}
 \[
 \lVert\mathrm{vec}(D_X(X_k - \bar{X}_k))\rVert_\infty \leq r
 \]
@@ -206,7 +293,7 @@ At each iteration:
 \end{block}
 \end{frame}
 
-\section{Theoretical Results}
+% \section{Theoretical Results}
 
 \begin{frame}{Optimality Guarantees}
 \begin{theorem}[Local Optimality]
@@ -218,10 +305,10 @@ When chance constraints are absent and the objective is quadratic, the solution 
 \end{theorem}
 
 \vspace{0.3cm}
-\textbf{Key:} Cholesky map is a diffeomorphism, preserving optimality structure
+\textbf{Key:} Cholesky map is a diffeomorphism (bijective and smooth), bijectively mapping the neighborhood of the optimal solution between the two representations.
 \end{frame}
 
-\section{Numerical Examples}
+% \section{Numerical Examples}
 
 \begin{frame}{Scalability Comparison}
 \begin{columns}
@@ -244,7 +331,6 @@ When chance constraints are absent and the objective is quadratic, the solution 
 \begin{itemize}
     \item Better scalability than block-matrix methods
     \item Achieves optimality (matches Liu et al.)
-    \item Memoryless feedback control
 \end{itemize}
 \end{frame}
 
@@ -261,30 +347,35 @@ When chance constraints are absent and the objective is quadratic, the solution 
 \begin{itemize}
     \item Small position uncertainty (100m)
     \item Large mean position (3km)
-    \item QoN objective function
 \end{itemize}
 
 \vspace{0.3cm}
 \textbf{Results:}
 \begin{itemize}
     \item Proposed method: 42 iterations, 5.0s
-    \item Full-covariance: \textbf{FAILED} (numerical issues)
+    \item Full-covariance: \textbf{UNKNOWN} (numerical issues)
 \end{itemize}
 \end{column}
 \end{columns}
 \end{frame}
 
 \begin{frame}{Covariance Propagation Accuracy}
+\textbf{Covariance propagation loss:}
+\[
+\text{Loss}_k = \frac{\norm{\phi(K_k, P_k) - P_{k+1}}_F}{\norm{P_{k+1}}_F}
+\]
+where $\phi(K_k, P_k) := (A_k + B_k K_k) P_k (A_k + B_k K_k)^\top + G_k G_k^\top$
+
+\vspace{0.3cm}
 \begin{figure}
 \includegraphics[width=0.7\textwidth]{example_cwh_covariance_propagation_loss.pdf}
-\caption{Covariance propagation loss}
 \end{figure}
 
 \vspace{0.3cm}
-\textbf{Key Finding:} Square root method maintains accurate covariance propagation even with tight tolerances
+Square root method maintains accurate covariance propagation.
 \end{frame}
 
-\section{Conclusions}
+% \section{Conclusions}
 
 \begin{frame}{Summary}
 \begin{block}{Benefits of Square Root Approach}
@@ -298,19 +389,18 @@ When chance constraints are absent and the objective is quadratic, the solution 
 \end{block}
 
 \vspace{0.5cm}
-\textbf{Trade-off:} Iterative SCP approach vs. single-shot convex optimization
+\textbf{Trade-off:} SCP vs. single-shot convex optimization
 \begin{itemize}
-    \item But: Offline computation, online is cheap
-    \item Flexibility and stability often worth the cost
+    \item Full-matrix approach needs SCP to handle CCs
+    \item CS is meant for offline computation, online is cheap
+    \item SCP convergence is reliable in practice
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Future Work}
 \begin{itemize}
-    \item Extension to continuous-time systems
-    \item Non-Gaussian uncertainty
-    \item Real-time applications with warm-starting
-    \item Integration with learning-based methods
+    \item Use with Hands-off covariance steering
+    \item Release the code
 \end{itemize}
 \end{frame}
 
@@ -326,9 +416,9 @@ When chance constraints are absent and the objective is quadratic, the solution 
     
     \vspace{1.5cm}
     
-    \normalsize
-    Code: \texttt{https://github.com/naoya-kumagai/}\\
-    \texttt{sqrt\_covariance\_steering/}
+    % \normalsize
+    % Code: \texttt{https://github.com/naoya-kumagai/}\\
+    % \texttt{sqrt\_covariance\_steering/}
 \end{frame}
 
 \end{document}
