@@ -106,10 +106,10 @@
 & \textbf{Block-matrix}\footnote{Skaf \& Boyd 2010; Okamoto et al. 2018; Okamoto \& Tsiotras 2019} & \textbf{Full-covariance}\footnote{Liu et al. 2025; Pilipovsky \& Tsiotras 2024} \\
 \midrule
 \textbf{Covariance} & Implicit (quadratic) & Explicit\\
-\textbf{Complexity} & High (large LMI) & Low (small LMIs) \\
 \textbf{Policy} & Causal/Non-state & Memoryless, State \\
 \textbf{Objective} & Flexible & Quadratic \\
 \textbf{Chance constraints} & Convex & Nonconvex \\
+\textbf{Complexity} & High (large LMI) & Low (small LMIs) \\
 \midrule
 \textbf{Bottlenecks} & Complexity & Ill-scaling, Objective\\
 \bottomrule
@@ -117,7 +117,7 @@
 \end{table}
 
 \textbf{Causal policy:} $u_k = v_k + \sum_{i=0}^k K_{k,i} (x_i - \E{x_i})$\\
-\textbf{Non-state feedback policy:} $u_k = v_k + K_k (y_k - \E{y_k})$ \\
+\textbf{Non-state feedback policy:} $u_k = v_k + K_k y_k$ \\
 \textbf{Memoryless policy:} $u_k = v_k + K_k (x_k - \E{x_k})$
 \end{frame}
 
@@ -125,7 +125,7 @@
 \textbf{Square Root Filtering:}
 \begin{itemize}
     \item Used in Apollo Guidance Computer
-    \item ``Half as many bits'' of precision needed
+    \item ``Half as many bits'' of precision needed, with similar computational cost
     \item Works with square root (Cholesky factor) of covariance
     \item Propagation equations are written as a QR decomposition - LDL version also exists
 \end{itemize}
@@ -375,7 +375,7 @@ When chance constraints are absent and the objective is quadratic, the solution 
 \begin{column}{0.5\textwidth}
 \textbf{Problem:}
 \begin{itemize}
-    \item Small position uncertainty (100m)
+    \item Small position uncertainty (10m)
     \item Large mean position (3km)
 \end{itemize}
 
@@ -411,15 +411,15 @@ Square root method maintains accurate covariance propagation.
 \begin{block}{Benefits of Square Root Approach}
 \begin{itemize}
     \item \textbf{Numerical reliability} for small variance problems
-    \item \textbf{Flexible cost formulation} (beyond quadratic)
+    \item \textbf{Flexible cost formulation} beyond quadratic
     \item \textbf{Good scalability} with horizon length
-    \item \textbf{Memoryless feedback} control law
+    \item \textbf{Memoryless} state feedback control law
     \item \textbf{Global optimality} for unconstrained quadratic case
 \end{itemize}
 \end{block}
 
 \vspace{0.5cm}
-\textbf{Trade-off:} SCP vs. single-shot convex optimization
+\textbf{Trade-off:} SCP vs. single-shot convex optimization. But...
 \begin{itemize}
     \item Full-covariance approach needs SCP to handle CCs
     \item CS is meant for offline computation, online is cheap
@@ -437,7 +437,6 @@ Square root method maintains accurate covariance propagation.
 \begin{block}{Discussion}
     \begin{itemize}
         \item Using QR and its derivative may have more applications
-        \item If you have an ``okay'' idea, discuss it with others!
     \end{itemize}
 \end{block}
 \end{frame}
