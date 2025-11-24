@@ -106,16 +106,19 @@
 & \textbf{Block-matrix}\footnote{Skaf \& Boyd 2010; Okamoto et al. 2018; Okamoto \& Tsiotras 2019} & \textbf{Full-covariance}\footnote{Liu et al. 2025; Pilipovsky \& Tsiotras 2024} \\
 \midrule
 \textbf{Covariance} & Implicit (quadratic) & Explicit\\
-\textbf{Complexity} & High (large LMI) & Good (small LMIs) \\
+\textbf{Complexity} & High (large LMI) & Low (small LMIs) \\
 \textbf{Policy} & Causal/Non-state & Memoryless, State \\
 \textbf{Objective} & Flexible & Quadratic \\
 \textbf{Chance constraints} & Convex & Nonconvex \\
 \midrule
-\textbf{Bottlenecks} & Complexity & Ill-scaling\\
+\textbf{Bottlenecks} & Complexity & Ill-scaling, Objective\\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\textbf{Causal policy:} $u_k = v_k + \sum_{i=0}^k K_{k,i} (x_i - \E{x_i})$\\
+\textbf{Non-state feedback policy:} $u_k = v_k + K_k (y_k - \E{y_k})$ \\
+\textbf{Memoryless policy:} $u_k = v_k + K_k (x_k - \E{x_k})$
 \end{frame}
 
 \begin{frame}{Motivation: Square Root Filtering}
@@ -124,8 +127,7 @@
     \item Used in Apollo Guidance Computer
     \item ``Half as many bits'' of precision needed
     \item Works with square root (Cholesky factor) of covariance
-    \item LDL version exists
-    \item Propagation equations are written as a QR decomposition
+    \item Propagation equations are written as a QR decomposition - LDL version also exists
 \end{itemize}
 
 \end{frame}
@@ -142,8 +144,8 @@
     \item \textbf{Computational advantages}
     \begin{itemize}
         \item Better scalability than block-matrix methods
-        \item Memoryless feedback control
-        \item Superior numerical stability
+        \item Memoryless state feedback control
+        \item Better numerical stability
     \end{itemize}
 
     \item \textbf{Sequential Convex Programming (SCP)} solution
@@ -186,22 +188,34 @@ P_{k+1} = A_k P_k A_k^\top + G_k G_k^\top
 \textbf{Define $S_{k+1}$ and $X_{k+1}$:}
 \[
 S_{k+1} = P_k^{1/2} \in \mathbb{L}_+^n, \quad
-X_{k+1} := \begin{bmatrix} A_k S_k & G_k \end{bmatrix} \in \mathbb{R}^{n \times (n+m)}
+X_{k+1} := \begin{bmatrix} A_k S_k & G_k \end{bmatrix} \in \mathbb{R}^{n \times 2n}
 \]
 
-Then: $X_{k+1} X_{k+1}^\top = S_{k+1} S_{k+1}^\top$, and
+$X_{k+1} X_{k+1}^\top = S_{k+1} S_{k+1}^\top$.
+More generally, for $Q \in \mathbb{R}^{2n \times n}$ such that $Q^\top Q = I_n$,
 \[
-S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top
+X_{k+1}^\top = Q S_{k+1}^\top \implies X_{k+1} X_{k+1}^\top = S_{k+1} Q^\top Q S_{k+1}^\top
+\]
+\[
+\therefore S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top
 \]
 
 \begin{itemize} 
-    \item QR ensures $S_{k+1} \in \mathbb{L}_+^n$ (lower triangular, positive diagonal)
     \item Existence and uniqueness apply, given $X_{k+1}$ is full rank
+    \item Unique $\implies$ QR-based propagation is uniquely equivalent to the standard propagation
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Covariance Propagation}
-\begin{block}{Standard Form (with Memoryless State Feedback)}
+\begin{frame}{Closed-Loop Covariance Propagation}
+\begin{block}{Dynamics:}
+\[
+x_{k+1} = A_k x_k + B_k u_k + G_k w_k
+\]
+\[
+u_k = v_k + K_k (x_k - \E{x_k})
+\]
+\end{block}
+\begin{block}{Standard Form}
 \[
 P_{k+1} = (A_k + B_k K_k) P_k (A_k + B_k K_k)^T + G_k G_k^\top
 \]
@@ -211,8 +225,8 @@ P_{k+1} = (A_k + B_k K_k) P_k (A_k + B_k K_k)^T + G_k G_k^\top
 \[
 S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top, \quad X_{k+1} = \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix}
 \]
-where $S_k = P_k^{1/2}$ is the Cholesky factor
 \end{block}
+QR is nonlinear; there is another bilinear term $K_k S_k$ !
 \end{frame}
 
 \begin{frame}{Change of Variables for Feedback Control}
@@ -369,7 +383,7 @@ When chance constraints are absent and the objective is quadratic, the solution 
 \textbf{Results:}
 \begin{itemize}
     \item Proposed method: 42 iterations, 5.0s
-    \item Full-covariance: \textbf{UNKNOWN} (numerical issues)
+    \item Full-covariance: MOSEK status \texttt{UNKNOWN} (numerical issues)
 \end{itemize}
 \end{column}
 \end{columns}
@@ -407,17 +421,25 @@ Square root method maintains accurate covariance propagation.
 \vspace{0.5cm}
 \textbf{Trade-off:} SCP vs. single-shot convex optimization
 \begin{itemize}
-    \item Full-matrix approach needs SCP to handle CCs
+    \item Full-covariance approach needs SCP to handle CCs
     \item CS is meant for offline computation, online is cheap
     \item SCP convergence is reliable in practice
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Future Work}
-\begin{itemize}
-    \item Use with Hands-off covariance steering
-    \item Release the code
-\end{itemize}
+\begin{frame}{Discussion and Next Steps}
+    \begin{block}{Next Steps}
+        \begin{itemize}
+            \item Use with Hands-off covariance steering
+            \item Release the code and paper
+        \end{itemize}
+    \end{block}
+\begin{block}{Discussion}
+    \begin{itemize}
+        \item Using QR and its derivative may have more applications
+        \item If you have an ``okay'' idea, discuss it with others!
+    \end{itemize}
+\end{block}
 \end{frame}
 
 \begin{frame}[plain]
