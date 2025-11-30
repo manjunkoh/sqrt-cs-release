@@ -49,11 +49,11 @@ Uncertainty is the fundamental reason for closed-loop control design. To explici
 
 However, CS possesses unique characteristics distinct from standard optimal control problems. Due to the inherent objective of steering uncertainty to small values while minimizing control effort, the variance of the state can show significantly different magnitudes throughout the time horizon. This contrasts with nominal trajectory optimization, where the magnitude of the state variables typically remains within a consistent range.
 
-This issue is amplified in real-world applications by two factors. First, the magnitude of the uncertainty is often much smaller than that of the mean state. Second, safety requirements and actuator limitations necessitate the use of chance constraints. These constraints mathematically couple the problem of finding the optimal feedforward sequence (mean-only steering) with that of finding the optimal feedback sequence (covariance-only steering) \cite{okamotoOptimalCovarianceControl2018}. Consequently, the resulting optimization problem is inherently ill-scaled. When implemented on finite-precision computers, standard algorithms may struggle to converge, as we demonstrate in this paper.
+This issue is amplified in real-world applications by two factors. First, the magnitude of the uncertainty is often much smaller than that of the mean state. Second, safety requirements and actuator limitations necessitate the use of chance constraints (CCs). These constraints mathematically couple the problem of finding the optimal feedforward sequence (mean-only steering) with that of finding the optimal feedback sequence (covariance-only steering) \cite{okamotoOptimalCovarianceControl2018}. Consequently, the resulting optimization problem is inherently ill-scaled. When implemented on finite-precision computers, standard algorithms may struggle to converge, as we demonstrate in this paper.
 
-Recent works on finite-horizon discrete-time CS mainly focus on converting the problem into a convex optimization problem. Skaf and Boyd \cite{skafDesignAffineControllers2010} consider an affine \textit{causal} state feedback controller and formulates the problem as a semidefinite programming (SDP) problem. Okamoto et al. \cite{okamotoOptimalCovarianceControl2018} add affine chance constraints while maintaining convexity. However, these methods suffer from the poor computational complexity with respect to horizon length due to the large linear matrix inequality (LMI) constraints involved, as shown in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019} remedy the need for block lower triangular matrix variables employed in \cite{skafDesignAffineControllers2010,okamotoOptimalCovarianceControl2018} by introducing an alternative affine feedback control law, requiring only a block diagonal structure. Nevertheless, due to the implicit representation of the covariance matrix variables as a function of all the previous system matrices, the LMIs to be solved remain rather large. For later discussion, it is also important to note that this implicit representation in \cite{skafDesignAffineControllers2010,okamotoOptimalCovarianceControl2018,okamotoOptimalStochasticVehicle2019} allows an affine representation of the Cholesky factor of the covariance matrix in terms of the optimization variables. This in turn allows affine chance constraints to be expressed exactly as second-order cone constraints. (See (42) and Proposition 4 of \cite{okamotoOptimalCovarianceControl2018} to observe that \((\cdot)^{1/2} \) appears in the deterministic formulation of the constraints.)
+Recent works on finite-horizon discrete-time CS mainly focus on converting the problem into a convex optimization problem. Skaf and Boyd \cite{skafDesignAffineControllers2010} consider an affine \textit{causal} state feedback controller and formulates the problem as a semidefinite programming (SDP) problem. Okamoto et al. \cite{okamotoOptimalCovarianceControl2018} add affine CCs while maintaining convexity. However, these methods suffer from the poor computational complexity with respect to horizon length due to the large linear matrix inequality (LMI) constraints involved, as shown in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019} remedy the need for block lower triangular matrix variables employed in \cite{skafDesignAffineControllers2010,okamotoOptimalCovarianceControl2018} by introducing an alternative affine feedback control law, requiring only a block diagonal structure. Nevertheless, due to the implicit representation of the covariance matrix variables as a function of all the previous system matrices, the LMIs to be solved remain rather large. For later discussion, it is also important to note that this implicit representation in \cite{skafDesignAffineControllers2010,okamotoOptimalCovarianceControl2018,okamotoOptimalStochasticVehicle2019} allows an affine representation of the Cholesky factor of the covariance matrix in terms of the optimization variables. This in turn allows affine CCs to be expressed exactly as second-order cone constraints. (See (42) and Proposition 4 of \cite{okamotoOptimalCovarianceControl2018} to observe that \((\cdot)^{1/2} \) appears in the deterministic formulation of the constraints.)
 
-More recently, Liu et al. \cite{liuOptimalCovarianceSteering2025} made notable breakthroughs. First, it shows the optimality of the affine \textit{memoryless} state feedback control law for the unconstrained CS problem, i.e. when chance constraints are not present. Second, it relaxes the nonconvex problem to an SDP, and shows that its first-order optimality conditions imply that the relaxation is tight. Compared to the block-matrix approaches (\cite{skafDesignAffineControllers2010,okamotoOptimalCovarianceControl2018,okamotoOptimalStochasticVehicle2019}), this method explicitly defines the covariance matrix variables and scales much better with the growth in problem size. Its proof of convexification has been extended to the chance-constrained problem \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. 
+More recently, Liu et al. \cite{liuOptimalCovarianceSteering2025} made notable breakthroughs. First, it shows the optimality of the affine \textit{memoryless} state feedback control law for the unconstrained CS problem, i.e. when CCs are not present. Second, it relaxes the nonconvex problem to an SDP, and shows that its first-order optimality conditions imply that the relaxation is tight. Compared to the block-matrix approaches (\cite{skafDesignAffineControllers2010,okamotoOptimalCovarianceControl2018,okamotoOptimalStochasticVehicle2019}), this method explicitly defines the covariance matrix variables and scales much better with the growth in problem size. Its proof of convexification has been extended to the chance-constrained problem \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. 
 
 At the same time, we have observed several drawbacks of \cite{liuOptimalCovarianceSteering2025} in application, which motivated this work: 
 \begin{itemize}
@@ -62,9 +62,32 @@ At the same time, we have observed several drawbacks of \cite{liuOptimalCovarian
 \item (\textbf{Numerical Reliability}) In scenarios where the state variance is small compared to the mean values \cite{oguriChanceConstrainedControlSafe2024a,kumagaiRobustCislunarLowThrust2025a}, state-of-the-art SDP solvers struggle to converge. We attribute the numerical difficulties to dealing with the covariance matrix directly; this necessarily squares the system units and amplifies ill-scaling, causing issues for solvers working in finite precision. Furthermore, the convexification process is only valid up to the numerical accuracy of the LMI that is solved. We have observed that when the solver terminates due to numerical issues, the covariance propagation equations can be lossy.
 
 \item (\textbf{Non-convexity under Chance Constraints}) 
-It is common to encounter objective functions or chance constraints that are represented as convex in the square root form, e.g. quantile objective functions or affine chance constraints \cite{okamotoOptimalCovarianceControl2018}. Due to the square root operation, these constraints are nonconvex in the covariance matrix.
+It is common to encounter objective functions or CCs that are represented as convex in the square root form, e.g. quantile objective functions or affine CCs \cite{okamotoOptimalCovarianceControl2018}. Due to the square root operation, these constraints are nonconvex in the covariance matrix.
 Thus, a reference covariance matrix for conservatively approximating the square root via linearization \cite{rapakouliasDiscreteTimeOptimalCovariance2023} or iterative algorithms \cite{pilipovskyComputationallyEfficientChance2024} are required.
 \end{itemize}
+
+\cref{tab:comparison} summarizes these solution methods for discrete-time chance-constrained CS.
+\begin{table}[ht]
+\caption{Comparison of existing methods for CS; \textbf{bold} indicates the more favorable property}
+\centering
+\begin{tabular}{lcc}
+\toprule
+& \cite{skafDesignAffineControllers2010,okamotoOptimalCovarianceControl2018,okamotoOptimalStochasticVehicle2019}& \cite{liuOptimalCovarianceSteering2025,rapakouliasDiscreteTimeOptimalCovariance2023,
+pilipovskyComputationallyEfficientChance2024}   \\
+\midrule
+Covariance & Implicit & Explicit\\
+Policy & Causal/Non-state & \textbf{Memoryless, State} \\
+Objective & \textbf{Flexible} & Quadratic \\
+CCs & \textbf{Convex} & Nonconvex \\
+Number of LMIs \cite{rapakouliasDiscreteTimeOptimalCovariance2023} & $N$ & $1$ \\
+Size of LMI(s) \cite{rapakouliasDiscreteTimeOptimalCovariance2023} & $n\times n$ & $ n (N{+}1) \times n (N{+}1)$ \\
+Complexity & High & \textbf{Low} \\
+\midrule
+Bottlenecks & Complexity & Numerical, CC nonconvexity\\
+\bottomrule
+\end{tabular}
+\label{tab:comparison}
+\end{table}
 
 The numerical issues encountered due to using the covariance matrix as the dependent variable can be explained by the \textit{square root filter} literature. As early as the 1960s, engineers developing the Apollo Guidance Computer (AGC) were aware of the numerical instability of the standard Kalman filter \cite{grewalApplicationsKalmanFiltering2010}. Potter's equivalent derivation of the filter which uses the Cholesky factor of the covariance matrix as the dependent variable gave rise to the square root Kalman filter; achieving the same accuracy with ``half as many bits" of precision, it was adopted for the AGC \cite{grewalApplicationsKalmanFiltering2010}. Since then, square root methods have been developed to include process noise \cite{dyerExtensionSquarerootFiltering1969}, and alternative LDL factorization-based methods have been proposed \cite{thorntonGramSchmidtAlgorithmsCovariance1975}. Thornton and Bierman later document a numerical comparison of the standard versus the square root methods, demonstrating the divergence of the former for a spacecraft orbit determination scenario \cite{thorntonNumericalComparisonDiscrete1976}. See \cite{kaminskiDiscreteSquareRoot1971,tapleyStatisticalOrbitDetermination2004} for a general review and comparison of these methods.
 
@@ -87,7 +110,7 @@ $\mathrm{vec}(\cdot)$ vectorizes a matrix.
 $\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix.
 
 \subsection{Problem Formulation}
-We address the finite-horizon discrete-time CS problem for a linear time-varying system with additive Gaussian noise. The goal is to find a state feedback controller that steers the state mean and covariance from their initial values to desired terminal values while minimizing a cost function and obeying chance constraints. Mathematically, the problem is formulated as follows.
+We address the finite-horizon discrete-time CS problem for a linear time-varying system with additive Gaussian noise. The goal is to find a state feedback controller that steers the state mean and covariance from their initial values to desired terminal values while minimizing a cost function and obeying CCs. Mathematically, the problem is formulated as follows.
 \begin{subequations}
 \label{eq:problem_statement}
 \begin{align}
@@ -124,12 +147,12 @@ The latter is a \textbf{quantile-of-norm} (QoN) cost, where the quantile functio
 \end{equation}
 $W_k^x \in \mathbb{R}^{w_x \times n}$ and $W_k^u \in \mathbb{R}^{w_u \times m}$ are weighting matrices for the state and control, respectively. Such a cost formulation is useful for risk sensitive scenarios where the worst-case scenario (up to a specified probability) is of more interest than the expected value, such as in finance \cite{rockafellarOptimizationConditionalValueatrisk2000}, statistical machine learning \cite{eastwoodProbableDomainGeneralization2022}, and spacecraft mission design \cite{oguriChanceConstrainedControlSafe2024a}.
 
-The sets \( \mathcal{X} \) and \( \mathcal{U} \) represent state and control feasible sets, respectively, with associated violation probabilities \( \epsilon_x \) and \( \epsilon_u \). Through some risk allocation procedure between each node, we assume that the chance constraints are given in one of two forms: a linear constraint or a norm constraint. For the linear constraint form, the chance constraint is given by:
+The sets \( \mathcal{X} \) and \( \mathcal{U} \) represent state and control feasible sets, respectively, with associated violation probabilities \( \epsilon_x \) and \( \epsilon_u \). Through some risk allocation procedure between each node, we assume that the CCs are given in one of two forms: a linear constraint or a norm constraint. For the linear constraint form, the CC is given by:
 \begin{equation} \label{eq:linear_chance_constraint}
 	\mathbb{P}(\alpha_j ^\top x_k \leq \beta_j) \geq 1 - p_j
 \end{equation}
 for each linear constraint defined by \( \alpha_j \in \mathbb{R}^n \) and \( \beta_j \in \mathbb{R} \), with violation probability \( p_j \).
-For the norm constraint form, the chance constraint is given by:
+For the norm constraint form, the CC is given by:
 \begin{equation} \label{eq:norm_chance_constraint}
 	\mathbb{P}(\| x_k \|_2 \leq \gamma) \geq 1 - p_\gamma
 \end{equation}
@@ -261,21 +284,20 @@ The initial distributional constraint is imposed by
 \end{equation}
 The terminal distributional constraint is imposed by \cite{okamotoOptimalCovarianceControl2018}
 \begin{equation} \label{eq:terminal_distributional_constraint}
-	\mu_N = \mu_{\mathrm{fin}}, \quad \norm{P_{\mathrm{fin}}^{-1/2} S_N}_2 - 1 \leq 0
+	\mu_N = \mu_{\mathrm{fin}}, \quad \norm{P_{\mathrm{fin}}^{-1/2} S_N}_2 - 1 \leq 0.
 \end{equation}
-where \( \norm{\cdot}_2 \) denotes the spectral norm here.
 
-Since we are working with the square root form, chance constraints can be imposed in a convex manner.
-For the linear constraint form \cref{eq:linear_chance_constraint}, the chance constraint can be exactly expressed as \cite{okamotoOptimalCovarianceControl2018}:
+Since we are working with the square root form, CCs can be imposed in a convex manner.
+For the linear constraint form \cref{eq:linear_chance_constraint}, the CC can be exactly expressed as \cite{okamotoOptimalCovarianceControl2018}:
 \begin{equation} \label{eq:linear_chance_constraint_deterministic}
 	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0, \quad k \in \N_{0}^{N}
 \end{equation}
-where \( \mathcal{Q}_{\mathcal{N}}(p_j) \) is the inverse of the standard normal cumulative distribution function.
-For the norm constraint form \cref{eq:norm_chance_constraint}, similar to the QoN cost, the chance constraint can be conservatively imposed as \cite{oguriChanceConstrainedControlSafe2024a}:
+where \( \mathcal{Q}_{\mathcal{N}}(\cdot) \) is the inverse of the standard normal cumulative distribution function.
+For the norm constraint form \cref{eq:norm_chance_constraint}, similar to the QoN cost, the CC can be conservatively imposed as \cite{oguriChanceConstrainedControlSafe2024a}:
 \begin{equation} \label{eq:norm_chance_constraint_deterministic}
 	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0, \quad k \in \N_{0}^{N}
 \end{equation}
-The control chance constraints can be imposed by replacing \( \mu_k \) with \( v_k \) and \( S_k \) with \( L_k \).
+The control CCs can be imposed by replacing \( \mu_k \) with \( v_k \) and \( S_k \) with \( L_k \).
 
 To summarize, \cref{eq:problem_statement} is converted into a nonconvex optimization problem as follows:
 \begin{equation} \label{eq:nonconvex_problem_statement}
@@ -443,7 +465,7 @@ Next, we apply this result to our specific problem. The following proposition is
 \end{proof}
 
 \begin{theorem} \label{th:global_optimality}
-	When the chance constraints are not present and the objective takes the quadratic form of \cref{eq:objective_function}, the solution is globally optimal.
+	When the CCs are not present and the objective takes the quadratic form of \cref{eq:objective_function}, the solution is globally optimal.
 \end{theorem}
 \begin{proof}
 	The unconstrained CS problem with quadratic cost is shown to be a convex optimization problem \cite{liuOptimalCovarianceSteering2025}. Since a local optimum of a convex problem is also a global optimum, from \cref{th:local_optimality}, the locally optimal solution obtained from \cref{alg:sqrt_qr_covariance_steering} is also globally optimal.
