@@ -162,17 +162,28 @@ classdef SqrtQRCovarianceSteeringOptimizer < SqrtQRCovarianceSteering
 				R_sqrt_upper = chol(obj.R);
 				Q_sqrt_upper = chol(obj.Q);
 				
+				% cone_matrix = [];
+                % 
+				% for k = 1:obj.N
+				% 	cone_matrix(:,k) = 2 * reshape(R_sqrt_upper * vars.L(:,:,k), [], 1);
+				% end
+				% % cone_matrix(9,:) = vars.t_L - 1;
+				% cone_matrix = [vars.t_L + 1; cone_matrix];
+				% constraints = [constraints; cone(cone_matrix)];
+
 				% SOC constraints for control cost: ||R_sqrt_upper * L||^2 <= t_L
 				for k = 1:obj.N
 					constraints = [constraints;
-						norm([2 * reshape(R_sqrt_upper * vars.L(:,:,k), [], 1); vars.t_L(k) - 1]) <= vars.t_L(k) + 1
+						% norm([2 * reshape(R_sqrt_upper * vars.L(:,:,k), [], 1); vars.t_L(k) - 1]) <= vars.t_L(k) + 1
+						cone([2 * reshape(R_sqrt_upper * vars.L(:,:,k), [], 1); vars.t_L(k) - 1], vars.t_L(k) + 1)
 					];
 				end
 				
 				% SOC constraints for state cost: ||Q_sqrt_upper * S||^2 <= t_S
 				for k = 1:obj.N
 					constraints = [constraints;
-						norm([2 * reshape(Q_sqrt_upper * vars.S(:,:,k), [], 1); vars.t_S(k) - 1]) <= vars.t_S(k) + 1
+						% norm([2 * reshape(Q_sqrt_upper * vars.S(:,:,k), [], 1); vars.t_S(k) - 1]) <= vars.t_S(k) + 1
+						cone([2 * reshape(Q_sqrt_upper * vars.S(:,:,k), [], 1); vars.t_S(k) - 1], vars.t_S(k) + 1)
 					];
 				end
 
@@ -183,17 +194,23 @@ classdef SqrtQRCovarianceSteeringOptimizer < SqrtQRCovarianceSteering
 				
 				% SOC constraints for mean state and control cost
 				if isfield(vars, 'mu') && isfield(vars, 'v') && ~isempty(vars.mu) && ~isempty(vars.v)
-					for k = 1:obj.N
-						% Mean state: ||Q_sqrt_upper * mu||^2 <= t_mu
-						constraints = [constraints;
-							norm([2 * Q_sqrt_upper * vars.mu(:,k); vars.t_mu(k) - 1]) <= vars.t_mu(k) + 1
-						];
+					constraints = [constraints;
+						cone([vars.t_mu + 1; 2 * Q_sqrt_upper * vars.mu(:,1:obj.N); vars.t_mu - 1])
+						cone([vars.t_v + 1; 2 * R_sqrt_upper * vars.v; vars.t_v - 1])
+					];
+					% for k = 1:obj.N
+					% 	% Mean state: ||Q_sqrt_upper * mu||^2 <= t_mu
+					% 	constraints = [constraints;
+					% 		% norm([2 * Q_sqrt_upper * vars.mu(:,k); vars.t_mu(k) - 1]) <= vars.t_mu(k) + 1
+					% 		cone([2 * Q_sqrt_upper * vars.mu(:,k); vars.t_mu(k) - 1], vars.t_mu(k) + 1)
+					% 	];
 						
-						% Mean control: ||R_sqrt * v||^2 <= t_v
-						constraints = [constraints;
-							norm([2 * R_sqrt_upper * vars.v(:,k); vars.t_v(k) - 1]) <= vars.t_v(k) + 1
-						];
-					end
+					% 	% Mean control: ||R_sqrt * v||^2 <= t_v
+					% 	constraints = [constraints;
+					% 		% norm([2 * R_sqrt_upper * vars.v(:,k); vars.t_v(k) - 1]) <= vars.t_v(k) + 1
+					% 		cone([2 * R_sqrt_upper * vars.v(:,k); vars.t_v(k) - 1], vars.t_v(k) + 1)
+					% 	];
+					% end
 
 					constraints = [constraints;
 						vars.t_mu >= 0

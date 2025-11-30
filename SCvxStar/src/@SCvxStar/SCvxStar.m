@@ -310,7 +310,7 @@ classdef SCvxStar < handle
             next_iter = SCPIter(obj.this_iter.iter + 1, obj);
 
             % DeltaL should be positive by asssumption when the constraints are linearized exactly
-            if obj.this_iter.delL < 0 && strcmp(obj.constParams.linearization, 'exact')
+            if obj.this_iter.iter > 1 && obj.this_iter.delL < 0 && strcmp(obj.constParams.linearization, 'exact')
                 obj.disp_verbose(verbose, ...
                 "DeltaL = " + obj.this_iter.delL + " < 0. Constraint linearization might be incorrect. Proceeding...");
                 % keyboard

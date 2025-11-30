@@ -1,5 +1,6 @@
 function opt = create_optimizer(obj)
     fprintf('Creating optimizer object...')
+    time_optimizer_start = tic;
     sdp_ref_vars = obj.scp_prob.define_vars();
 
     w = sdpvar(1);
@@ -15,7 +16,8 @@ function opt = create_optimizer(obj)
 
         % See Problem 4.26 in Boyd's book
         constraints = [constraints
-            norm([2 * xi; xi_norm_squared - 1]) <= xi_norm_squared + 1
+            % norm([2 * xi; xi_norm_squared - 1]) <= xi_norm_squared + 1
+            cone([2 * xi; xi_norm_squared - 1], xi_norm_squared + 1)
             xi_norm_squared >= 0
         ];
     else
@@ -29,7 +31,8 @@ function opt = create_optimizer(obj)
         zeta_norm_squared = sdpvar(1);
 
         constraints = [constraints
-            norm([2 * zeta; zeta_norm_squared - 1]) <= zeta_norm_squared + 1
+            % norm([2 * zeta; zeta_norm_squared - 1]) <= zeta_norm_squared + 1
+            cone([2 * zeta; zeta_norm_squared - 1], zeta_norm_squared + 1)
             zeta >= 0
         ];
     else
@@ -87,6 +90,6 @@ function opt = create_optimizer(obj)
         problem_params_cell = struct2cell(obj.scp_prob.p_double);
         opt = opt(cell(1, num_other_params), problem_params_cell{:});
     end
-    fprintf('Done!\n')
+    fprintf('Done! (took %f seconds)\n', toc(time_optimizer_start));
 
 end

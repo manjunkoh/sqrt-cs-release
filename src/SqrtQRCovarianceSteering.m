@@ -189,6 +189,7 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 		function constraints = convex_ineq(obj, vars)
 			constraints = [
 				[norm( chol(obj.P_f, 'lower') \ vars.S(:,:,obj.N+1), 2) - 1 <= 0]:'Terminal Covariance'
+				% cone(vec(chol(obj.P_f, 'lower') \ vars.S(:,:,obj.N+1)), 1)
 			];
 
 			% Ensure positive diagonal elements of S for uniqueness
@@ -227,7 +228,8 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 						for k = nodes
 							if k >= 1 && k <= obj.N+1
 								constraints = [constraints;
-									alpha' * vars.mu(:,k) + z * norm(alpha' * vars.S(:,:,k)) - beta <= 0
+									% alpha' * vars.mu(:,k) + z * norm(alpha' * vars.S(:,:,k)) - beta <= 0
+									cone([ (- alpha' * vars.mu(:,k) + beta) / z; vars.S(:,:,k)' * alpha])
 								];
 							end
 						end
@@ -282,13 +284,12 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 						z = norminv(1 - p);
 						
 						for k = nodes
-							if k >= 1 && k <= obj.N
-								v_k = vars.v(:,k);
-								L_k = vars.L(:,:,k);
-								constraints = [constraints;
-									[alpha' * v_k + z * norm(alpha' * L_k) - beta <= 0]:sprintf('Control Affine Chance Constraint (k=%d)', k)
+							v_k = vars.v(:,k);
+							L_k = vars.L(:,:,k);
+							constraints = [constraints;
+								% [alpha' * v_k + z * norm(L_k*alpha') - beta <= 0]:sprintf('Control Affine Chance Constraint (k=%d)', k)
+								cone([ (- alpha' * v_k + beta) / z; L_k*alpha'])
 								];
-							end
 						end
 					elseif strcmp(cc.type, 'norm')
 						% Norm chance constraint: P(||u||_2 <= gamma) >= 1-p
