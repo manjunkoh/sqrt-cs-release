@@ -127,28 +127,16 @@ end
 disp('=== Solving with SqrtQRCovarianceSteering ===');
 
 scp_params = SCPParams();
-scp_params.tol_opt = 1E-4;
+scp_params.tol_opt = 1E-3;
 scp_params.tol_feas = 1E-4;
 
 % Initial guess for SqrtQRCovarianceSteering
-clear init
+init = struct();
 
 init.S = interpolate_lower_triangular(chol(Sigma0, 'lower'), chol(SigmaN, 'lower'), N+1, 'log-cholesky');
 init.L = zeros(nu, nx, N);
 init.mu = linspace_vec(mu0, muN, N+1);
 init.v = zeros(nu, N);
-
-init.t_L = zeros(1, N);
-init.t_S = zeros(1, N);
-init.t_mu = zeros(1, N);
-init.t_v = zeros(1, N);
-
-for k = 1:N
-	init.t_L(k) = trace(init.L(:,:,k) * init.L(:,:,k)' * R);
-	init.t_S(k) = trace(init.S(:,:,k) * init.S(:,:,k)' * Q);
-	init.t_mu(k) = init.mu(:,k)' * Q * init.mu(:,k);
-	init.t_v(k) = init.v(:,k)' * R * init.v(:,k);
-end
 
 prob_qr = SqrtQRCovarianceSteeringOptimizer(init, ...
     N=N, ...

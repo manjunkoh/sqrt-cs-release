@@ -15,7 +15,7 @@ nx = 6; % triple integrator in x and y (position and velocity and acceleration)
 nu = 2; % two inputs (x and y thrust)
 nw = 6;
 
-% Build block matrices as in the figure
+% System dynamics
 I2 = eye(2);
 Z2 = zeros(2);
 A_block = [I2, dt*I2, 0*I2;
@@ -39,15 +39,15 @@ mu_i = [20; 0; 0; 0; 0; 0];
 mu_f = zeros(nx,1);
 
 % Waypoint constraints: intermediate mean positions
+waypoint_nodes = N * [1/3, 2/3];
 % At node 20: position [13, 5], at node 40: position [7, -5]
 % State is [x, y, vx, vy, ax, ay], so we only specify position (first 2 elements)
 waypoints = {
-    struct('node', 20, 'mu', [13; 5; NaN; NaN; NaN; NaN]);  % Waypoint at node 20
-    struct('node', 40, 'mu', [7; -5; NaN; NaN; NaN; NaN]);  % Waypoint at node 40
+    struct('node', waypoint_nodes(1), 'mu', [13; 5; NaN; NaN; NaN; NaN]);
+    struct('node', waypoint_nodes(2), 'mu', [7; -5; NaN; NaN; NaN; NaN]);
 };
 
 % Chance constraint parameters (boxes): example linear constraints
-% State: [x, y, vx, vy, ax, ay] for 6D triple integrator
 p_x = 0.005;
 % State constraints: x in [-3, 25], y in [-7, 7]
 alpha_x1 = [1; 0; 0; 0; 0; 0];  % x <= 25 (x is first element)
@@ -65,12 +65,12 @@ state_cc = {
 };
 
 % Objective weights
-Q = 0.01 * eye(nx);
-R = 0.1 * eye(nu);
+Q = 0.0001 * eye(nx);
+R = 0.001 * eye(nu);
 
 sdp_settings = sdpsettings('verbose', 0, 'solver', 'mosek');
 
-% block method take a lot of time and becomes infeasible. Change to false to try it.
+% block method takes a lot of time and becomes infeasible. Change to false to try it.
 skip_block = true;
 
 %% Solve with BlockCholeskySteering
@@ -146,7 +146,8 @@ prob_qr = SqrtQRCovarianceSteering(init, ...
     mu_0=mu_i, mu_f=mu_f);
 
 scp_params = SCPParams();
-scp_params.tol_opt = 1E-3;
+scp_params.k_max = 100;
+scp_params.tol_opt = 1E-2;
 scp_params.tol_feas = 1E-4;
 
 prob_qr.D = 0.1 * eye(6);

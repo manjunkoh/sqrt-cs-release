@@ -1,8 +1,7 @@
 %% Scalability vs Horizon Size: 2D Double Integrator with Cone Constraints
 % Based on example_cone_path.m
 % Fixed total horizon time; dt changes with N
-clear;
-clc;
+clear; clc;
 addpath ./SCvxStar/src/
 addpath(genpath('./utils'))
 addpath('./src')
@@ -11,8 +10,8 @@ figure_settings
 
 % Fixed total time and horizon sizes to test
 T_total = 4.0;                  % total time [s] (N=20 with dt=0.2 gives T=4.0)
-N_list = [120];      % different horizon lengths to test
-num_trials = 3;                 % trials per N for averaging
+N_list = [40];      % different horizon lengths to test
+num_trials = 1;                 % trials per N for averaging
 
 % Problem dimensions for 2D double integrator
 nx = 4; % [x, y, vx, vy]
@@ -21,7 +20,7 @@ nw = 4; % process noise dimension same as state
 
 % SCP parameters for the square root method
 scp_params = SCPParams();
-scp_params.tol_opt = 1E-4;
+scp_params.tol_opt = 1E-3;
 scp_params.tol_feas = 1E-4;
 scp_params.k_max = 100;
 
@@ -172,19 +171,7 @@ for iN = 1:length(N_list)
         init.mu = linspace_vec(mu0, muN, N+1);
         init.v = zeros(nu, N);
 
-        % init.t_L = zeros(1, N);
-        % init.t_S = zeros(1, N);
-        % init.t_mu = zeros(1, N);
-        % init.t_v = zeros(1, N);
-        % 
-        % for k = 1:N
-        %     init.t_L(k) = trace(init.L(:,:,k) * init.L(:,:,k)' * R);
-        %     init.t_S(k) = trace(init.S(:,:,k) * init.S(:,:,k)' * Q);
-        %     init.t_mu(k) = init.mu(:,k)' * Q * init.mu(:,k);
-        %     init.t_v(k) = init.v(:,k)' * R * init.v(:,k);
-        % end
-
-        prob_qr = SqrtQRCovarianceSteering(init, ...
+        prob_qr = SqrtQRCovarianceSteeringOptimizer(init, ...
             N=N, ...
             A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
             P_0=Sigma0, P_f=SigmaN, Q=Q, R=R, ...

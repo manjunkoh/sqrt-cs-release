@@ -1,7 +1,6 @@
 %% Scalability vs Horizon Size: 3D Double Integrator System
 % Fixed total horizon time; dt changes with N
-clear;
-clc;
+clear; clc;
 addpath ./SCvxStar/src/
 addpath(genpath('./utils'))
 addpath('./src')
@@ -10,7 +9,7 @@ figure_settings
 
 % Fixed total time and horizon sizes to test
 T_total = 3.0;                  % total time [s]
-N_list = [10, 20, 40, 80];      % different horizon lengths to test
+N_list = [10, 20, 40, 80, 160]; % different horizon lengths to test
 num_trials = 3;                % trials per N for averaging
 
 % Problem dimensions for 3D double integrator
@@ -155,6 +154,7 @@ for iN = 1:length(N_list)
         end
 
         % Initial guess for SqrtQR method
+        init = struct();
         init.S = interpolate_lower_triangular(chol(Sigma0, 'lower'), chol(SigmaN, 'lower'), N+1, 'log-cholesky');
         init.L = zeros(nu, nx, N);
         init.mu = zeros(nx, N+1);
@@ -228,12 +228,31 @@ end
 avg_full = mean(results.fullcov_time, 2);
 avg_block = mean(results.blockcholesky_time, 2);
 avg_qr = zeros(length(N_list), 1);
+min_full = zeros(length(N_list), 1);
+max_full = zeros(length(N_list), 1);
+min_block = zeros(length(N_list), 1);
+max_block = zeros(length(N_list), 1);
+min_qr = zeros(length(N_list), 1);
+max_qr = zeros(length(N_list), 1);
 for iN = 1:length(N_list)
+    % Full covariance: min and max
+    min_full(iN) = min(results.fullcov_time(iN, :));
+    max_full(iN) = max(results.fullcov_time(iN, :));
+    
+    % Block Cholesky: min and max
+    min_block(iN) = min(results.blockcholesky_time(iN, :));
+    max_block(iN) = max(results.blockcholesky_time(iN, :));
+    
+    % SqrtQR: average, min and max over valid trials
     times = results.sqrtqr_time(iN, results.sqrtqr_time(iN, :) > 0);
     if ~isempty(times)
         avg_qr(iN) = mean(times);
+        min_qr(iN) = min(times);
+        max_qr(iN) = max(times);
     else
         avg_qr(iN) = NaN;
+        min_qr(iN) = NaN;
+        max_qr(iN) = NaN;
     end
 end
 
@@ -269,9 +288,19 @@ end
 
 %% Plot runtime
 figure(Position=[0, 0, 20, 12]);
-loglog(N_list, avg_full, 'o-', 'Color', '#0082B2', 'LineWidth', 2, 'MarkerSize', 8); hold on;
-loglog(N_list, avg_block, '^-', 'Color', '#D55E00', 'LineWidth', 2, 'MarkerSize', 8); hold on;
-loglog(N_list, avg_qr, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8);
+% Calculate error bar values (distance from mean to min/max)
+err_full_lower = avg_full - min_full;
+err_full_upper = max_full - avg_full;
+err_block_lower = avg_block - min_block;
+err_block_upper = max_block - avg_block;
+err_qr_lower = avg_qr - min_qr;
+err_qr_upper = max_qr - avg_qr;
+
+% Plot with error bars
+errorbar(N_list, avg_full, err_full_lower, err_full_upper, 'o-', 'Color', '#0082B2', 'LineWidth', 2, 'MarkerSize', 8, 'CapSize', 6); hold on;
+errorbar(N_list, avg_block, err_block_lower, err_block_upper, '^-', 'Color', '#D55E00', 'LineWidth', 2, 'MarkerSize', 8, 'CapSize', 6); hold on;
+errorbar(N_list, avg_qr, err_qr_lower, err_qr_upper, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8, 'CapSize', 6);
+set(gca, 'XScale', 'log', 'YScale', 'log');
 grid on;
 xlabel('Horizon length N');
 ylabel('Average runtime (s)');

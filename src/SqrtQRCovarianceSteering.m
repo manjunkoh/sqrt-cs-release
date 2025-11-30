@@ -36,9 +36,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 		mu % state mean trajectory, set after solving
 		v  % control mean trajectory, set after solving
 
-		mean_trust_region_radius = 0.1;
-		impose_mean_trust_region = false;
-		mu_ref = []; % reference mean trajectory, used for mean trust region
 	end
 
 	methods
@@ -59,9 +56,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				options.mu_0 = []
 				options.mu_f = []
 				options.waypoints = {}
-				options.mean_trust_region_radius = 0.1;
-				options.impose_mean_trust_region = false;
-				options.mu_ref = [];
 				options.D = [] % Trust region scaling matrix. If empty, defaults to scalar 1
 			end
 			obj@SCPProblem();
@@ -79,9 +73,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			obj.Q = options.Q;
 			obj.R = options.R;
 			obj.objective_type = options.objective_type;
-			obj.mean_trust_region_radius = options.mean_trust_region_radius;
-			obj.impose_mean_trust_region = options.impose_mean_trust_region;
-			obj.mu_ref = options.mu_ref;
 			% optional chance constraints and endpoint means
 			obj.chance_constraints_state = options.chance_constraints_state;
 			obj.chance_constraints_control = options.chance_constraints_control;
@@ -325,11 +316,6 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 
 			end
 
-			if obj.impose_mean_trust_region
-				constraints = [constraints;
-					norm(vec(vars.mu - obj.mu_ref), inf) <= obj.mean_trust_region_radius
-				];
-			end
 		end
 
 		function constraintLHS = noncvx_eq(obj, vars)

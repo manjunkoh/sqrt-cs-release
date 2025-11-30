@@ -1,6 +1,6 @@
 % Square root covariance steering optimizer with YALMIP optimizer capability
 % This class inherits from SqrtQRCovarianceSteering and uses YALMIP's optimizer
-% functionality to accelerate the algorithm by pre-compiling the optimization problem
+% functionality to accelerate the algorithm by "pre-compiling" the optimization problem
 classdef SqrtQRCovarianceSteeringOptimizer < SqrtQRCovarianceSteering
 
 	properties 
