@@ -287,7 +287,7 @@ for iN = 1:length(N_list)
 end
 
 %% Plot runtime
-figure(Position=[0, 0, 20, 12]);
+figure(Position=[0, 0, 11, 12]);
 % Calculate error bar values (distance from mean to min/max)
 err_full_lower = avg_full - min_full;
 err_full_upper = max_full - avg_full;
@@ -305,24 +305,26 @@ grid on;
 xlabel('Horizon length N');
 ylabel('Average runtime (s)');
 xticks(N_list)
-legend('Liu et al. (2025)', 'Okamoto \& Tsiotras (2019)', 'Proposed method', 'Location', 'northwest', 'EdgeColor', 'none');
-exportgraphics(gcf, 'figures/horizon_size_scalability.png', Resolution=300)
-exportgraphics(gcf, 'figures/horizon_size_scalability.pdf', ContentType='vector')
+legend('Liu et al.', 'Okamoto \& Tsiotras', 'Proposed method', 'Location', 'northwest', 'EdgeColor', 'none', 'BackgroundAlpha', 0.2, 'IconColumnWidth', 15);
+% exportgraphics(gcf, 'figures/horizon_size_scalability_small.png', Resolution=300)
+exportgraphics(gcf, 'figures/horizon_size_scalability_small.pdf', ContentType='vector')
 
 %% Plot objective function values
-figure(Position=[0, 0, 20, 12]);
-semilogy(N_list, avg_block_opt./avg_full_opt, '^-', 'Color', '#D55E00', 'LineWidth', 2, 'MarkerSize', 8); hold on;
-semilogy(N_list, avg_qr_opt./avg_full_opt, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8);
+figure(Position=[0, 0, 11, 12]);
+plot(N_list, avg_block_opt./avg_full_opt, '^-', 'Color', '#D55E00', 'LineWidth', 2, 'MarkerSize', 8); hold on;
+plot(N_list, avg_qr_opt./avg_full_opt, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8);
 grid on;
 xlabel('Horizon length N');
 ylabel('Cost ratio to Liu et al.');
 xticks(N_list)
-lgd = legend('Okamoto \& Tsiotras (2019)', 'Proposed method', 'Location', 'west', 'EdgeColor', 'none');
+lgd = legend('Okamoto \& Tsiotras', 'Proposed method', 'Location', 'west', 'EdgeColor', 'none', 'BackgroundAlpha', 0.2, 'IconColumnWidth', 15);
 xlim([N_list(1) N_list(end)])
 ylim([0.99, max(avg_block_opt./avg_full_opt)])
+xscale log
 
-exportgraphics(gcf, 'figures/horizon_size_cost_comparision.png', Resolution=300)
-exportgraphics(gcf, 'figures/horizon_size_cost_comparision.pdf', ContentType='vector')
+% exportgraphics(gcf, 'figures/horizon_size_cost_comparision_small.png', Resolution=300)
+exportgraphics(gcf, 'figures/horizon_size_cost_comparision_small.pdf', ContentType='vector')
+
 %%
 save('data/horizon_size_scalability_results.mat', 'results', 'T_total', 'N_list');
 fprintf('\nSaved results to /data/horizon_size_scalability_results.mat\n');
