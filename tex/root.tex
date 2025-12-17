@@ -33,14 +33,13 @@
 \maketitle
 
 \begin{abstract}
-We propose a novel method for solving the discrete-time chance-constrained covariance steering problem. We explicitly write the propagation equations of the covariance matrix Cholesky factor using the QR decomposition. Due to this nonconvex representation, the problem is solved iteratively via sequential convex programming. 
-Specifically when chance constraints are not present and the objective function is quadratic, the converged solution obtained from this method is shown to be globally optimal. 
-In general, the locally optimal solution obtained from this method corresponds to a local optimum obtained with existing methods where the covariance matrices are represented in its original form.
-Compared to methods that require large block matrix formulations, the proposed method scales much better with the growth in horizon length, shows better optimality, and employs a memoryless state feedback control law. Compared to methods that explicitly define the covariance matrix as variables, the proposed method is free of proofs of convexification that rely on a specific objective function form, and shows better numerical reliability due to working with the square root of the covariance matrix.
+Covariance steering is an optimal control method that optimizes for a control policy which drives the state's mean and covariance matrix to desired values. We consider the discrete-time, linear time-varying case; the state has Gaussian initial state distribution and Gaussian noise corrupts the dynamics; the state and control are chance-constrained by affine and norm constraints. The contribution of this paper is a novel solution method for this problem. Our method explicitly writes the propagation equations of the Cholesky factor of the state covariance matrix by using the QR decomposition. As in other methods that assume a memoryless state feedback, our solution uses sequential convex programming. We prove that the algorithm converges to a local minimum, and that the local optimality is invariant to the representation of the covariance matrix in its standard form or the QR-factorized form.
+For the special case when chance constraints are absent and the objective function is an expectation-of-quadratic, we show that the converged solution is globally optimal. 
+Compared to solution methods that require large block matrix formulations, the proposed method scales better with the growth in horizon length, shows better optimality, and uses a memoryless state feedback control law. Compared to another class of methods that explicitly define the covariance matrix as variables, the proposed method allows flexible cost formulations and shows better numerical reliability when uncertainty terms are smaller than the mean.
 \end{abstract}
 
 \begin{IEEEkeywords}
-	Chance constraints, covariance steering, QR decomposition, sequential convex programming, square root filtering.
+	Stochastic optimal control, semidefinite programming, sequential convex programming.
 \end{IEEEkeywords}
 
 \section{Introduction}
@@ -617,7 +616,7 @@ where \( K_k, P_k \) are the solution of the optimization, and
 This supports our hypothesis: by working with the covariance matrix which necessarily squares the units of deviation, numerical solvers are more likely to encounter problems. We also tested with alternative objective functions, such as the EoQ form, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. 
 
 \section{Conclusions}
-Defining the Cholesky factor of the covariance matrix as the dependent variable in covariance steering brings several benefits. It allows flexibility in cost formulation beyond the quadratic form, and provides numerical reliability for real-world problems with small variance components. Its computational complexity with respect to horizon length shows mild growth, while achieving good optimality, all while employing a memoryless state feedback control law. For the unconstrained problem without chance constraints, the converged solution reaches the global optimum.
+This paper presents a new solution method for chance-constrained covariance steering. The presented method addresses the drawbacks in existing solution methods, namely: numerical ill-conditioning and cost formulation inflexibility in the full covariance method as well as computational complexity in the block-matrix method. The key innovation lies in formulating the problem using the Cholesky factor of covariance matrix, inspired by the literature on square root filtering. We then show the optimality properties of the proposed method; in the special case where the cost takes the quadratic form and no chance constraint is present, the solution is globally optimal, while in general the solution is locally optimal. The proof leverages techniques from manifold topology. Numerical examples support our theoretical claims of optimality and numerical reliability, and demonstrate \textr{good} scalability to larger horizon sizes.
 
 % \section{Appendix}
 
