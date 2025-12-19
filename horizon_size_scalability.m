@@ -288,25 +288,39 @@ end
 
 %% Plot runtime
 figure(Position=[0, 0, 11, 12]);
-% Calculate error bar values (distance from mean to min/max)
-err_full_lower = avg_full - min_full;
-err_full_upper = max_full - avg_full;
-err_block_lower = avg_block - min_block;
-err_block_upper = max_block - avg_block;
-err_qr_lower = avg_qr - min_qr;
-err_qr_upper = max_qr - avg_qr;
+hold on;
 
-% Plot with error bars
-errorbar(N_list, avg_full, err_full_lower, err_full_upper, 'o-', 'Color', '#0082B2', 'LineWidth', 2, 'MarkerSize', 8, 'CapSize', 6); hold on;
-errorbar(N_list, avg_block, err_block_lower, err_block_upper, '^-', 'Color', '#D55E00', 'LineWidth', 2, 'MarkerSize', 8, 'CapSize', 6); hold on;
-errorbar(N_list, avg_qr, err_qr_lower, err_qr_upper, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8, 'CapSize', 6);
+% Create shaded regions (light grey) for min-max ranges
+% Full covariance method
+x_fill_full = [N_list, fliplr(N_list)];
+y_fill_full = [min_full', fliplr(max_full')];
+fill(x_fill_full, y_fill_full, [0.8, 0.8, 0.8], 'EdgeColor', 'none', 'FaceAlpha', 0.6, HandleVisibility='off');
+
+% Block Cholesky method
+x_fill_block = [N_list, fliplr(N_list)];
+y_fill_block = [min_block', fliplr(max_block')];
+fill(x_fill_block, y_fill_block, [0.8, 0.8, 0.8], 'EdgeColor', 'none', 'FaceAlpha', 0.6, HandleVisibility='off');
+
+% SqrtQR method (only where valid)
+valid_qr_idx = ~isnan(avg_qr);
+if any(valid_qr_idx)
+    x_fill_qr = [N_list(valid_qr_idx), fliplr(N_list(valid_qr_idx))];
+    y_fill_qr = [min_qr(valid_qr_idx)', fliplr(max_qr(valid_qr_idx)')];
+    fill(x_fill_qr, y_fill_qr, [0.8, 0.8, 0.8], 'EdgeColor', 'none', 'FaceAlpha', 0.6, HandleVisibility='off');
+end
+
+% Plot mean lines
+plot(N_list, avg_full, 'o-', 'Color', '#0082B2', 'LineWidth', 2, 'MarkerSize', 8, DisplayName='Liu et al.');
+plot(N_list, avg_block, '^-', 'Color', '#D55E00', 'LineWidth', 2, 'MarkerSize', 8, DisplayName='Okamoto \& Tsiotras');
+plot(N_list, avg_qr, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8, DisplayName='Proposed method');
+
 set(gca, 'XScale', 'log', 'YScale', 'log');
 grid on;
 xlabel('Horizon length N');
 ylabel('Average runtime (s)');
 xticks(N_list)
-legend('Liu et al.', 'Okamoto \& Tsiotras', 'Proposed method', 'Location', 'northwest', 'EdgeColor', 'none', 'BackgroundAlpha', 0.2, 'IconColumnWidth', 15);
-% exportgraphics(gcf, 'figures/horizon_size_scalability_small.png', Resolution=300)
+legend('Location', 'northwest', 'EdgeColor', 'none', 'BackgroundAlpha', 0.2, 'IconColumnWidth', 15);
+exportgraphics(gcf, 'figures/horizon_size_scalability_small.png', Resolution=300)
 exportgraphics(gcf, 'figures/horizon_size_scalability_small.pdf', ContentType='vector')
 
 %% Plot objective function values
