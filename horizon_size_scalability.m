@@ -1,5 +1,7 @@
 %% Scalability vs Horizon Size: 3D Double Integrator System
 % Fixed total horizon time; dt changes with N
+% To produce plots without rerunning the simulation, load
+% data/horizon_size_scalability_results.mat
 clear; clc;
 addpath ./SCvxStar/src/
 addpath(genpath('./utils'))
@@ -7,6 +9,7 @@ addpath('./src')
 
 figure_settings
 
+%%
 % Fixed total time and horizon sizes to test
 T_total = 3.0;                  % total time [s]
 N_list = [10, 20, 40, 80, 160]; % different horizon lengths to test
@@ -294,19 +297,19 @@ hold on;
 % Full covariance method
 x_fill_full = [N_list, fliplr(N_list)];
 y_fill_full = [min_full', fliplr(max_full')];
-fill(x_fill_full, y_fill_full, [0.8, 0.8, 0.8], 'EdgeColor', 'none', 'FaceAlpha', 0.6, HandleVisibility='off');
+fill(x_fill_full, y_fill_full, "", 'FaceColor', '#0082B2', 'EdgeColor', 'none', 'FaceAlpha', 0.3, HandleVisibility='off');
 
 % Block Cholesky method
 x_fill_block = [N_list, fliplr(N_list)];
 y_fill_block = [min_block', fliplr(max_block')];
-fill(x_fill_block, y_fill_block, [0.8, 0.8, 0.8], 'EdgeColor', 'none', 'FaceAlpha', 0.6, HandleVisibility='off');
+fill(x_fill_block, y_fill_block, "", 'FaceColor', '#D55E00', 'EdgeColor', 'none', 'FaceAlpha', 0.3, HandleVisibility='off');
 
 % SqrtQR method (only where valid)
 valid_qr_idx = ~isnan(avg_qr);
 if any(valid_qr_idx)
     x_fill_qr = [N_list(valid_qr_idx), fliplr(N_list(valid_qr_idx))];
     y_fill_qr = [min_qr(valid_qr_idx)', fliplr(max_qr(valid_qr_idx)')];
-    fill(x_fill_qr, y_fill_qr, [0.8, 0.8, 0.8], 'EdgeColor', 'none', 'FaceAlpha', 0.6, HandleVisibility='off');
+    fill(x_fill_qr, y_fill_qr, "", 'FaceColor', '#000000', 'EdgeColor', 'none', 'FaceAlpha', 0.3, HandleVisibility='off');
 end
 
 % Plot mean lines
@@ -336,7 +339,7 @@ xlim([N_list(1) N_list(end)])
 ylim([0.99, max(avg_block_opt./avg_full_opt)])
 xscale log
 
-% exportgraphics(gcf, 'figures/horizon_size_cost_comparision_small.png', Resolution=300)
+exportgraphics(gcf, 'figures/horizon_size_cost_comparision_small.png', Resolution=300)
 exportgraphics(gcf, 'figures/horizon_size_cost_comparision_small.pdf', ContentType='vector')
 
 %%
