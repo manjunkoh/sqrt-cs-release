@@ -131,9 +131,9 @@ classdef SCvxStar < handle
 
                 end
 
-                if obj.check_close_to_optimum(iter, last_checked_close_to_optimum)
+                % if obj.check_close_to_optimum(iter, last_checked_close_to_optimum)
                     % beep;
-                    disp('Recent iterations satisfy feasibility tolerance but objective function seems to be jumping around.')
+                    % disp('Recent iterations satisfy feasibility tolerance but objective function seems to be jumping around.')
                     % user_input = input('\nTo accept the best solution found so far, input y. Press any other key to continue: ', 's');
                     % switch user_input
                     %     case 'y'
@@ -147,7 +147,7 @@ classdef SCvxStar < handle
                     %     otherwise
                     %         last_checked_close_to_optimum = iter;
                     % end
-                end
+                % end
 
                 if obj.check_numerical(iter)
                     obj.fprintf_verbose(verbose, '\nNumerical issues detected. Exiting...\n');
@@ -160,22 +160,23 @@ classdef SCvxStar < handle
                 obj.this_iter = next_iter;
             end
 
-            obj.fprintf_verbose(verbose, '\nReached %i iterations. To continue, input the number of additional iterations.', obj.constParams.k_max);
-            beep;
+            % obj.fprintf_verbose(verbose, '\nReached %i iterations. To continue, input the number of additional iterations.', obj.constParams.k_max);
+            % beep;
 
             % Get user input for the number of additional iterations
-            additional_iters = input('Additional iterations: ');
-            if isempty(additional_iters)
-                obj.create_report(iter, false, SCPCode.REACHED_MAX_ITERS);
-                return;
-            end
+            % additional_iters = input('Additional iterations: ');
+            % if isempty(additional_iters)
+            obj.fprintf_verbose(verbose, '\nReached %i iterations. Exiting...\n', obj.constParams.k_max);
+            obj.create_report(iter, false, SCPCode.REACHED_MAX_ITERS);
+            return;
+            % end
 
-            while ~isnumeric(additional_iters) || additional_iters < 0
-                disp('Input a valid number');
-                additional_iters = input('Additional iterations: ');
-            end
+            % while ~isnumeric(additional_iters) || additional_iters < 0
+            %     disp('Input a valid number');
+            %     additional_iters = input('Additional iterations: ');
+            % end
 
-            obj.constParams.k_max = obj.constParams.k_max + additional_iters;
+            % obj.constParams.k_max = obj.constParams.k_max + additional_iters;
 
         end          
 
