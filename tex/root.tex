@@ -25,8 +25,7 @@
 
 \title{Square Root QR Covariance Steering}
 \author{Naoya Kumagai, \IEEEmembership{Graduate Student Member, IEEE}, Kenshiro Oguri, \IEEEmembership{Member, IEEE}
-\thanks{This material is based upon work supported by the Air Force Office of Scientific Research under award number FA9550-23-10512. N. Kumagai acknowledges support for his graduate studies from the Shigeta Education Fund.}
-\thanks{N. Kumagai and K. Oguri are with the School of Aeronautics and Astronautics, Purdue University, West Lafayette, IN 47907 USA (e-mail: nkumagai@purdue.edu, koguri@purdue.edu).}}
+\thanks{This material is based upon work supported by the Air Force Office of Scientific Research under award number FA9550-23-10512. N. K. acknowledges support for his graduate studies from the Shigeta Education Fund. The authors are with the School of Aeronautics and Astronautics, Purdue University, West Lafayette, IN 47907 USA (\{nkumagai, koguri\}@purdue.edu).}}
 
 \begin{document}
 
@@ -600,10 +599,7 @@ For this problem, the covariance dynamics are largely violated, according to a m
 \begin{equation}
 	\text{Loss}_k = \norm{\phi(K_k, P_k) - P_{k+1}}_F / \norm{P_{k+1}}_F
 \end{equation}
-where \( K_k, P_k \) are the solution of the optimization, and
-\begin{equation}
-	\phi(K_k, P_k) := (A_k + B_k K_k) P_k (A_k + B_k K_k)^\top + G_k G_k^\top.
-\end{equation}
+where \( K_k, P_k \) are the solution of the optimization, and $\phi(K_k, P_k)$ is the RHS of \cref{eq:full_covariance_propagation}.
 \cref{fig:example_cwh_covariance_propagation_loss} shows the loss for the two methods, showing the superior accuracy of the proposed method's covariance propagation; using tighter convergence tolerance for the proposed method can further improve the accuracy if desired.
 
 \begin{figure}[ht]
