@@ -1,0 +1,355 @@
+%% Scalability vs Horizon Size: Random System Dynamics
+% Fixed total horizon time; dt changes with N
+% Uses MATLAB's drss command to generate random discrete-time systems
+% To produce plots without rerunning the simulation, load
+% data/horizon_size_scalability_random_results.mat
+clear; clc;
+addpath ./SCvxStar/src/
+addpath(genpath('./utils'))
+addpath('./src')
+
+figure_settings
+
+%%
+% Fixed total time and horizon sizes to test
+N_list = [30]; % different horizon lengths to test
+num_trials = 20;                % trials per N for averaging
+
+% Problem dimensions for random system
+nx = 6;  % State dimension
+nu = 3;  % Input dimension (nx/2)
+nw = nx; % Noise dimension
+
+% SCP parameters for the square root method
+scp_params = SCPParams();
+scp_params.tol_opt = 1E-3;
+scp_params.tol_feas = 1E-5;
+scp_params.k_max = 150;
+
+% Results storage
+results = struct();
+results.N_list = N_list;
+results.sqrtqr_time = zeros(length(N_list), num_trials);
+results.fullcov_time = zeros(length(N_list), num_trials);
+results.fullcov_solvertime = zeros(length(N_list), num_trials);
+results.fullcov_yalmiptime = zeros(length(N_list), num_trials);
+results.blockcholesky_time = zeros(length(N_list), num_trials);
+results.blockcholesky_solvertime = zeros(length(N_list), num_trials);
+results.blockcholesky_yalmiptime = zeros(length(N_list), num_trials);
+results.sqrtqr_status = cell(length(N_list), num_trials);
+results.fullcov_status = cell(length(N_list), num_trials);
+results.blockcholesky_status = cell(length(N_list), num_trials);
+results.sqrtqr_opt = NaN(length(N_list), num_trials);
+results.fullcov_opt = NaN(length(N_list), num_trials);
+results.blockcholesky_opt = NaN(length(N_list), num_trials);
+results.sqrtqr_success = false(length(N_list), num_trials);
+
+fprintf('Scalability across horizon sizes with random system dynamics\n');
+fprintf('State size: nx=%d, nu=%d, nw=%d\n', nx, nu, nw);
+fprintf('Horizon sizes: %s\n', mat2str(N_list));
+fprintf('Trials per setting: %d\n\n', num_trials);
+
+%%
+rng(1)
+
+for iN = 1:length(N_list)
+    N = N_list(iN);
+    fprintf('============================================================\n');
+    fprintf('Testing N = %d\n', N);
+
+    for trial = 1:num_trials
+        fprintf('  Trial %2d/%2d ... ', trial, num_trials);
+        
+        % Generate random discrete-time system using drss
+        sys = drss(nx, nx, nu);
+        A = sys.A;
+        B = sys.B;
+
+        % Time-invariant replication along horizon
+        A_sys = repmat(A, [1, 1, N]);
+        B_sys = repmat(B, [1, 1, N]);
+
+        % Process noise matrix
+        q = 0.05; % base spectral density
+        G = sqrt(q) * eye(nw);
+        G_sys = repmat(G, [1, 1, N]);
+
+        % Covariance boundary conditions
+        Sigma0 = eye(nx);
+        SigmaN = 0.5 * Sigma0;
+
+        % Objective weights
+        Q = 0.1 * eye(nx);
+        R = eye(nu);
+
+        % Full covariance method
+        prob_full = FullCovarianceSteering( ...
+            A=A_sys, B=B_sys, G=G_sys, ...
+            P_0=Sigma0, P_f=SigmaN, ...
+            Q=Q, R=R, ...
+            N=N);
+
+        t_full = tic;
+        diag_full = prob_full.solve();
+        results.fullcov_time(iN, trial) = toc(t_full);
+        
+        % Store solver and YALMIP times from diagnostics
+        if isfield(diag_full, 'solvertime')
+            results.fullcov_solvertime(iN, trial) = diag_full.solvertime;
+        end
+        if isfield(diag_full, 'yalmiptime')
+            results.fullcov_yalmiptime(iN, trial) = diag_full.yalmiptime;
+        end
+
+        % Interpret status and optimal value
+        switch diag_full.problem
+            case 0
+                results.fullcov_status{iN, trial} = 'SOLVED';
+                results.fullcov_opt(iN, trial) = prob_full.optimal_objective;
+            case 1
+                results.fullcov_status{iN, trial} = 'INFEASIBLE';
+            case 4
+                results.fullcov_status{iN, trial} = 'NUMERICAL';
+                results.fullcov_opt(iN, trial) = prob_full.optimal_objective;
+            otherwise
+                results.fullcov_status{iN, trial} = sprintf('ERR%d', diag_full.problem);
+        end
+
+        % Block Cholesky method
+        % prob_block = BlockCholeskySteering( ...
+        %     A=A_sys, B=B_sys, G=G_sys, ...
+        %     P_0=Sigma0, P_f=SigmaN, ...
+        %     Q=Q, R=R, ...
+        %     N=N);
+        % 
+        % t_block = tic;
+        % diag_block = prob_block.solve();
+        % results.blockcholesky_time(iN, trial) = toc(t_block);
+        % 
+        % % Store solver and YALMIP times from diagnostics
+        % if isfield(diag_block, 'solvertime')
+        %     results.blockcholesky_solvertime(iN, trial) = diag_block.solvertime;
+        % end
+        % if isfield(diag_block, 'yalmiptime')
+        %     results.blockcholesky_yalmiptime(iN, trial) = diag_block.yalmiptime;
+        % end
+        % 
+        % % Interpret status and optimal value for block Cholesky
+        % switch diag_block.problem
+        %     case 0
+        %         results.blockcholesky_status{iN, trial} = 'SOLVED';
+        %         results.blockcholesky_opt(iN, trial) = prob_block.optimal_objective;
+        %     case 1
+        %         results.blockcholesky_status{iN, trial} = 'INFEASIBLE';
+        %     case 4
+        %         results.blockcholesky_status{iN, trial} = 'NUMERICAL';
+        %         results.blockcholesky_opt(iN, trial) = prob_block.optimal_objective;
+        %     otherwise
+        %         results.blockcholesky_status{iN, trial} = sprintf('ERR%d', diag_block.problem);
+        % end
+
+        % If clearly problematic (not numerical), skip QR to keep stats clean
+        % if diag_full.problem && diag_full.problem ~= 4
+        %     fprintf('full=%s (%.2fs), block=%s (%.2fs), skip QR\n', ...
+        %         results.fullcov_status{iN, trial}, results.fullcov_time(iN, trial), ...
+        %         results.blockcholesky_status{iN, trial}, results.blockcholesky_time(iN, trial));
+        %     continue;
+        % end
+
+        % Initial guess for SqrtQR method
+        init = struct();
+        init.S = interpolate_lower_triangular(chol(Sigma0, 'lower'), chol(SigmaN, 'lower'), N+1, 'log-cholesky');
+        init.L = zeros(nu, nx, N);
+        init.mu = zeros(nx, N+1);
+        init.v = zeros(nu, N);
+
+        prob = SqrtQRCovarianceSteering(init, ...
+            N=N, ...
+            A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
+            P_0=Sigma0, P_f=SigmaN, Q=Q, R=R, ...
+            objective_type='LQR');
+
+        flag = prob.solve(save_bool=false, scp_params=scp_params, verbose=true);
+        if flag
+            prob.postprocess();
+        end
+        results.sqrtqr_time(iN, trial) = seconds(prob.scp.report.time);
+        results.sqrtqr_success(iN, trial) = flag;
+        results.sqrtqr_status{iN, trial} = SCPCode.toString(prob.scp.report.code);
+        if flag
+            results.sqrtqr_opt(iN, trial) = prob.optimal_objective;
+        end
+
+        fprintf('full=%s (%.2fs), block=%s (%.2fs), qr=%s (%.2fs)\n', ...
+            results.fullcov_status{iN, trial}, results.fullcov_time(iN, trial), ...
+            results.blockcholesky_status{iN, trial}, results.blockcholesky_time(iN, trial), ...
+            results.sqrtqr_status{iN, trial}, results.sqrtqr_time(iN, trial));
+    end
+
+    % Summary per N
+    valid_qr = results.sqrtqr_time(iN, results.sqrtqr_time(iN, :) > 0);
+    if ~isempty(valid_qr)
+        fprintf('  QR avg time: %.2f s\n', mean(valid_qr));
+    end
+    fprintf('  FullCov avg time: %.2f s\n', mean(results.fullcov_time(iN, :)));
+    % fprintf('  BlockCholesky avg time: %.2f s\n\n', mean(results.blockcholesky_time(iN, :)));
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Console table summary
+fprintf('\n=== TERMINATION AND TIME SUMMARY (Random Dynamics) ===\n');
+fprintf(' N  | FullCov | BlockChol | SqrtQR  | FullCovOptVal | BlockCholOptVal | SqrtQROptVal | FullTime(s) | BlockTime(s) | QRTime(s)\n');
+fprintf('----|---------|-----------|---------|---------------|-----------------|--------------|-------------|--------------|----------\n');
+for iN = 1:length(N_list)
+    N = N_list(iN);
+    for trial = 1:num_trials
+        cov_opt_str = 'N/A';
+        if ~isnan(results.fullcov_opt(iN, trial))
+            cov_opt_str = sprintf('%.2e', results.fullcov_opt(iN, trial));
+        end
+        block_opt_str = 'N/A';
+        if ~isnan(results.blockcholesky_opt(iN, trial))
+            block_opt_str = sprintf('%.2e', results.blockcholesky_opt(iN, trial));
+        end
+        qr_opt_str = 'N/A';
+        if ~isnan(results.sqrtqr_opt(iN, trial))
+            qr_opt_str = sprintf('%.2e', results.sqrtqr_opt(iN, trial));
+        end
+        fprintf('%3d | %-7s | %-9s | %-7s | %13s | %15s | %12s | %10.2f | %12.2f | %8.2f\n', ...
+            N, ...
+            results.fullcov_status{iN, trial}, ...
+            results.blockcholesky_status{iN, trial}, ...
+            results.sqrtqr_status{iN, trial}, ...
+            cov_opt_str, block_opt_str, qr_opt_str, ...
+            results.fullcov_time(iN, trial), ...
+            results.blockcholesky_time(iN, trial), ...
+            results.sqrtqr_time(iN, trial));
+    end
+    if iN < length(N_list)
+        fprintf('----|---------|---------|-----------|---------|---------------|-----------------|--------------|-------------|--------------|----------\n');
+    end
+end
+
+%% Simple plot: average times vs N
+avg_full = mean(results.fullcov_time, 2);
+avg_block = mean(results.blockcholesky_time, 2);
+avg_qr = zeros(length(N_list), 1);
+min_full = zeros(length(N_list), 1);
+max_full = zeros(length(N_list), 1);
+min_block = zeros(length(N_list), 1);
+max_block = zeros(length(N_list), 1);
+min_qr = zeros(length(N_list), 1);
+max_qr = zeros(length(N_list), 1);
+for iN = 1:length(N_list)
+    % Full covariance: min and max
+    min_full(iN) = min(results.fullcov_time(iN, :));
+    max_full(iN) = max(results.fullcov_time(iN, :));
+    
+    % Block Cholesky: min and max
+    min_block(iN) = min(results.blockcholesky_time(iN, :));
+    max_block(iN) = max(results.blockcholesky_time(iN, :));
+    
+    % SqrtQR: average, min and max over valid trials
+    times = results.sqrtqr_time(iN, results.sqrtqr_time(iN, :) > 0);
+    if ~isempty(times)
+        avg_qr(iN) = mean(times);
+        min_qr(iN) = min(times);
+        max_qr(iN) = max(times);
+    else
+        avg_qr(iN) = NaN;
+        min_qr(iN) = NaN;
+        max_qr(iN) = NaN;
+    end
+end
+
+% Compute average objective values
+avg_full_opt = zeros(length(N_list), 1);
+avg_block_opt = zeros(length(N_list), 1);
+avg_qr_opt = zeros(length(N_list), 1);
+for iN = 1:length(N_list)
+    % Full covariance: average over non-NaN values
+    valid_full = results.fullcov_opt(iN, ~isnan(results.fullcov_opt(iN, :)));
+    if ~isempty(valid_full)
+        avg_full_opt(iN) = mean(valid_full);
+    else
+        avg_full_opt(iN) = NaN;
+    end
+    
+    % Block Cholesky: average over non-NaN values
+    valid_block = results.blockcholesky_opt(iN, ~isnan(results.blockcholesky_opt(iN, :)));
+    if ~isempty(valid_block)
+        avg_block_opt(iN) = mean(valid_block);
+    else
+        avg_block_opt(iN) = NaN;
+    end
+    
+    % SqrtQR: average over non-NaN values
+    valid_qr = results.sqrtqr_opt(iN, ~isnan(results.sqrtqr_opt(iN, :)));
+    if ~isempty(valid_qr)
+        avg_qr_opt(iN) = mean(valid_qr);
+    else
+        avg_qr_opt(iN) = NaN;
+    end
+end
+
+%% Plot runtime
+figure(Position=[0, 0, 11, 12]);
+hold on;
+
+% Create shaded regions (light grey) for min-max ranges
+% Full covariance method
+x_fill_full = [N_list, fliplr(N_list)];
+y_fill_full = [min_full', fliplr(max_full')];
+fill(x_fill_full, y_fill_full, "", 'FaceColor', '#0082B2', 'EdgeColor', 'none', 'FaceAlpha', 0.3, HandleVisibility='off');
+
+% Block Cholesky method
+x_fill_block = [N_list, fliplr(N_list)];
+y_fill_block = [min_block', fliplr(max_block')];
+fill(x_fill_block, y_fill_block, "", 'FaceColor', '#D55E00', 'EdgeColor', 'none', 'FaceAlpha', 0.3, HandleVisibility='off');
+
+% SqrtQR method (only where valid)
+valid_qr_idx = ~isnan(avg_qr);
+if any(valid_qr_idx)
+    x_fill_qr = [N_list(valid_qr_idx), fliplr(N_list(valid_qr_idx))];
+    y_fill_qr = [min_qr(valid_qr_idx)', fliplr(max_qr(valid_qr_idx)')];
+    fill(x_fill_qr, y_fill_qr, "", 'FaceColor', '#000000', 'EdgeColor', 'none', 'FaceAlpha', 0.3, HandleVisibility='off');
+end
+
+% Plot mean lines
+plot(N_list, avg_full, 'o-', 'Color', '#0082B2', 'LineWidth', 2, 'MarkerSize', 8, DisplayName='Liu et al.');
+plot(N_list, avg_block, '^-', 'Color', '#D55E00', 'LineWidth', 2, 'MarkerSize', 8, DisplayName='Okamoto \& Tsiotras');
+plot(N_list, avg_qr, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8, DisplayName='Proposed method');
+
+set(gca, 'XScale', 'log', 'YScale', 'log');
+grid on;
+xlabel('Horizon length N');
+ylabel('Average runtime (s)');
+xticks(N_list)
+legend('Location', 'northwest', 'EdgeColor', 'none', 'BackgroundAlpha', 0.2, 'IconColumnWidth', 15);
+title('Horizon Size Scalability (Random System Dynamics)');
+exportgraphics(gcf, 'figures/horizon_size_scalability_random_small.png', Resolution=300)
+exportgraphics(gcf, 'figures/horizon_size_scalability_random_small.pdf', ContentType='vector')
+
+%% Plot objective function values
+figure(Position=[0, 0, 11, 12]);
+plot(N_list, avg_block_opt./avg_full_opt, '^-', 'Color', '#D55E00', 'LineWidth', 2, 'MarkerSize', 8); hold on;
+plot(N_list, avg_qr_opt./avg_full_opt, 's-', 'Color', '#000000', 'LineWidth', 2, 'MarkerSize', 8);
+grid on;
+xlabel('Horizon length N');
+ylabel('Cost ratio to Liu et al.');
+xticks(N_list)
+lgd = legend('Okamoto \& Tsiotras', 'Proposed method', 'Location', 'west', 'EdgeColor', 'none', 'BackgroundAlpha', 0.2, 'IconColumnWidth', 15);
+title('Cost Comparison (Random System Dynamics)');
+xlim([N_list(1) N_list(end)])
+if any(~isnan(avg_block_opt./avg_full_opt))
+    ylim([0.99, max(avg_block_opt./avg_full_opt)])
+end
+xscale log
+
+exportgraphics(gcf, 'figures/horizon_size_cost_comparision_random_small.png', Resolution=300)
+exportgraphics(gcf, 'figures/horizon_size_cost_comparision_random_small.pdf', ContentType='vector')
+
+%%
+save('data/horizon_size_scalability_random_results.mat', 'results', 'T_total', 'N_list', 'nx', 'nu', 'nw');
+fprintf('\nSaved results to data/horizon_size_scalability_random_results.mat\n');
+
