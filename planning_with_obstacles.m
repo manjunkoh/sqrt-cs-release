@@ -1,6 +1,6 @@
 clc; clear;
 
-% Plot the environment
+%%
 wall_y_pos = 2.2;
 obstacle_center = [5, 0];
 obstacle_radius = 1.2;
@@ -8,19 +8,22 @@ obstacle_radius = 1.2;
 function plot_obstacles(centers, radius)
     hold on
     for i = 1:size(centers, 1)
-        plot_circle(centers(i, :), radius);
+        filled_circle(centers(i, :), radius);
     end
 end
 
-function plot_circle(center, radius)
-    theta = linspace(0, 2*pi, 100);
-    x = center(1) + radius * cos(theta);
-    y = center(2) + radius * sin(theta);
-    plot(x, y, 'k');
+function filled_circle(center, radius)
+    % theta = linspace(0, 2*pi, 100);
+    % x = center(1) + radius * cos(theta);
+    % y = center(2) + radius * sin(theta);
+    % plot(x, y, 'k');
+
+    % Plot a filled circle
+    rectangle('Position', [center(1)-radius, center(2)-radius, 2*radius, 2*radius], 'Curvature', [1, 1], 'FaceColor', 'k', 'FaceAlpha', 0.5);
 end
 
 num_nodes = 50;
-t_f = 50;
+t_f = 30;
 dt = t_f / num_nodes;
 nx = 4;
 nu = 2;
@@ -28,22 +31,22 @@ nu = 2;
 mu_0 = [0; 0; 0; 0];
 mu_f = [10; 0; 0; 0];
 
-Sigma_0 = 0.1 * eye(nx);
-Sigma_f = 0.1 * eye(nx);
+Sigma_0 = diag([0.1, 0.1, 0.01, 0.01]);
+Sigma_f = Sigma_0;
 
 function plot_wall(wall_y_pos)
     yline(wall_y_pos, 'k--');
 end
 
 function plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f)
-    figure(Position=[0, 0, 15, 7]);
+    figure(Position=[0, 0, 20, 10]);
     axis equal
     plot_obstacles(obstacle_center, obstacle_radius);
     % plot_wall(wall_y_pos);
-    plot1sigmaEllipse(mu_0, Sigma_0, 'b')
-    plot1sigmaEllipse(mu_f, Sigma_f, 'b')
-    xlabel('x')
-    ylabel('y')
+    plot3sigmaEllipse(mu_0, Sigma_0, Color='#D55E00', DisplayName='Start')
+    plot3sigmaEllipse(mu_f, Sigma_f, Color='#D55E00', LineStyle=":", DisplayName='Goal')
+    xlabel('$x$')
+    ylabel('$y$')
 end
 
 plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
@@ -73,7 +76,7 @@ objective = 0;
 
 for k = 1:num_nodes
     constraints = [constraints, x(:,k+1) == A * x(:,k) + B * u(:,k)];
-    constraints = [constraints, x(2,k) <= wall_y_pos];
+    % constraints = [constraints, x(2,k) <= wall_y_pos];
     constraints = [constraints, u(:,k) <= u_max];
     constraints = [constraints, u(:,k) >= -u_max];
 end
@@ -175,7 +178,7 @@ circular_obstacles={struct('center', obstacle_center, 'radius', obstacle_radius,
 
 %% Solve the constrained stochastic problem via iterative approach
 max_iters = 100;
-penalty_scalar = 100;
+% penalty_scalar = 100;
 convergence_tolerance = 1E-2;
 
 yalmip('clear')
@@ -184,13 +187,14 @@ v = sdpvar(nu, num_nodes, 'full');
 P = sdpvar(nx, nx, num_nodes+1);
 U = sdpvar(nu, nx, num_nodes, 'full');
 Y = sdpvar(nu, nu, num_nodes);
-lambda = sdpvar(1, num_nodes+1, 'full');
+% lambda = sdpvar(1, num_nodes, 'full');
 
 mu_ref = x_opt;
 P_ref = repmat(Sigma_0, [1,1,num_nodes+1]);
 v_ref = u_opt;
 Y_ref = repmat(0.001 * eye(nu), [1,1,num_nodes]);
 
+tic;
 for iter = 1:max_iters
     constraints = [];
     objective = 0;
@@ -231,7 +235,7 @@ for iter = 1:max_iters
             p = chance_constraints_control{i}.p;
             z = norminv(1 - p);
             sqrt_ref = sqrt(a' * Y_ref_k * a);
-            constraints = [constraints,
+            constraints = [constraints
                 z / (2 * sqrt_ref) * (a' * Y_k * a) + a' * v_k - b + z * sqrt_ref / 2 <= 0
             ];
         end
@@ -249,22 +253,22 @@ for iter = 1:max_iters
             % time, so it isn't used here
             sqrt_ref = 0.001;
         end
-        constraints = [constraints,
-            z / (2 * sqrt_ref) * (a' * P(1:2,1:2,k) * a) + z * sqrt_ref / 2 + a' * mu(1:2,k) + b <= lambda(k)
+        constraints = [constraints
+            z / (2 * sqrt_ref) * (a' * P(1:2,1:2,k) * a) + z * sqrt_ref / 2 + a' * mu(1:2,k) + b <= 0
         ];
     end
 
-    constraints = [constraints, lambda >= 0];
+    % constraints = [constraints, lambda >= 0];
 
     for k = 1:num_nodes
         objective = objective + mu(:,k)' * Q * mu(:,k) + v(:,k)' * R * v(:,k) + trace(Q * P(:,:,k)) + trace(R * Y(:,:,k));
     end
 
-    objective_augmented = objective + penalty_scalar * sum(lambda);
+    % objective_augmented = objective + penalty_scalar * sum(lambda);
 
     fprintf("Iteration %d    ", iter)
 
-    sol = optimize(constraints, objective_augmented, sdpsettings('verbose', 0));
+    sol = optimize(constraints, objective, sdpsettings('verbose', 0));
 
 
     if sol.problem
@@ -278,10 +282,11 @@ for iter = 1:max_iters
     v_opt = value(v);
     P_opt = value(P);
     Y_opt = value(Y);
-    lambda_opt = value(lambda);
+    % lambda_opt = value(lambda);
 
-    if norm(mu_opt - mu_ref) < convergence_tolerance
-        fprintf('Converged in %d iterations\n', iter);
+    if all(vecnorm(mu_opt - mu_ref, Inf) < convergence_tolerance)
+        time_full_covariance = toc;
+        fprintf('Converged in %d iterations in %.3f seconds\n', iter, time_full_covariance);
         break;
     end
 
@@ -295,10 +300,14 @@ end
 
 %% Plot the results
 plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
-plot(mu_opt(1,:), mu_opt(2,:), 'r.-');
 for k = 1:num_nodes
-    plot3sigmaEllipse(mu_opt(:,k), P_opt(1:2,1:2,k), 'r');
+    fill3sigmaEllipse(mu_opt(:,k), P_opt(1:2,1:2,k), '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
 end
+plot(mu_opt(1,:), mu_opt(2,:), 'k.-', DisplayName='mean', LineWidth=1);
+legend(legendUnq(), Location='south', Orientation='horizontal', IconColumnWidth=15)
+
+exportgraphics(gcf, 'figures/planning_with_obstacles_full_covariance.png', Resolution=300)
+exportgraphics(gcf, 'figures/planning_with_obstacles_full_covariance.pdf', ContentType='vector')
 
 %% Solve with SQRT QR method
 yalmip('clear')
@@ -324,7 +333,7 @@ scp_params = SCPParams();
 scp_params.k_max = 100;
 scp_params.tol_opt = 1E-2;
 scp_params.tol_feas = 1E-4;
-% scp_params.w_init = 1000;
+scp_params.w_init = 100;
 scp_params.linearization = 'inexact';
 
 flag_solved_qr = prob_qr.solve(scp_params=scp_params);
@@ -341,9 +350,14 @@ end
 %% Plot the results
 plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
 for k = 1:num_nodes
-    plot3sigmaEllipse(prob_qr.mu(:,k), prob_qr.P(:,:,k), 'r');
+    fill3sigmaEllipse(prob_qr.mu(:,k), prob_qr.P(:,:,k), '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
 end
-plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'b.-');
+plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'k.-', DisplayName='mean', LineWidth=1);
+
+legend(legendUnq(), Location='south', Orientation='horizontal', IconColumnWidth=15)
+
+exportgraphics(gcf, 'figures/planning_with_obstacles_sqrt_qr.png', Resolution=300)
+exportgraphics(gcf, 'figures/planning_with_obstacles_sqrt_qr.pdf', ContentType='vector')
 
 %% Plot the coordinate-wise control 
 figure;

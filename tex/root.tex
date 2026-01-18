@@ -352,7 +352,7 @@ The reference QR matrices $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\}, k \in [N{-}1]$ are 
 	\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix}).
 \end{equation}
 
-To ensure that the linearization process does not cause artificial infeasibility/unboundedness \cite{maoSuccessiveConvexificationNonconvex2016}, we impose a trust region constraint:
+To ensure that the linearization process does not cause artificial infeasibility/unboundedness \cite{maoSuccessiveConvexificationNonConvex2016}, we impose a trust region constraint:
 \begin{align} \label{eq:trust_region_constraint}
 	\norm{\mathrm{vec}(D_X(X_k - \bar{X}_k))}_\infty &\leq r, \quad k \in [N{-}1]
 \end{align}
@@ -521,7 +521,7 @@ We use MATLAB with YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cit
 The initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) is set to zero.
 
 \subsection{Optimality and Scalability}
-Here, we perform a horizon-length scalability analysis, and also compare the solution costs between Liu et al. \cite{liuOptimalCovarianceSteering2025}, Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019}, and the proposed method. We consider a three-dimensional double integrator system with a total horizon time of \(T = 3\) seconds, and vary the horizon length from 10 to 80 (so the step size is \(\Delta t = T / N\)). 
+Here, we perform a horizon-length scalability analysis, and also compare the solution costs between Liu et al. \cite{liuOptimalCovarianceSteering2025}, Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019}, and the proposed method. We consider a three-dimensional double integrator system with a total horizon time of \(T = 3\) seconds, and vary the horizon length from 10 to 160 (so the step size is \(\Delta t = T / N\)). 
 The time-invariant dynamics are given by
 \begin{equation}
 	A = \begin{bmatrix}
@@ -535,7 +535,7 @@ The time-invariant dynamics are given by
 	G = \sqrt{q \Delta t} I_6
 \end{equation}
 with \( q = 0.05 \) being the process noise spectral density.
-The initial and terminal state covariance are \(P_{\mathrm{init}} = I_6\) and \(P_{\mathrm{final}} = 0.5 P_{\mathrm{init}}\), respectively. We use a quadratic cost function, with \(Q = 0.1 I_6\) and \(R = I_3\).
+The initial and terminal state covariance are \(I_6\) and \(0.5 I_6\), respectively. We use a quadratic cost function with \(Q = 0.1 I_6\) and \(R = I_3\).
 The results are shown in \cref{fig:comparison_of_methods}. To time the solutions, we perform 5 trials for each method for each horizon length. Convergence and feasibility tolerance for our method are set to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-4}\). The scaling matrix \(D_X\) is set to identity.
 
 For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers fast and optimal solutions. The computational complexity of \cite{okamotoOptimalStochasticVehicle2019} grows quickly, which matches the observations in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Another observation is that due to its specific feedback policy, it compromises optimality. Our approach shows scalability that is between the two, while achieving optimality, empirically validating \cref{th:global_optimality}.
@@ -610,6 +610,66 @@ where \( K_k, P_k \) are the solution of the optimization, and $\phi(K_k, P_k)$ 
 \end{figure}
 
 This supports our hypothesis: by working with the covariance matrix which necessarily squares the units of deviation, numerical solvers are more likely to encounter problems. We also tested with alternative objective functions, such as the EoQ form, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. 
+
+\subsection{Path Planning with Obstacles}
+Next, we consider path planning in an environment with an obstacle. In general, such scenarios make the safe state space nonconvex. A common approach to handling chance-constrained obstacle avoidance is to first linearize the obstacle around a reference mean trajectory, and then apply the deterministic reformulation for affine chance constraints \cite{ratheeshOperatorSplittingCovariance2025a}. 
+% As pointed out in earlier sections, when using the covariance matrix as the variable, even affine chance constraints are still nonconvex, and another linearization step is required. The numerical experiments demonstrate that this double linearization results in largely conservative solutions. On the other hand, the proposed approach can handle affine chance constraints in an exact manner. This allows solutions where the original (before any linearization) chance constraint is nearly active. 
+
+We consider a 2D double integrator scenario with a circular obstacle with its center at $[5, 0]$ and radius $1.2$. We define the nonconvex chance constraint as
+\begin{equation} \label{eq:chance_constraint_obstacle}
+	\P{\norm{p - [5, 0]}_2 \geq 1.2} \geq 1 - 0.005.
+\end{equation}
+for each node, where $p = [x, y]^\top$.
+The control is chance-constrained so that
+\begin{equation}
+	\P{|u| \leq 0.15} \geq 1 - 0.005.
+\end{equation}
+for each control component and node. The other parameters are: 
+$ G = [0_{2 \times 2}, I_{2 \times 2}]^\top$, $ \mu_0 = [0, 0, 0, 0]^\top$, $ \mu_f = [10, 0, 0, 0]^\top$, $ \Sigma_0 = \diag{0.1, 0.1, 0.01, 0.01}$, $ \Sigma_f = \Sigma_0 $, $ Q = 0.001 I_4$, $ R = 0.01 I_2$, $ N = 50$, $ \Delta t = 0.6$.
+
+The full covariance formulation linearizes the expression inside $\P{\cdot}$ in \cref{eq:chance_constraint_obstacle} around a reference mean for each node\cite{ratheeshOperatorSplittingCovariance2025a}. Then, its deterministic reformulation is again linearized using a reference covariance matrix \cite{rapakouliasDiscreteTimeOptimalCovariance2023}, resulting in a convexified constraint of the form:
+\begin{equation} \label{eq:convexified_chance_constraint_obstacle}
+	\frac{z \cdot a^\top P_{p,k} a}{2 \sqrt{a^\top \bar{P}_{p,k} a}} + z/2 \cdot \sqrt{a^\top \bar{P}_{p,k} a} + a^\top \mu_{p,k} + b \leq 0
+\end{equation}
+where $z = \Phi^{-1}(1 - 0.005)$. See e.g. \cite{rapakouliasDiscreteTimeOptimalCovariance2023} for the expressions for $a$ and $b$. Here, $\bar{\square}$ denotes the reference value, and $\square_{p}$ denotes the indices of the state which correspond to the position $p$. The control chance constraint is convexified in a similar manner. The reference values are updated at each iteration.
+
+In contrast, the proposed method convexifies the chance constraint in an exact manner. One note of caution is that when the obstacle avoidance constraint is linearized and then solved exactly, the resulting constraint is convex but depends on the reference values. This requires a modification to the step acceprance criterion of \texttt{SCvx*}; in our previous work \cite{kumagaiRobustCislunarLowThrust2025}, we proposed a modification to the step acceptance criterion, termed \textit{inexact linearization} to handle this case. We omit the details here for brevity.
+
+To obtain an initial reference solution for the mean values, we solve a deterministic version of the problem. We use $\Sigma_0$ as the initial state covariance reference for all nodes. The control covariance reference is chosen to be small to avoid artifical infeasibility \cite{maoSuccessiveConvexificationNonConvex2016} while avoiding division by zero in the convexification process.
+
+The full covariance formulation exits the iteration loop when the change in the mean state is small: $\norm{\mu_k - \bar{\mu}_k}_\infty \leq 10^{-2}$ for all $k$. The proposed method uses tolerance parameters $\epsilon_{\mathrm{opt}} = 10^{-2}$, $\epsilon_{\mathrm{feas}} = 10^{-4}$.
+
+A comparison between is shown in \cref{tab:comparison_of_methods}. While the proposed method requires more iterations, it achieves a lower cost. This is visually apparent in \cref{fig:planning_with_obstacles_full_covariance} and \cref{fig:planning_with_obstacles_sqrt_qr}. The proposed method's covariance ellipses approach the keep-out region more tightly; on the other hand, the full covariance method unnecessarily shrinks the state covariance and stays far from the obstacle. We can hypothesize that this is due to the method requiring two linearization steps, which introduces conservativeness.
+It is important to that we chose a relatively simple scenario for demonstration; however, in more complex scenarios, the conservativeness of the full covariance method may result in artificial infeasibility issues.
+
+\begin{table}[ht]
+\centering
+\caption{Comparison of the two methods}
+\label{tab:comparison_of_methods}
+\begin{tabular}{llll}
+\toprule
+Method & Iterations & Cost & Avg. Time (s)\\
+\midrule
+Full covariance & 4 & 1.371 & 1.5\\
+Proposed method & 39 & 1.031 & 8.3\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.7\linewidth]{planning_with_obstacles_full_covariance.pdf}
+	\caption{Obstacle avoidance with full covariance method}
+	\label{fig:planning_with_obstacles_full_covariance}
+\end{figure}
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.7\linewidth]{planning_with_obstacles_sqrt_qr.pdf}
+	\caption{Obstacle avoidance with proposed method}
+	\label{fig:planning_with_obstacles_sqrt_qr}
+\end{figure}
 
 \section{Conclusions}
 This paper presents a new solution method for chance-constrained covariance steering. The presented method addresses the drawbacks in existing solution methods, namely: numerical ill-conditioning and cost formulation inflexibility in the full covariance method as well as computational complexity in the block-matrix method. The key innovation lies in formulating the problem using the Cholesky factor of covariance matrix, inspired by the literature on square root filtering. We then show the optimality properties of the proposed method; in the special case where the cost takes the quadratic form and no chance constraint is present, the solution is globally optimal, while in general the solution is locally optimal. The proof leverages techniques from manifold topology. Numerical examples support our theoretical claims of optimality and numerical reliability, and demonstrate scalability to large horizon sizes.
