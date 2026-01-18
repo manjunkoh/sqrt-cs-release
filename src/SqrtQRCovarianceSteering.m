@@ -30,6 +30,7 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 		%   - For norm: gamma (scalar), p (violation prob), n (dimension), nodes (optional, default: all)
 		chance_constraints_state = {}
 		chance_constraints_control = {} % Same format as state constraints
+		circular_obstacles = {} % cell array of circular obstacles with fields: 'center' (nx x 1 vector), 'radius' (scalar), 'p' (violation prob)
 		mu_0 = []  % initial mean (nx x 1) or empty -> assumed zero
 		mu_f = []  % terminal mean (nx x 1) or empty -> assumed zero
 		waypoints = {}  % cell array of waypoint structs with fields: 'node' (scalar, 1:N+1) and 'mu' (nx x 1 vector)
@@ -57,6 +58,7 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				options.mu_f = []
 				options.waypoints = {}
 				options.D = [] % Trust region scaling matrix. If empty, defaults to scalar 1
+				options.circular_obstacles = {}
 			end
 			obj@SCPProblem();
 			obj.init_guess_struct = init_guess_struct;
@@ -81,6 +83,7 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			obj.waypoints = options.waypoints;
 			% Trust region scaling matrix
 			obj.D = options.D;
+			obj.circular_obstacles = options.circular_obstacles;
 
 			yalmip('clear');
 			obj.initialize();
@@ -287,8 +290,8 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 							v_k = vars.v(:,k);
 							L_k = vars.L(:,:,k);
 							constraints = [constraints;
-								% [alpha' * v_k + z * norm(L_k*alpha') - beta <= 0]:sprintf('Control Affine Chance Constraint (k=%d)', k)
-								cone([ (- alpha' * v_k + beta) / z; L_k*alpha'])
+								%[alpha' * v_k + z * norm(L_k'*alpha) - beta <= 0]:sprintf('Control Affine Chance Constraint (k=%d)', k)
+								cone([ (- alpha' * v_k + beta) / z; L_k'*alpha])
 								];
 						end
 					elseif strcmp(cc.type, 'norm')
@@ -384,6 +387,34 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 		% Non-convex inequality constraints (relaxed)
 		function constraintLHS = noncvx_ineq_relaxed(obj, vars, ref_vars)
 			constraintLHS = [];
+		end
+
+		function constraints = convexified_exact(obj, vars, ref_vars)
+			% Convex/convexified constraints that are imposed exactly but change with the reference variables
+			% WARNING: In general, this breaks the convergence guarantee of SCvx/SCvx* and causes Delta L to become negative
+			% Use this for handling circular keep-out zones which are linearized around the reference mean and covariance
+			constraints = [];
+
+			pos_idx = 1:2;
+
+			for i = 1:length(obj.circular_obstacles)
+				obstacle = obj.circular_obstacles{i};
+				center = obstacle.center;
+				radius = obstacle.radius;
+				p = obstacle.p;
+				z = norminv(1 - p);
+				for k = 1:obj.N+1
+					mu_k = vars.mu(:,k);
+					S_k = vars.S(:,:,k);
+					mu_ref_k = ref_vars.mu(:,k);
+					a = - (mu_ref_k(pos_idx) - center');
+					b = - 0.5 * norm(mu_ref_k(pos_idx) - center')^2  + 0.5 * radius^2 - a' * mu_ref_k(pos_idx);
+					constraints = [constraints;
+						cone([ (- a' * mu_k(pos_idx) - b) / z; S_k(pos_idx,pos_idx)' * a]) % sign is flipped somewhere
+						% a' * mu_k(pos_idx) + z * norm(a' * S_k(pos_idx,pos_idx)) + b <= 0
+					];
+				end
+			end
 		end
 
 		function postprocess(obj)
