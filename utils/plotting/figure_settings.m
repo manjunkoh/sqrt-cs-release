@@ -93,8 +93,8 @@ set(groot, 'defaultTextboxshapeLineStyle', 'none')
 
 % set(groot, 'DefaultAxesXLimitmethod', 'tight')
 
-set(groot,'DefaultFigureWindowStyle','docked')
-% set(groot,'DefaultFigureWindowStyle','normal')
+% set(groot,'DefaultFigureWindowStyle','docked')
+set(groot,'DefaultFigureWindowStyle','normal')
 
 % 
 % use this command to get all graphics objects
