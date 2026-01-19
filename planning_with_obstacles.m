@@ -1,10 +1,6 @@
 clc; clear;
 
 %%
-wall_y_pos = 2.2;
-obstacle_center = [5, 0];
-obstacle_radius = 1.2;
-
 function plot_obstacles(centers, radius)
     hold on
     for i = 1:size(centers, 1)
@@ -13,14 +9,44 @@ function plot_obstacles(centers, radius)
 end
 
 function filled_circle(center, radius)
-    % theta = linspace(0, 2*pi, 100);
-    % x = center(1) + radius * cos(theta);
-    % y = center(2) + radius * sin(theta);
-    % plot(x, y, 'k');
-
-    % Plot a filled circle
     rectangle('Position', [center(1)-radius, center(2)-radius, 2*radius, 2*radius], 'Curvature', [1, 1], 'FaceColor', 'k', 'FaceAlpha', 0.5);
 end
+
+function plot_wall(wall_y_pos)
+    yline(wall_y_pos, 'k--');
+end
+
+function plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, options)
+    arguments
+        obstacle_center
+        obstacle_radius
+        wall_y_pos
+        mu_0
+        Sigma_0
+        mu_f
+        Sigma_f
+        options.fig = []
+    end
+
+    if isempty(options.fig)
+        figure(Position=[0, 0, 20, 10]);
+    else
+        figure(options.fig);
+    end
+    axis equal
+    plot_obstacles(obstacle_center, obstacle_radius);
+    % plot_wall(wall_y_pos);
+    plot3sigmaEllipse(mu_0, Sigma_0, Color='#D55E00', DisplayName='Start')
+    plot3sigmaEllipse(mu_f, Sigma_f, Color='#D55E00', LineStyle=":", DisplayName='Goal')
+    xlabel('$x$')
+    ylabel('$y$')
+end
+
+wall_y_pos = 2.2;
+obstacle_center = [5, 0];
+obstacle_radius = 1.2;
+
+% plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
 
 num_nodes = 50;
 t_f = 30;
@@ -33,23 +59,6 @@ mu_f = [10; 0; 0; 0];
 
 Sigma_0 = diag([0.1, 0.1, 0.01, 0.01]);
 Sigma_f = Sigma_0;
-
-function plot_wall(wall_y_pos)
-    yline(wall_y_pos, 'k--');
-end
-
-function plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f)
-    figure(Position=[0, 0, 20, 10]);
-    axis equal
-    plot_obstacles(obstacle_center, obstacle_radius);
-    % plot_wall(wall_y_pos);
-    plot3sigmaEllipse(mu_0, Sigma_0, Color='#D55E00', DisplayName='Start')
-    plot3sigmaEllipse(mu_f, Sigma_f, Color='#D55E00', LineStyle=":", DisplayName='Goal')
-    xlabel('$x$')
-    ylabel('$y$')
-end
-
-plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
 
 Q = 0.001 * eye(nx);
 R = 0.01 * eye(nu);
@@ -68,6 +77,15 @@ G_sys = repmat(G, [1,1,num_nodes]);
 control_risk = 0.005;
 u_max = 0.15;
 state_risk = 0.005;
+
+% Define the chance constraints
+chance_constraints_control={...
+    struct('type', 'affine', 'alpha', [0; 1], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes), ...
+    struct('type', 'affine', 'alpha', [0; -1], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes), ...
+    struct('type', 'affine', 'alpha', [1; 0], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes), ...
+    struct('type', 'affine', 'alpha', [-1; 0], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes)};
+
+circular_obstacles={struct('center', obstacle_center, 'radius', obstacle_radius, 'p', state_risk)};
 
 %% Solve the obstacle-free deterministic problem
 yalmip('clear')
@@ -105,7 +123,9 @@ plot(x_opt(1,:), x_opt(2,:), 'r.-');
 
 %% Solve the constrained deterministic problem via iterative approach
 % Linearize the obstacles around the current state
-max_iters = 10;
+penalty_scalar = 10;
+max_iters = 50;
+
 yalmip('clear')
 x = sdpvar(nx, num_nodes+1, 'full');
 u = sdpvar(nu, num_nodes, 'full');
@@ -115,16 +135,19 @@ x_ref = x_opt;
 
 for iter = 1:max_iters
 
+    fprintf("Iter %d\n", iter)
+
     constraints = [];
     objective = 0;
 
     for k = 1:num_nodes
         constraints = [constraints, x(:,k+1) == A * x(:,k) + B * u(:,k)];
-        % constraints = [constraints, x(2,k) <= wall_y_pos];
         constraints = [constraints, u(:,k) <= u_max];
         constraints = [constraints, u(:,k) >= -u_max];
     end
-    constraints = [constraints, x(2, ceil(num_nodes/2)) >= 0.1]; % symmetry-breaking constraint
+    if iter == 1
+        constraints = [constraints, x(2, ceil(num_nodes* 0.5)) >= 0.1]; % symmetry-breaking constraint
+    end
     constraints = [constraints, x(:,1) == mu_0, x(:,num_nodes+1) == mu_f];
 
     for k = 1:num_nodes
@@ -138,7 +161,7 @@ for iter = 1:max_iters
     constraints = [constraints, lambda >= 0];
 
     for k = 1:num_nodes
-        objective = objective + x(:,k)' * Q * x(:,k) + u(:,k)' * R * u(:,k) + lambda(k);
+        objective = objective + x(:,k)' * Q * x(:,k) + u(:,k)' * R * u(:,k) + penalty_scalar * lambda(k);
     end
 
     sol = optimize(constraints, objective, sdpsettings('verbose', 0));
@@ -151,7 +174,7 @@ for iter = 1:max_iters
     x_opt = value(x);
     u_opt = value(u);
 
-    if norm(x_opt - x_ref) < 1e-3
+    if norm(x_opt - x_ref) < 1e-3 && is_collision_free(x_opt, obstacle_center, obstacle_radius)
 
         fprintf('Converged in %d iterations\n', iter);
         break;
@@ -159,25 +182,26 @@ for iter = 1:max_iters
 
     x_ref = x_opt;
 
+    if iter == max_iters
+        fprintf('Reached max iters.\n')
+        return
+    end
+
 end
 
-for k = 1:num_nodes
-    assert(x_opt(2,k) <= wall_y_pos);
-    assert(norm(x_opt(1:2,k) - obstacle_center') - obstacle_radius >= 0);
+function yn = is_collision_free(x_opt, obstacle_center, obstacle_radius)
+    yn = false;
+    for k = 1:size(x_opt, 2)
+        if norm(x_opt(1:2,k) - obstacle_center') < obstacle_radius
+            return
+        end
+    end
+    yn = true;
 end
         
 %% Plot the results
 plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
 plot(x_opt(1,:), x_opt(2,:), 'r.-');
-
-%% Define the chance constraints
-chance_constraints_control={...
-    struct('type', 'affine', 'alpha', [0; 1], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes), ...
-    struct('type', 'affine', 'alpha', [0; -1], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes), ...
-    struct('type', 'affine', 'alpha', [1; 0], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes), ...
-    struct('type', 'affine', 'alpha', [-1; 0], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes)};
-
-circular_obstacles={struct('center', obstacle_center, 'radius', obstacle_radius, 'p', state_risk)};
 
 %% Solve the constrained stochastic problem via iterative approach
 max_iters = 100;
@@ -197,6 +221,11 @@ P_ref = repmat(Sigma_0, [1,1,num_nodes+1]);
 v_ref = u_opt;
 Y_ref = repmat(0.001 * eye(nu), [1,1,num_nodes]);
 
+% Initialize tracking variables
+iters_full_covariance = NaN;
+objective_full_covariance = NaN;
+time_full_covariance = NaN;
+
 tic;
 for iter = 1:max_iters
     constraints = [];
@@ -208,8 +237,6 @@ for iter = 1:max_iters
         constraints = [constraints, [P(:,:,k) , U(:,:,k)' ;
                                     U(:,:,k) , Y(:,:,k)] >= 0];
         constraints = [constraints, P(:,:,k) >= 0, Y(:,:,k) >= 0];
-        % constraints = [constraints, v(:,k) <= u_max];
-        % constraints = [constraints, v(:,k) >= -u_max];
     end
 
     for k = 1:num_nodes + 1
@@ -227,6 +254,7 @@ for iter = 1:max_iters
     %     ];
     % end
 
+    % Control chance constraints
     for k = 1:num_nodes
         v_k = v(:,k);
         Y_k = Y(:,:,k);
@@ -244,9 +272,10 @@ for iter = 1:max_iters
         end
     end
 
+    % State chance constraints
     for k = 1:num_nodes+1
         a = - (x_ref(1:2,k) - obstacle_center');
-        b = - 0.5 * norm(x_ref(1:2,k) - obstacle_center')^2  + 0.5 * obstacle_radius^2 - a' * x_ref(1:2,k);
+        b = - 0.5 * norm(x_ref(1:2,k) - obstacle_center')^2 + 0.5 * obstacle_radius^2 - a' * x_ref(1:2,k);
         P_ref_pos_k = P_ref(1:2,1:2,k);
         sqrt_ref = sqrt(a' * P_ref_pos_k * a);
         if sqrt_ref <= 0
@@ -275,6 +304,8 @@ for iter = 1:max_iters
 
 
     if sol.problem
+        time_full_covariance = toc;
+        iters_full_covariance = iter;
         fprintf('Infeasible at iteration %d\n', iter);
         break;
     end
@@ -286,6 +317,8 @@ for iter = 1:max_iters
     P_opt = value(P);
     Y_opt = value(Y);
     % lambda_opt = value(lambda);
+    
+    objective_full_covariance = value(objective);
 
     if all(vecnorm(mu_opt - mu_ref, Inf) < convergence_tolerance)
         time_full_covariance = toc;
@@ -297,9 +330,12 @@ for iter = 1:max_iters
     P_ref = P_opt;
 
     if iter == max_iters
+        time_full_covariance = toc;
         fprintf('Reached maximum iterations\n')
     end
 end
+
+iters_full_covariance = iter;
 
 %% Plot the results
 plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
@@ -307,8 +343,10 @@ for k = 1:num_nodes
     fill3sigmaEllipse(mu_opt(:,k), P_opt(1:2,1:2,k), '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
 end
 plot(mu_opt(1,:), mu_opt(2,:), 'k.-', DisplayName='mean', LineWidth=1);
-legend(legendUnq(), Location='south', Orientation='horizontal', IconColumnWidth=15)
+legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
 
+xlim([-1.4, 11])
+ylim([-3, 1.5])
 exportgraphics(gcf, 'figures/planning_with_obstacles_full_covariance.png', Resolution=300)
 exportgraphics(gcf, 'figures/planning_with_obstacles_full_covariance.pdf', ContentType='vector')
 
@@ -340,14 +378,20 @@ scp_params.w_init = 100;
 scp_params.linearization = 'inexact';
 
 flag_solved_qr = prob_qr.solve(scp_params=scp_params);
-time_qr = seconds(prob_qr.scp.report.time);
 
 if flag_solved_qr
     prob_qr.postprocess();
-    fprintf('SqrtQRCovarianceSteering solved successfully in %.3f seconds\n', time_qr);
-    fprintf('  Number of iterations: %d\n', prob_qr.scp.report.iters);
+    time_qr = seconds(prob_qr.scp.report.time);
+    iters_qr = prob_qr.scp.report.iters;
     objective_qr = prob_qr.objective(prob_qr.sol);
+    fprintf('SqrtQRCovarianceSteering solved successfully in %.3f seconds\n', time_qr);
+    fprintf('  Number of iterations: %d\n', iters_qr);
     fprintf('  Objective value: %.6f\n', objective_qr);
+else
+    time_qr = NaN;
+    iters_qr = NaN;
+    objective_qr = NaN;
+    fprintf('SqrtQRCovarianceSteering did not solve successfully\n');
 end
 
 %% Plot the results
@@ -357,11 +401,62 @@ for k = 1:num_nodes
 end
 plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'k.-', DisplayName='mean', LineWidth=1);
 
-legend(legendUnq(), Location='south', Orientation='horizontal', IconColumnWidth=15)
+legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
 
+xlim([-1.4, 11])
+ylim([-3, 1.5])
 exportgraphics(gcf, 'figures/planning_with_obstacles_sqrt_qr.png', Resolution=300)
 exportgraphics(gcf, 'figures/planning_with_obstacles_sqrt_qr.pdf', ContentType='vector')
 
+%% Plot the results for both methods using a single figure
+% figure;
+% tiledlayout(2, 1);
+% nexttile;
+% 
+% plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, fig=gcf);
+% for k = 1:num_nodes
+%     fill3sigmaEllipse(mu_opt(:,k), P_opt(1:2,1:2,k), '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
+% end
+% plot(mu_opt(1,:), mu_opt(2,:), 'k.-', DisplayName='mean', LineWidth=1);
+% xlim([-2, 11])
+% ylim([-3, 1.5])
+% nexttile;
+% 
+% plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, fig=gcf);
+% for k = 1:num_nodes
+%     fill3sigmaEllipse(prob_qr.mu(:,k), prob_qr.P(:,:,k), '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
+% end
+% plot(prob_qr.mu(1,:), prob_qr.mu(2,:), 'k.-', DisplayName='mean', LineWidth=1);
+% 
+% legend(legendUnq(), Location='south', Orientation='horizontal', IconColumnWidth=15)
+% xlim([-2, 11])
+% ylim([-3, 1.5])
+%% Display summary table
+fprintf('\n');
+fprintf('================================================================================\n');
+fprintf('SUMMARY TABLE\n');
+fprintf('================================================================================\n');
+fprintf('%-30s | %-12s | %-15s | %-15s\n', 'Method', 'Iterations', 'Cost', 'Time (s)');
+fprintf('--------------------------------------------------------------------------------\n');
+
+% Format full covariance row
+if isnan(iters_full_covariance) || isnan(objective_full_covariance) || isnan(time_full_covariance)
+    fprintf('%-30s | %-12s | %-15s | %-15s\n', 'Full Covariance', 'N/A', 'N/A', 'N/A');
+else
+    fprintf('%-30s | %-12d | %-15.6f | %-15.3f\n', 'Full Covariance', iters_full_covariance, objective_full_covariance, time_full_covariance);
+end
+
+% Format sqrt QR row
+if isnan(iters_qr) || isnan(objective_qr) || isnan(time_qr)
+    fprintf('%-30s | %-12s | %-15s | %-15s\n', 'Sqrt QR', 'N/A', 'N/A', 'N/A');
+else
+    fprintf('%-30s | %-12d | %-15.6f | %-15.3f\n', 'Sqrt QR', iters_qr, objective_qr, time_qr);
+end
+
+fprintf('================================================================================\n');
+fprintf('\n');
+
+%% Additional plotting for the sqrt method
 %% Plot the coordinate-wise control 
 figure;
 tiledlayout(nu, 1);
