@@ -32,9 +32,9 @@
 \maketitle
 
 \begin{abstract}
-Covariance steering is an optimal control method that synthesizes a control policy which drives the state's mean and covariance matrix to desired values. We consider the discrete-time, linear time-varying case; the state has Gaussian initial state distribution and Gaussian noise corrupts the dynamics; the state and control are chance-constrained by affine and norm constraints. The contribution of this paper is a novel solution method for this problem. Our method explicitly writes the propagation equations of the Cholesky factor of the state covariance matrix by using the QR decomposition. As in other methods that assume a memoryless state feedback, our solution uses sequential convex programming. We prove that the algorithm converges to a local minimum, and that the local optimality is invariant to the representation of the covariance matrix in its standard form or the QR-factorized form.
+Covariance steering aims to synthesize a control policy which drives the state's mean and covariance matrix towards desired values. We consider the chance-constrained, discrete-time, linear time-varying case with Gaussian noise. The contribution of this paper is a novel solution method for this problem. Our method explicitly writes the propagation equations of the Cholesky factor of the state covariance matrix by using the QR decomposition. As in other methods for chance-constrained CS that assume a memoryless state feedback, our solution uses sequential convex programming. We prove that the algorithm converges to a local minimum, and that the local optimality is invariant to the representation of the covariance matrix in its standard form or the Cholesky-factorized form.
 For the special case when chance constraints are absent and the objective function is an expectation-of-quadratic, we show that the converged solution is globally optimal. 
-Compared to solution methods that require large block matrix formulations, the proposed method scales better with the growth in horizon length, shows better optimality, and uses a memoryless state feedback control law. Compared to another class of methods that explicitly define the covariance matrix as variables, the proposed method allows flexible cost formulations and shows better numerical reliability when uncertainty terms are smaller than the mean.
+Compared to solution methods that require large block matrix formulations, the proposed method scales better with the growth in horizon length, shows better optimality, and uses memoryless state feedback. Compared to another class of methods that explicitly define the covariance matrix as variables, the proposed method allows flexible cost formulations and shows better numerical reliability when uncertainty terms are smaller than the mean.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -453,8 +453,9 @@ From the definition, $\mathcal{X} = T(\mathcal{Y})$.
 \label{prop:global_optimality_diffeomorphism}
 Let $y^*$ be a local minimum of (B). Then $x^* = T(y^*)$ is a local minimum of (A).
 \end{proposition}
+We offer two proofs for this proposition. The first proof is based on manifold topology. The second proof is algebraic, based on the KKT conditions.
 
-\begin{proof}
+\begin{proof}[Proof 1]
 Since $y^*$ is a local minimum of (B), there exists a neighborhood $\mathcal{N}$ around $y^*$ such that
 \begin{equation}
 \label{eq:local_minimum}
@@ -478,6 +479,10 @@ Therefore, for any $x \in \mathcal{S}_A$, there exists a unique pre-image $y = T
 Hence, \(x^*\) is a local minimum of (A).
 \end{proof}
 
+\begin{proof}[Proof 2]
+	Another method of proof is to show that the KKT conditions of (A) and (B) are equivalent. Readers are referred to Proposition 1 of \cite{fatkhullinGlobalSolutionsNonConvex2025a}. The assumptions used in the proposition, 1. weak convexity of the objective and constraints and 2. differentiability of the coordinate transformation, are satisfied by the problem statement in \cref{eq:nonconvex_problem_statement}.
+\end{proof}
+
 Next, we apply this result to our specific problem. The following proposition is used in the proof.
 \begin{proposition}[\cite{linRiemannianGeometrySymmetric2019}]
 	\label{prop:cholesky_diffeomorphism}
@@ -487,18 +492,14 @@ Next, we apply this result to our specific problem. The following proposition is
 \begin{theorem} \label{th:local_optimality}
 	\cref{alg:sqrt_qr_covariance_steering} converges to a locally optimal solution of the chance-constrained CS problem. The local optimality is invariant to whether the problem is represented with the full covariance matrix or its square root. 
 \end{theorem}
-We offer two proofs for this theorem. The first proof uses the topological arguments from \cref{prop:global_optimality_diffeomorphism}. The second proof is algebraic, taken from \cite{fatkhullinGlobalSolutionsNonConvex2025a}.
 
-\begin{proof}[Proof 1]
+\begin{proof}
 	Let (A) from \cref{prop:global_optimality_diffeomorphism} be the determinisic formulation method in \cite{liuOptimalCovarianceSteering2025}. In this formulation, variable $x \in \mathcal{M}_A = \mathbb{S}_+^n \times \cdots \times \mathbb{S}_+^n \times \R^{n\times m} \times \cdots \times \R^{n \times m}$ where the first $N+1$ spaces are the positive definite matrices $P_k$ and the next $N$ spaces are the feedback gains $K_k$. 
 	Let (B) from \cref{prop:global_optimality_diffeomorphism} be \cref{eq:nonconvex_problem_statement} before the change of variables $L_k = K_k S_k$. In this formulation, variable $y \in \mathcal{M}_B = \mathbb{L}_+^n \times \cdots \times \mathbb{L}_+^n \times \R^{n\times m} \times \cdots \times \R^{n \times m}$, where the first $N+1$ spaces are $S_k$ and the next $N$ spaces are the feedback gains $K_k$. (We can ignore the mean variables $\bm{v}, \bm{\mu}$ as they appear exactly in the same way in either problem.)
 	(B) is solved via \cref{alg:sqrt_qr_covariance_steering}, and the diffeomorphism $T: \mathcal{M}_B \rightarrow \mathcal{M}_A$ maps each of the matrices $\mathbb{S}_+^n$ to $\mathbb{L}_+^n$ via the inverse of the Cholesky map \(\mathcal{L} : \mathbb{S}^n_+ \rightarrow \mathbb{L}_+^n\) and does not modify the feedback gains $K_k$. The inverse of a diffeomorphism is also a diffeomorphism.
 	Then, the proof follows from the local optimality of the \texttt{SCvx*} algorithm \cite[Theorem 3]{oguriSuccessiveConvexificationFeasibility2023a} and \cref{prop:cholesky_diffeomorphism}. 
 \end{proof}
 
-\begin{proof}[Proof 2]
-	Another method of proof is to show that the KKT conditions of (A) and (B) are equivalent. Readers are referred to Proposition 1 of \cite{fatkhullinGlobalSolutionsNonConvex2025a}. The assumptions used in the proposition, 1. weak convexity of the objective and constraints and 2. differentiability of the coordinate transformation, are satisfied by the problem statement in \cref{eq:nonconvex_problem_statement}.
-\end{proof}
 
 \begin{theorem} \label{th:global_optimality}
 	When the CCs are not present and the objective takes the quadratic form of \cref{eq:objective_function}, the solution is globally optimal.
@@ -561,7 +562,8 @@ For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers f
 \end{figure}
 
 \begin{remark}
-	We further tested global optimality for unconstrained problems by randomly generating system dynamics. Note that depending on the dynamics and algorithm hyperparameters, the algorithm may require a large number of iterations (few hundreds) to converge to the global optimum. Furthermore, if using rather large tolerance parameters (e.g. $10^{-4}$), the algorithm may terminate at a suboptimal point; in this case, continuing with a smaller value (e.g. $10^{-7}$) will more likely achieve global optimality. For unconstrained problems with good numerical scaling, the convex formulation of \cite{liuOptimalCovarianceSteering2025} is faster and more reliable. The strength of the proposed method over this baseline for other scenarios is shown in the next subsections.
+	We further tested global optimality for unconstrained problems by randomly generating the system matrices. We observed that depending on the dynamics and algorithm hyperparameters, the algorithm may require a large number of iterations (few hundreds) to converge to the global optimum. Furthermore, if using rather large tolerance parameters (e.g. $10^{-4}$), the algorithm may terminate at a suboptimal point; in this case, continuing until convergence with a smaller value (e.g. $10^{-7}$) will more likely achieve global optimality. 
+	% For unconstrained problems with good numerical scaling, the convex formulation of \cite{liuOptimalCovarianceSteering2025} is faster and more reliable. The strength of the proposed method over this baseline for other scenarios is shown in the next subsection.
 \end{remark}
 
 \subsection{Numerical Reliability}
@@ -569,7 +571,7 @@ Here, we demonstrate the numerical reliability of the proposed method when the v
 
 \begin{table}[ht]
 \centering
-\caption{Problem parameters for the spacecraft rendezvous example}
+\caption{Parameters for the spacecraft rendezvous problem}
 \label{tab:cwh_parameters}
 \begin{tabular}{llll}
 \toprule
@@ -621,68 +623,9 @@ where \( K_k, P_k \) are the solution of the optimization, and $\phi(K_k, P_k)$ 
 
 This supports our hypothesis: by working with the covariance matrix which necessarily squares the units of deviation, numerical solvers are more likely to encounter problems. We also tested with alternative objective functions, such as the EoQ form, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. 
 
-\subsection{Path Planning with Obstacles}
-Next, we consider path planning in an environment with an obstacle. A common approach to handling chance-constrained obstacle avoidance is to first linearize the obstacle around a reference mean trajectory, and then apply the deterministic reformulation for affine CCs \cite{ratheeshOperatorSplittingCovariance2025a}. 
-% As pointed out in earlier sections, when using the covariance matrix as the variable, even affine chance constraints are still nonconvex, and another linearization step is required. The numerical experiments demonstrate that this double linearization results in largely conservative solutions. On the other hand, the proposed approach can handle affine chance constraints in an exact manner. This allows solutions where the original (before any linearization) chance constraint is nearly active. 
-
-We consider a 2D double integrator scenario with a circular obstacle with its center at $[5, 0]$ and radius $1.2$. We define the nonconvex state CC as
-\begin{equation} \label{eq:chance_constraint_obstacle}
-	\P{\norm{p - [5, 0]}_2 \geq 1.2} \geq 1 - 0.005
-\end{equation}
-for each node, where $p = [x, y]^\top$.
-The control is chance-constrained so that
-\begin{equation}
-	\P{|u| \leq 0.15} \geq 1 - 0.005
-\end{equation}
-for each control component and node. The other parameters are: 
-$ G = 0.01 \cdot [I_2, I_2]^\top$, $ \mu_{\mathrm{init}} = [0, 0, 0, 0]^\top$, $ \mu_{\mathrm{fin}} = [10, 0, 0, 0]^\top$, $P_{\mathrm{init}} = P_{\mathrm{fin}} = \diag{0.1, 0.1, 0.01, 0.01}$, $ Q = 0.001 I_4$, $ R = 0.01 I_2$, $ N = 50$, $ \Delta t = 0.6$.
-
-The baseline formulation using the full covariance linearizes the expression inside $\P{\cdot}$ in \cref{eq:chance_constraint_obstacle} around a reference mean for each node\cite{ratheeshOperatorSplittingCovariance2025a}. Then, its deterministic reformulation is again linearized using a reference covariance matrix \cite{rapakouliasDiscreteTimeOptimalCovariance2023}, resulting in a convexified constraint of the form:
-\begin{equation} \label{eq:convexified_chance_constraint_obstacle}
-	\frac{z \cdot a^\top P_{p,k} a}{2 \sqrt{a^\top \bar{P}_{p,k} a}} + z/2 \cdot \sqrt{a^\top \bar{P}_{p,k} a} + a^\top \mu_{p,k} + b \leq 0
-\end{equation}
-where $z = \mathcal{Q}_{\mathcal{N}}(1 - 0.005)$. See \cite{rapakouliasDiscreteTimeOptimalCovariance2023} for the expressions for $a$ and $b$. Here, $\bar{\square}$ denotes the reference value, and $\square_{p}$ denotes the indices of the mean/covariance which correspond to position. The control CC is convexified in a similar manner. The reference values are updated at each iteration.
-
-In contrast, the proposed method handles affine CCs in an exact manner. We remark that when the obstacle avoidance constraint is linearized, the deterministic reformulation is convex but depends on the reference values. This requires a modification to the step acceptance criterion of \texttt{SCvx*}; in our previous work \cite{kumagaiRobustCislunarLowThrust2025}, we proposed a modification to the step acceptance criterion, termed \textit{inexact linearization} to handle this case. We omit the details here for brevity.
-
-To obtain an initial reference solution for the mean values, we solve a deterministic version of the problem. We use $\Sigma_0$ as the initial state covariance reference for all nodes. For the baseline formulation, the control covariance reference is $0.001 I_2$, chosen to be small to avoid artifical infeasibility \cite{maoSuccessiveConvexificationNonConvex2016} while avoiding division by zero in the convexification process.
-
-The full covariance formulation exits the iteration loop when the change in the mean state is small: $\norm{\mu_k - \bar{\mu}_k}_\infty \leq 10^{-2}$ for all $k$. The proposed method uses tolerance parameters $\epsilon_{\mathrm{opt}} = 10^{-2}$, $\epsilon_{\mathrm{feas}} = 10^{-4}$.
-
-A comparison between is shown in \cref{tab:comparison_of_methods}. While the proposed method requires more iterations, it achieves a lower cost. The effect on the trajectory is visually apparent in \cref{fig:planning_with_obstacles_comparison}. The proposed method's covariance ellipses approach the keep-out region more tightly, while the baseline method unnecessarily shrinks the state covariance and stays far from the obstacle. We can hypothesize that this is due to the method requiring two linearization steps, which introduces conservativeness.
-Note that we chose a relatively simple scenario for demonstration; however, further constrained environments, the conservativeness of the baseline method may result in artificial infeasibility.
-
-\begin{table}[ht]
-\centering
-\caption{Comparison of the two methods}
-\label{tab:comparison_of_methods}
-\begin{tabular}{lccc}
-\toprule
-Method & Iterations & Cost & Avg. Time (s)\\
-\midrule
-Baseline & 4 & 1.281 & 1.6\\
-Proposed method & 25 & 1.040 & 5.0\\
-\bottomrule
-\end{tabular}
-\end{table}%
-
-
-\begin{figure}[ht]
-	\centering
-	\begin{subfigure}{0.5\linewidth}
-		\centering
-		\includegraphics[width=\textwidth]{planning_with_obstacles_full_covariance.pdf}
-	\end{subfigure}%
-	\begin{subfigure}{0.5\linewidth}
-		\centering
-		\includegraphics[width=\textwidth]{planning_with_obstacles_sqrt_qr.pdf}
-	\end{subfigure}
-	\caption{Obstacle avoidance with baseline method (left) and proposed method (right)}
-	\label{fig:planning_with_obstacles_comparison}
-\end{figure}
 
 \section{Conclusions}
-This paper presents a new solution method for chance-constrained covariance steering. The presented method addresses the drawbacks in existing solution methods, namely: numerical ill-conditioning and cost formulation inflexibility in the full covariance method as well as computational complexity in the block-matrix method. The key innovation lies in formulating the problem using the Cholesky factor of covariance matrix, inspired by the literature on square root filtering. We then show the optimality properties of the proposed method; in the special case where the cost takes the quadratic form and no chance constraint is present, the solution is globally optimal, while in general the solution is locally optimal. The proof leverages techniques from manifold topology. Numerical examples support our theoretical claims of optimality and numerical reliability, and demonstrate scalability to large horizon sizes.
+This paper presents a new solution method for chance-constrained covariance steering. The presented method addresses the drawbacks in existing solution methods, namely: numerical ill-conditioning and cost formulation inflexibility in the full covariance method as well as computational complexity in the block-matrix method. The key innovation lies in formulating the problem using the Cholesky factor of the covariance matrix, inspired by the literature on square root filtering. We then show the optimality properties of the proposed method; in the special case where the cost takes the quadratic form and no chance constraint is present, the solution is globally optimal, while in general the solution is locally optimal. The proof leverages techniques from manifold topology. Numerical examples support our theoretical claims of optimality and numerical reliability, and demonstrate scalability to large horizon sizes.
 
 % \section{Appendix}
 
