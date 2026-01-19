@@ -56,7 +56,10 @@ R = 0.01 * eye(nu);
 
 A = [eye(2), dt*eye(2); zeros(2, 2), eye(2)];
 B = [0.5*dt^2*eye(2); dt*eye(2)];
-G = 0.01 * [zeros(2, 2); eye(2)];
+% G = 0.01 * [zeros(2, 2); eye(2)];
+G = [0.01 * eye(2); 0.01 * eye(2)];
+% q = 0.1;
+% G = sqrt(q * dt) * eye(4);
 
 A_sys = repmat(A, [1,1,num_nodes]);
 B_sys = repmat(B, [1,1,num_nodes]);
