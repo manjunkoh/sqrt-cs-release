@@ -635,13 +635,13 @@ The control is chance-constrained so that
 	\P{|u| \leq 0.15} \geq 1 - 0.005
 \end{equation}
 for each control component and node. The other parameters are: 
-$ G = 0.01 \cdot [I_2, I_2]^\top$, $ \mu_0 = [0, 0, 0, 0]^\top$, $ \mu_f = [10, 0, 0, 0]^\top$, $ \Sigma_0 = \diag{0.1, 0.1, 0.01, 0.01}$, $ \Sigma_f = \Sigma_0 $, $ Q = 0.001 I_4$, $ R = 0.01 I_2$, $ N = 50$, $ \Delta t = 0.6$.
+$ G = 0.01 \cdot [I_2, I_2]^\top$, $ \mu_{\mathrm{init}} = [0, 0, 0, 0]^\top$, $ \mu_{\mathrm{fin}} = [10, 0, 0, 0]^\top$, $P_{\mathrm{init}} = P_{\mathrm{fin}} = \diag{0.1, 0.1, 0.01, 0.01}$, $ Q = 0.001 I_4$, $ R = 0.01 I_2$, $ N = 50$, $ \Delta t = 0.6$.
 
 The baseline formulation using the full covariance linearizes the expression inside $\P{\cdot}$ in \cref{eq:chance_constraint_obstacle} around a reference mean for each node\cite{ratheeshOperatorSplittingCovariance2025a}. Then, its deterministic reformulation is again linearized using a reference covariance matrix \cite{rapakouliasDiscreteTimeOptimalCovariance2023}, resulting in a convexified constraint of the form:
 \begin{equation} \label{eq:convexified_chance_constraint_obstacle}
 	\frac{z \cdot a^\top P_{p,k} a}{2 \sqrt{a^\top \bar{P}_{p,k} a}} + z/2 \cdot \sqrt{a^\top \bar{P}_{p,k} a} + a^\top \mu_{p,k} + b \leq 0
 \end{equation}
-where $z = \Phi^{-1}(1 - 0.005)$. See \cite{rapakouliasDiscreteTimeOptimalCovariance2023} for the expressions for $a$ and $b$. Here, $\bar{\square}$ denotes the reference value, and $\square_{p}$ denotes the indices of the mean/covariance which correspond to position. The control CC is convexified in a similar manner. The reference values are updated at each iteration.
+where $z = \mathcal{Q}_{\mathcal{N}}(1 - 0.005)$. See \cite{rapakouliasDiscreteTimeOptimalCovariance2023} for the expressions for $a$ and $b$. Here, $\bar{\square}$ denotes the reference value, and $\square_{p}$ denotes the indices of the mean/covariance which correspond to position. The control CC is convexified in a similar manner. The reference values are updated at each iteration.
 
 In contrast, the proposed method handles affine CCs in an exact manner. We remark that when the obstacle avoidance constraint is linearized, the deterministic reformulation is convex but depends on the reference values. This requires a modification to the step acceptance criterion of \texttt{SCvx*}; in our previous work \cite{kumagaiRobustCislunarLowThrust2025}, we proposed a modification to the step acceptance criterion, termed \textit{inexact linearization} to handle this case. We omit the details here for brevity.
 
