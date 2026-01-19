@@ -219,7 +219,7 @@ Y = sdpvar(nu, nu, num_nodes);
 mu_ref = x_opt;
 P_ref = repmat(Sigma_0, [1,1,num_nodes+1]);
 v_ref = u_opt;
-Y_ref = repmat(0.001 * eye(nu), [1,1,num_nodes]);
+Y_ref = repmat(0.00001 * eye(nu), [1,1,num_nodes]);
 
 % Initialize tracking variables
 iters_full_covariance = NaN;
