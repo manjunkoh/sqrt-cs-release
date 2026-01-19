@@ -121,7 +121,7 @@ for iter = 1:max_iters
         constraints = [constraints, u(:,k) <= u_max];
         constraints = [constraints, u(:,k) >= -u_max];
     end
-
+    constraints = [constraints, x(2, ceil(num_nodes/2)) >= 0.1]; % symmetry-breaking constraint
     constraints = [constraints, x(:,1) == mu_0, x(:,num_nodes+1) == mu_f];
 
     for k = 1:num_nodes
