@@ -11,21 +11,19 @@ figure_settings
 %%
 % Fixed horizon length
 N = 30; % horizon length
-num_trials = 20;                % number of trials for averaging
+num_trials = 20; % number of trials for averaging
 
 % Problem dimensions for random system
 nx = 6;  % State dimension
 nu = 3;  % Input dimension (nx/2)
 nw = nx; % Noise dimension
 
-% SCP parameters for the square root method
+% SCP parameters for the square root method; tolerances set to very small
+% values to prevent terminating at suboptimal point
 scp_params = SCPParams();
-scp_params.tol_opt = 1E-5;
-scp_params.tol_feas = 1E-5;
-scp_params.k_max = 300;
-% scp_params.r_init = 1.0;
-scp_params.r_init = 2.0;
-% scp_params.superlinear = true;
+scp_params.tol_opt = 1E-7;
+scp_params.tol_feas = 1E-7;
+scp_params.k_max = 10000; 
 
 % Results storage
 results = struct();
@@ -50,6 +48,9 @@ results.B = cell(1, num_trials);
 results.G = cell(1, num_trials);
 results.prob = cell(1, num_trials);
 results.prob_full = cell(1, num_trials);
+% Storage for feedback gains
+results.fullcov_K = cell(1, num_trials);
+results.sqrtqr_K = cell(1, num_trials);
 
 fprintf('State size: nx=%d, nu=%d, nw=%d\n', nx, nu, nw);
 fprintf('Horizon size: %d\n', N);
@@ -119,13 +120,19 @@ for trial = 1:num_trials
             case 0
                 results.fullcov_status{trial} = 'SOLVED';
                 results.fullcov_opt(trial) = prob_full.optimal_objective;
+                % Store feedback gains
+                results.fullcov_K{trial} = prob_full.K;
             case 1
                 results.fullcov_status{trial} = 'INFEASIBLE';
+                results.fullcov_K{trial} = [];
             case 4
                 results.fullcov_status{trial} = 'NUMERICAL';
                 results.fullcov_opt(trial) = prob_full.optimal_objective;
+                % Store feedback gains even for numerical issues
+                results.fullcov_K{trial} = prob_full.K;
             otherwise
                 results.fullcov_status{trial} = sprintf('ERR%d', diag_full.problem);
+                results.fullcov_K{trial} = [];
         end
 
         % Block Cholesky method
@@ -185,6 +192,10 @@ for trial = 1:num_trials
         flag = prob.solve(save_bool=false, scp_params=scp_params, verbose=true);
         if flag
             prob.postprocess();
+            % Store feedback gains
+            results.sqrtqr_K{trial} = prob.K;
+        else
+            results.sqrtqr_K{trial} = [];
         end
         results.sqrtqr_time(trial) = seconds(prob.scp.report.time);
         results.sqrtqr_success(trial) = flag;
@@ -315,8 +326,8 @@ grid on;
 ylabel('Runtime (s)');
 title(sprintf('Runtime Comparison (N=%d, Random System Dynamics)', N));
 legend('off');
-exportgraphics(gcf, 'figures/horizon_size_scalability_random_small.png', Resolution=300)
-exportgraphics(gcf, 'figures/horizon_size_scalability_random_small.pdf', ContentType='vector')
+% exportgraphics(gcf, 'figures/horizon_size_scalability_random_small.png', Resolution=300)
+% exportgraphics(gcf, 'figures/horizon_size_scalability_random_small.pdf', ContentType='vector')
 
 %% Plot objective function values
 figure(Position=[0, 0, 11, 12]);
@@ -335,8 +346,8 @@ if any(~isnan(cost_ratios))
     ylim([0.99, max(cost_ratios)])
 end
 
-exportgraphics(gcf, 'figures/horizon_size_cost_comparision_random_small.png', Resolution=300)
-exportgraphics(gcf, 'figures/horizon_size_cost_comparision_random_small.pdf', ContentType='vector')
+% exportgraphics(gcf, 'figures/horizon_size_cost_comparision_random_small.png', Resolution=300)
+% exportgraphics(gcf, 'figures/horizon_size_cost_comparision_random_small.pdf', ContentType='vector')
 
 %%
 save('data/horizon_size_scalability_random_results.mat', 'results', 'N', 'nx', 'nu', 'nw');
