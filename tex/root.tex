@@ -635,7 +635,7 @@ The control is chance-constrained so that
 	\P{|u| \leq 0.15} \geq 1 - 0.005
 \end{equation}
 for each control component and node. The other parameters are: 
-$ G = [0_{2 \times 2}, I_{2 \times 2}]^\top$, $ \mu_0 = [0, 0, 0, 0]^\top$, $ \mu_f = [10, 0, 0, 0]^\top$, $ \Sigma_0 = \diag{0.1, 0.1, 0.01, 0.01}$, $ \Sigma_f = \Sigma_0 $, $ Q = 0.001 I_4$, $ R = 0.01 I_2$, $ N = 50$, $ \Delta t = 0.6$.
+$ G = 0.01 \cdot [I_2, I_2]^\top$, $ \mu_0 = [0, 0, 0, 0]^\top$, $ \mu_f = [10, 0, 0, 0]^\top$, $ \Sigma_0 = \diag{0.1, 0.1, 0.01, 0.01}$, $ \Sigma_f = \Sigma_0 $, $ Q = 0.001 I_4$, $ R = 0.01 I_2$, $ N = 50$, $ \Delta t = 0.6$.
 
 The baseline formulation using the full covariance linearizes the expression inside $\P{\cdot}$ in \cref{eq:chance_constraint_obstacle} around a reference mean for each node\cite{ratheeshOperatorSplittingCovariance2025a}. Then, its deterministic reformulation is again linearized using a reference covariance matrix \cite{rapakouliasDiscreteTimeOptimalCovariance2023}, resulting in a convexified constraint of the form:
 \begin{equation} \label{eq:convexified_chance_constraint_obstacle}
@@ -649,7 +649,7 @@ To obtain an initial reference solution for the mean values, we solve a determin
 
 The full covariance formulation exits the iteration loop when the change in the mean state is small: $\norm{\mu_k - \bar{\mu}_k}_\infty \leq 10^{-2}$ for all $k$. The proposed method uses tolerance parameters $\epsilon_{\mathrm{opt}} = 10^{-2}$, $\epsilon_{\mathrm{feas}} = 10^{-4}$.
 
-A comparison between is shown in \cref{tab:comparison_of_methods}. While the proposed method requires more iterations, it achieves a lower cost. The effect on the trajectory is visually apparent in \cref{fig:planning_with_obstacles_full_covariance} and \cref{fig:planning_with_obstacles_sqrt_qr}. The proposed method's covariance ellipses approach the keep-out region more tightly, while the baseline method unnecessarily shrinks the state covariance and stays far from the obstacle. We can hypothesize that this is due to the method requiring two linearization steps, which introduces conservativeness.
+A comparison between is shown in \cref{tab:comparison_of_methods}. While the proposed method requires more iterations, it achieves a lower cost. The effect on the trajectory is visually apparent in \cref{fig:planning_with_obstacles_comparison}. The proposed method's covariance ellipses approach the keep-out region more tightly, while the baseline method unnecessarily shrinks the state covariance and stays far from the obstacle. We can hypothesize that this is due to the method requiring two linearization steps, which introduces conservativeness.
 Note that we chose a relatively simple scenario for demonstration; however, further constrained environments, the conservativeness of the baseline method may result in artificial infeasibility.
 
 \begin{table}[ht]
@@ -660,24 +660,25 @@ Note that we chose a relatively simple scenario for demonstration; however, furt
 \toprule
 Method & Iterations & Cost & Avg. Time (s)\\
 \midrule
-Baseline & 4 & 1.371 & 1.5\\
-Proposed method & 39 & 1.031 & 8.3\\
+Baseline & 4 & 1.281 & 1.6\\
+Proposed method & 25 & 1.040 & 5.0\\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table}%
 
 
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width=0.7\linewidth]{planning_with_obstacles_full_covariance.pdf}
-	\caption{Obstacle avoidance with baseline method}
-	\label{fig:planning_with_obstacles_full_covariance}
-\end{figure}%
-\begin{figure}[ht]
-	\centering
-	\includegraphics[width=0.7\linewidth]{planning_with_obstacles_sqrt_qr.pdf}
-	\caption{Obstacle avoidance with proposed method}
-	\label{fig:planning_with_obstacles_sqrt_qr}
+	\begin{subfigure}{0.5\linewidth}
+		\centering
+		\includegraphics[width=\textwidth]{planning_with_obstacles_full_covariance.pdf}
+	\end{subfigure}%
+	\begin{subfigure}{0.5\linewidth}
+		\centering
+		\includegraphics[width=\textwidth]{planning_with_obstacles_sqrt_qr.pdf}
+	\end{subfigure}
+	\caption{Obstacle avoidance with baseline method (left) and proposed method (right)}
+	\label{fig:planning_with_obstacles_comparison}
 \end{figure}
 
 \section{Conclusions}
