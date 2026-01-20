@@ -19,7 +19,7 @@ the covariance propagation equation is given by:
 \begin{equation} \label{eq:full_covariance_propagation}
 	P_{k+1} = (A_k + B_k K_k) P_k (A_k + B_k K_k)^\top + G_k G_k^\top.
 \end{equation}
-Define the following matrix:
+Recalling that $S_k S_k^\top = P_k$, define the following matrix:
 \begin{equation} \label{eq:X_definition}
 	X_{k+1} := \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix}.
 \end{equation}
@@ -34,7 +34,7 @@ Define the following matrix:
 	A symmetric positive semidefinite matrix $P$ of size $n \times n$ is strictly positive definite if and only if $\rank(P) = n$.
 \end{lemma}
 \begin{lemma} \label{lemma:rank_X_n_iff_P_succ_0}
-	Let $P_{k+1}$, $X_{k+1}$ be defined as in \cref{eq:full_covariance_propagation} and \cref{eq:X_definition}, respectively. Assume $P_k \succ 0$. Then,
+	Let $P_{k+1}$, $X_{k+1}$ be defined as in \cref{eq:full_covariance_propagation} and \cref{eq:X_definition}, respectively. Then,
 	\begin{equation}
 		\rank(X_{k+1}) = n \Leftrightarrow P_{k+1} \succ 0.
 	\end{equation}
@@ -64,7 +64,7 @@ Define the following matrix:
 \end{lemma}
 
 \begin{proof}
-If we define \( S_k = P_k^{1/2} \), the covariance propagation can be expressed as:
+The covariance propagation can be expressed as:
 \begin{equation} \label{eq:covariance_propagation}
 	S_{k+1} S_{k+1}^\top = X_{k+1} X_{k+1}^\top
 \end{equation}
@@ -84,14 +84,14 @@ Then, this QR decomposition is unique.
 \end{proof}
 \cref{lemma:sqrt_propagation} ensures that $S_{k+1}$ obtained from \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control} provides a unique matrix in $\mathbb{L}_n^+$ such that \cref{eq:full_covariance_propagation} is satisfied.
 
-Since both $P_k$ and $K_k$ in \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control} are unknowns, there is a bilinear term \( K_k S_k \) in \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control}; for the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is positive definite by \cref{assump:positive_definite_state}.
+Observing \cref{eq:X_definition,eq:square_root_covariance_propagation_nonlinear_feedback_control}, since both $S_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \); for the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is positive definite by \cref{assump:positive_definite_state}.
 So we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
 	S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top, \ X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix}
 \end{equation}
 with its first-order approximation given by:
 \begin{equation} \label{eq:square_root_covariance_propagation_linearized}
-	S_{k+1} \approx \mathrm{qr}(\bar{X}_{k+1}^\top)^\top + \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1})^\top
+	\hspace{-1pt}S_{k+1} \approx \mathrm{qr}(\bar{X}_{k+1}^\top)^\top + \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1})^\top
 \end{equation}
 where \( \bar{X}_{k+1} = \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\) and \(\bar{L}_k\) being the reference values, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\). 
 
@@ -109,7 +109,7 @@ After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and performing some s
 The QoN cost is a conservative approximation based on the triangle inequality \cite{oguriChanceConstrainedControlSafe2024a}; \( \mathcal{Q}_{\chi^2_d}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( d \) degrees of freedom.
 
 \begin{remark} \label{remark:convexifying_term}
-	Although it is an approximation, the QoN cost is easily handled in the proposed method as a convex function of the variables (also by the block matrix methods \cite{ridderhofChanceConstrainedCovarianceControl2020,oguriChanceConstrainedControlSafe2024a}). The seminal work \cite{liuOptimalCovarianceSteering2025}, due to relying on the EoQ cost for convexification, cannot straightforwardly handle other costs. A natural workaround is to 1. linearize the square root that appears when using the full covariance matrix ($Y_k$ in the notation of \cite{liuOptimalCovarianceSteering2025}) and 2. add a ``convexifying term'' \(\epsilon \trace(Y_k)\) with small \( \epsilon > 0 \), to ensure the partial of the Lagrangian with respect to \(Y_k\) is strictly positive definite, as we do in \cite{kumagaiRobustCislunarLowThrust2025}.
+	\normalfont Although it is an approximation, the QoN cost is easily handled in the proposed method as a convex function of the variables (also by the block matrix methods \cite{ridderhofChanceConstrainedCovarianceControl2020,oguriChanceConstrainedControlSafe2024a}). The seminal work \cite{liuOptimalCovarianceSteering2025}, due to relying on the EoQ cost for convexification, cannot straightforwardly handle other costs. A natural workaround is to 1. linearize the square root that appears when using the full covariance matrix ($Y_k$ in the notation of \cite{liuOptimalCovarianceSteering2025}) and 2. add a ``convexifying term'' \(\eta \trace(Y_k)\) with small \( \eta > 0 \), to ensure the partial of the Lagrangian with respect to \(Y_k\) is strictly positive definite, as we do in \cite{kumagaiRobustCislunarLowThrust2025} ($\eta$ is originally $\epsilon_Y$ in the reference).
 \end{remark}
 
 \subsection{Constraints}

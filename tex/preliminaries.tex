@@ -12,15 +12,14 @@ We address the finite-horizon discrete-time CS problem for a linear time-varying
 \begin{subequations}
 \label{eq:problem_statement}
 \begin{align}
-	&\minimize_{\bm{v}, \bm{K}} \quad J = \sum_{k=0}^{N-1} J_k (x_k, u_k) \\
-	&\text{subject to} \nonumber \\
-	& x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad k \in [N{-}1] \\
-	& u_k = v_k + K_k (x_k - \E{x_k}), \quad k \in [N{-}1] \label{eq:feedback_control_law}\\
-	& x_0 \sim \mathcal{N}(\mu_{\mathrm{init}}, P_{\mathrm{init}}) \\
-	& \mu_{\mathrm{fin}} = \E{x_N}\\
-	& P_{\mathrm{fin}} \succeq \E{(x_N - \E{x_N})(x_N - \E{x_N})^\top} \\
-	& \mathbb{P}(x_k \in \mathcal{X}) \geq 1 - \epsilon_x, \quad k \in [N] \label{eq:state_chance_constraint}\\ 
-	& \mathbb{P}(u_k \in \mathcal{U}) \geq 1 - \epsilon_u, \quad k \in [N{-}1] \label{eq:control_chance_constraint}
+	& \mathrlap{\minimize_{\bm{v}, \bm{K}} \quad J = \sum_{k=0}^{N-1} J_k (x_k, u_k) }\\
+	& \suchthat &&x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad k \in [N{-}1] \\
+	& && u_k = v_k + K_k (x_k - \E{x_k}), \quad k \in [N{-}1] \label{eq:feedback_control_law}\\
+	& &&x_0 \sim \mathcal{N}(\mu_{\mathrm{init}}, P_{\mathrm{init}}) \\
+	& &&\mu_{\mathrm{fin}} = \E{x_N}\\
+	& &&P_{\mathrm{fin}} \succeq \E{(x_N - \E{x_N})(x_N - \E{x_N})^\top} \\
+	& &&\mathbb{P}(x_k \in \mathcal{X}) \geq 1 - \epsilon_x, \quad k \in [N] \label{eq:state_chance_constraint}\\ 
+	& &&\mathbb{P}(u_k \in \mathcal{U}) \geq 1 - \epsilon_u, \quad k \in [N{-}1] \label{eq:control_chance_constraint}
 \end{align}
 \end{subequations}
 where \( x_k \in \mathbb{R}^n \) is the state vector, \( u_k \in \mathbb{R}^m \) is the control input, and \( w_k \in \mathbb{R}^n \) is standard Gaussian process noise. \( \bm{v} := \{v_k\}_{k=0}^{N-1}\) and \(\bm{K} := \{K_k\}_{k=0}^{N-1}\) are respectively the nominal control input and the state feedback gain to be designed, with \( v_k \in \mathbb{R}^m \) and \( K_k \in \mathbb{R}^{m \times n} \). Note that due to the affine feedback control law, the state and the control input are Gaussian at each time step.
@@ -50,9 +49,9 @@ For the norm constraint form, the CC is given by:
 \begin{equation} \label{eq:norm_chance_constraint}
 	\mathbb{P}(\| x_k \|_2 \leq \gamma) \geq 1 - p_\gamma
 \end{equation}
-for some scalar \( \gamma > 0 \) and violation probability \( p_\gamma \). The same forms apply to the control input \( u_k \). In numerical experiments, we also show how the proposed method handles nonconvex $\mathcal{X}$, such as environments with obstacles.
+for some scalar \( \gamma > 0 \) and violation probability \( p_\gamma \). The same forms apply to the control input \( u_k \).
 
-For convenience, we make the following assumption. It is reasonable in practical applications, and also required in \cite{liuOptimalCovarianceSteering2025} to retrieve its feedback gains after a change of variables:
+For convenience, we make the following assumption which is reasonable in practical applications and also required in \cite{liuOptimalCovarianceSteering2025}:
 \begin{assumption} \label{assump:positive_definite_state}
 	The state covariance matrix remains strictly positive definite throughout the horizon.
 \end{assumption}
@@ -73,7 +72,7 @@ From here on, we will use the phrase ``QR decomposition'' to refer to the econom
 \footnote{In MATLAB, this requires using $\mathrm{qr}(M, \text{``econ"})$. Then, to ensure uniqueness, if the function returns an \( R \) matrix with negative diagonal entries, multiply the corresponding columns of \( Q \) and rows of \( R \) by -1 to ensure positive diagonals.}
 
 \begin{remark}
-	If \(M\) is full rank, then so is \(R\), hence \(R\) is invertible.
+	\normalfont If \(M\) is full rank, then so is \(R\), hence \(R\) is invertible.
 \end{remark}
 
 \subsection{QR Decomposition Derivative}

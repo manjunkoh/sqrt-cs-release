@@ -1,41 +1,40 @@
 \section{Numerical Examples}
-We use MATLAB with YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} to solve the SDPs. All experiments are performed on a MacBook Pro with an M4 Max processor with 24GB of RAM. The SCP parameters are from \cite{oguriSuccessiveConvexificationFeasibility2023a}, summarized in \cref{tab:scp_parameters}.
-\footnote{Code available at \url{https://github.com/naoya-kumagai/sqrt_covariance_steering/}.}
+For all experiments, we use MATLAB on a MacBook Pro with an M4 Max processor with 24GB of RAM, and  YALMIP \cite{lofbergYALMIPToolboxModeling2004} and MOSEK \cite{mosekapsMOSEKOptimizationToolbox2025} to solve SDPs. 
+Code is available at {\small \url{https://github.com/naoya-kumagai/sqrt_covariance_steering/}}.
+The SCP parameters are from \cite{oguriSuccessiveConvexificationFeasibility2023a}, summarized in \cref{tab:scp_parameters}. For the proposed method, the initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) is set to zero.
 
-\begin{table}[ht]
-\centering
-\caption{\texttt{SCvx*} parameters ($\epsilon_{\mathrm{opt}}, \epsilon_{\mathrm{feas}}$ defined in text)}
-\label{tab:scp_parameters}
-\begin{tabular}{cccc}
-\toprule
- $\{\rho_0, \rho_1, \rho_2\}$ & $\{\alpha_1, \alpha_2, \beta, \gamma\}$ & $\{r_{\mathrm{init}}, r_{\mathrm{min}}, r_{\mathrm{max}}\}$ & $w_{\mathrm{init}}$\\
-\midrule
- $\{0, 0.25, 0.7\}$ & $\{2, 3, 2, 0.9\}$ & $\{0.1, 10^{-6}, 1\}$ & $100$\\
-\bottomrule
-\end{tabular}
+\begin{table}[t]
+	\centering
+	\caption{\texttt{SCvx*} parameters ($\epsilon_{\mathrm{opt}}, \epsilon_{\mathrm{feas}}$ defined in text)}
+	\label{tab:scp_parameters}
+	\begin{tabular}{cccc}
+	\toprule
+	 $\{\rho_0, \rho_1, \rho_2\}$ & $\{\alpha_1, \alpha_2, \beta, \gamma\}$ & $\{r_{\mathrm{init}}, r_{\mathrm{min}}, r_{\mathrm{max}}\}$ & $w_{\mathrm{init}}$\\
+	\midrule
+	 $\{0, 0.25, 0.7\}$ & $\{2, 3, 2, 0.9\}$ & $\{0.1, 10^{-6}, 1\}$ & $100$\\
+	\bottomrule
+	\end{tabular}
 \end{table}
 
-For the proposed method, the initial guess \( \bar{\bm{S}} \) is obtained by the covariance matrix interpolation technique from \cite{linRiemannianGeometrySymmetric2019}. The initial guess \( \bar{\bm{L}} \) is set to zero.
-
 \subsection{Optimality and Scalability}
-Here, we perform a horizon-length scalability analysis, and also compare the solution costs between Liu et al. \cite{liuOptimalCovarianceSteering2025}, Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019}, and the proposed method. We consider a three-dimensional double integrator system with a total horizon time of \(T = 3\) seconds, and vary the horizon length from 10 to 160 (so the step size is \(\Delta t = T / N\)). 
+Here, we compare the horizon-length scalability and solution optimality of our method against Liu et al. \cite{liuOptimalCovarianceSteering2025} and Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019}. We consider a three-dimensional double integrator system with a total horizon time of \(T = 3\) seconds, and vary the horizon length from 10 to 160 (so the step size is \(\Delta t = T / N\)). 
 The time-invariant dynamics are given by
-\begin{equation}
-	A = \begin{bmatrix}
+\begin{equation} 
+	A = \smqty[
 		I_3 & \Delta t I_3 \\
 		0_{3 \times 3} & I_3
-	\end{bmatrix},
-	B = \begin{bmatrix}
+	],\ 
+	B = \smqty[
 		0.5 \Delta t^2 I_3 \\
 		\Delta t I_3
-	\end{bmatrix},
+	],\ 
 	G = \sqrt{q \Delta t} I_6
 \end{equation}
 with \( q = 0.05 \) being the process noise spectral density.
 The initial and terminal state covariance are \(I_6\) and \(0.5 I_6\), respectively. We use a quadratic cost function with \(Q = 0.1 I_6\) and \(R = I_3\).
-The results are shown in \cref{fig:comparison_of_methods}. To time the solutions, we perform 5 trials for each method for each horizon length. Convergence and feasibility tolerance for our method are set to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-4}\). The scaling matrix \(D_X\) is set to identity.
+For our method, we set the convergence and feasibility tolerance to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-4}\) and scaling matrix \(D_X\) to identity. To time the solutions, we perform 5 trials for each case. The results are shown in \cref{fig:comparison_of_methods}.
 
-For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers fast and optimal solutions. The computational complexity of \cite{okamotoOptimalStochasticVehicle2019} grows quickly, which matches the observations in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Another observation is that due to its specific feedback policy, it compromises optimality. Our approach shows scalability that is between the two, while achieving optimality, empirically validating \cref{th:global_optimality}.
+For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers fast and optimal solutions. The computational complexity of \cite{okamotoOptimalStochasticVehicle2019} grows quickly, which matches the observations in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Due to its specific feedback policy, it also compromises optimality. In comparison, our approach has moderate computational complexity, with rate of growth similar to \cite{liuOptimalCovarianceSteering2025}. The optimality empirically validates \cref{th:global_optimality}.
 
 \begin{figure}[ht]
 	\centering
@@ -52,14 +51,14 @@ For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers f
 \end{figure}
 
 \begin{remark}
-	We further tested global optimality for unconstrained problems by randomly generating the system matrices. We observed that depending on the dynamics and algorithm hyperparameters, the algorithm may require a large number of iterations (few hundreds) to converge to the global optimum. Furthermore, if using rather large tolerance parameters (e.g. $10^{-4}$), the algorithm may terminate at a suboptimal point; in this case, continuing until convergence with a smaller value (e.g. $10^{-7}$) will more likely achieve global optimality. 
-	% For unconstrained problems with good numerical scaling, the convex formulation of \cite{liuOptimalCovarianceSteering2025} is faster and more reliable. The strength of the proposed method over this baseline for other scenarios is shown in the next subsection.
+	% We further tested global optimality for unconstrained problems by randomly generating the system matrices. We observed that depending on the dynamics and algorithm hyperparameters, the algorithm may require a large number of iterations (few hundreds) to converge to the global optimum. Furthermore, if using rather large tolerance parameters (e.g. $10^{-4}$), the algorithm may terminate at a suboptimal point; in this case, continuing until convergence with a smaller value (e.g. $10^{-7}$) will more likely achieve global optimality. 
+	\textr{Add some analysis}
 \end{remark}
 
 \subsection{Numerical Reliability}
-Here, we demonstrate the numerical reliability of the proposed method when the variance of some state components are small. We consider the problem from \cite{oguriChanceConstrainedControlSafe2024a} which considers CS for a spacecraft rendezvous setting. We greatly simplify the problem, using the same system dynamics and boundary condition; we also consider continuous control instead of impulsive control. The problem considers a QoN type objective function with $W_k^x = 0$ and $W_k^u = I$ for all $k$ \cref{eq:objective_function} which is common for optimizing the quantile of the spacecraft's necessary fuel. We emphasize that the parameters of uncertainty are rather realistic for a spacecraft rendezvous setting, and are not artificial. The problem parameters are summarized in \cref{tab:cwh_parameters} for completeness.
+Here, we demonstrate the numerical reliability of the proposed method when the variance of some state components are small. We consider the problem from \cite{oguriChanceConstrainedControlSafe2024a} which uses CS for a spacecraft rendezvous setting. We greatly simplify the problem, using the same system dynamics and boundary condition; we also consider continuous control instead of impulsive control. The problem considers a QoN type objective function with $W_k^x = 0$ and $W_k^u = I$ for all $k$ \cref{eq:objective_function} which is common for optimizing the quantile of the spacecraft's necessary fuel. We emphasize that the parameters of uncertainty are rather realistic for a spacecraft rendezvous setting, and not artificial. The problem parameters are summarized in \cref{tab:cwh_parameters} for completeness.
 
-\begin{table}[ht]
+\begin{table}[t]
 \centering
 \caption{Parameters for the spacecraft rendezvous problem}
 \label{tab:cwh_parameters}
@@ -85,30 +84,29 @@ gravitational parameter & $\mu$ & $3.986004418 \times 10^{5}$ & km$^3$/s$^2$ \\
 \end{table}
 
 The continuous-time Clohessy-Wiltshire-Hill equations \cite{schaubAnalyticalMechanicsSpace2003} are discretized using zero-order hold control, as described in \cite{oguriChanceConstrainedControlSafe2024a}. 
-We use $D_X = \mathrm{diag}(10, 10, 10, 10^3, 10^3, 10^3)$ for the trust region scaling, chosen to make the magnitude of $D_X S_k$ close to unity. We set the convergence and feasibility tolerance to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-5}\).
+We use $D_X = \mathrm{diag}(10, 10, 10, 10^3, 10^3, 10^3)$ for the trust region scaling, chosen to make the magnitude of $D_X S_k$ close to unity. We set \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-5}\).
 The proposed method solves the problem in 42 iterations in 5.0 seconds (average of 10 runs). The results are shown in \cref{fig:example_cwh_trajectory}, along with the results of 1000 Monte Carlo simulations. We can observe that the terminal covariance constraint is satisfied with equality, and the Monte Carlo samples are within the 3-sigma bounds.
 
-\begin{figure}[ht]
+\begin{figure}[t]
 	\centering
 	\includegraphics[width=0.8\linewidth]{example_cwh_trajectory.pdf}
 	\caption{Projection of trajectory onto the $x$-$y$ plane for the spacecraft rendezvous problem, with $3\sigma$ covariance ellipses around the mean trajectory}
 	\label{fig:example_cwh_trajectory}
 \end{figure}
 
-For the full covariance approach \cite{liuOptimalCovarianceSteering2025}, we use $\epsilon = 10^{-3}$ for the convexifying term (see \cref{remark:convexifying_term}).
-The full covariance approach is not able to solve the problem, as MOSEK returns status \texttt{UNKNOWN}; note that we experimented with various values of $\epsilon$, but the observations are similar. This indicates numerical issues; the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. 
+For the full covariance approach \cite{liuOptimalCovarianceSteering2025}, we use $\eta = 10^{-3}$ for the convexifying term (see \cref{remark:convexifying_term}).
+The full covariance approach is unable to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues, where the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. 
 For this problem, the covariance dynamics are largely violated, according to a measure of loss in covariance propagation defined as follows:
 \begin{equation}
 	\text{Loss}_k = \norm{\phi(K_k, P_k) - P_{k+1}}_F / \norm{P_{k+1}}_F
 \end{equation}
-where \( K_k, P_k \) are the solution of the optimization, and $\phi(K_k, P_k)$ is the RHS of \cref{eq:full_covariance_propagation}.
-\cref{fig:example_cwh_covariance_propagation_loss} shows the loss for the two methods, showing the superior accuracy of the proposed method's covariance propagation; using tighter convergence tolerance for the proposed method can further improve the accuracy if desired.
+where \( K_k, P_k \) are the solution of the optimization, and $\phi(K_k, P_k)$ is the RHS of \cref{eq:full_covariance_propagation}. 
+\cref{fig:example_cwh_covariance_propagation_loss} shows the loss for the two methods, showing the superior accuracy of the proposed method's covariance propagation; using tighter convergence tolerance for the proposed method can further improve the accuracy if desired. We also tested with different values of $\eta$ and alternative objective functions for the full covariance approach, such as the EoQ form, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \eta \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), all either resulting in numerical issues and/or lossy covariance propagation.
+These results support our hypothesis: by working with the square root of the covariance matrix, solvers can work with better-scaled problems and are less likely to encounter numerical issues.
 
-\begin{figure}[ht]
+\begin{figure}[t]
 	\centering
 	\includegraphics[width=0.8\linewidth]{example_cwh_covariance_propagation_loss.pdf}
 	\caption{Covariance propagation loss for the spacecraft rendezvous problem}
 	\label{fig:example_cwh_covariance_propagation_loss}
 \end{figure}
-
-This supports our hypothesis: by working with the covariance matrix which necessarily squares the units of deviation, numerical solvers are more likely to encounter problems. We also tested with alternative objective functions, such as the EoQ form, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \epsilon \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), which either resulted in numerical issues and/or resulted in lossy covariance propagation. 

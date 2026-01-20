@@ -18,9 +18,8 @@ From the definition, $\mathcal{X} = T(\mathcal{Y})$.
 \label{prop:global_optimality_diffeomorphism}
 Let $y^*$ be a local minimum of (B). Then $x^* = T(y^*)$ is a local minimum of (A).
 \end{proposition}
-We offer two proofs for this proposition. The first proof is based on manifold topology. The second proof is algebraic, based on the KKT conditions.
 
-\begin{proof}[Proof 1]
+\begin{proof}
 Since $y^*$ is a local minimum of (B), there exists a neighborhood $\mathcal{N}$ around $y^*$ such that
 \begin{equation}
 \label{eq:local_minimum}
@@ -44,9 +43,9 @@ Therefore, for any $x \in \mathcal{S}_A$, there exists a unique pre-image $y = T
 Hence, \(x^*\) is a local minimum of (A).
 \end{proof}
 
-\begin{proof}[Proof 2]
-	Another method of proof is to show that the KKT conditions of (A) and (B) are equivalent. Readers are referred to Proposition 1 of \cite{fatkhullinGlobalSolutionsNonConvex2025a}. The assumptions used in the proposition, 1. weak convexity of the objective and constraints and 2. differentiability of the coordinate transformation, are satisfied by the problem statement in \cref{eq:nonconvex_problem_statement}.
-\end{proof}
+\begin{remark}
+	\normalfont Another method of proof is to show that the KKT conditions of (A) and (B) are equivalent. Readers are referred to Proposition 1 of \cite{fatkhullinGlobalSolutionsNonConvex2025}. The assumptions used in the proposition, 1. weak convexity of the objective and constraints and 2. differentiability of the coordinate transformation, are satisfied by the problem statement in \cref{eq:nonconvex_problem_statement}.
+\end{remark}
 
 Next, we apply this result to our specific problem. The following proposition is used in the proof.
 \begin{proposition}[\cite{linRiemannianGeometrySymmetric2019}]
