@@ -95,8 +95,8 @@ The proposed method solves the problem in 42 iterations in 5.0 seconds (average 
 \end{figure}
 
 For the full covariance approach \cite{liuOptimalCovarianceSteering2025}, we use $\eta = 10^{-3}$ for the convexifying term (see \cref{remark:convexifying_term}).
-The full covariance approach is unable to solve the problem, as MOSEK returns status \texttt{UNKNOWN}. This indicates numerical issues, where the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. 
-For this problem, the covariance dynamics are largely violated, according to a measure of loss in covariance propagation defined as follows:
+For this scenario, MOSEK returns status \texttt{UNKNOWN}; this indicates numerical issues, where the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. 
+Here, the covariance dynamics are largely violated, according to a measure of loss in covariance propagation defined as follows:
 \begin{equation}
 	\text{Loss}_k = \norm{\phi(K_k, P_k) - P_{k+1}}_F / \norm{P_{k+1}}_F
 \end{equation}

@@ -85,7 +85,7 @@ The algorithm terminates when both $|\Delta J^{(i)}| \leq \epsilon_{\mathrm{opt}
 	\Else
 		\State $\bm{\lambda}^{(i+1)} \gets \bm{\lambda}^{(i)}$, $\delta^{(i+1)} \gets \delta^{(i)}$, $w^{(i+1)} \gets w^{(i)}$
 	\EndIf
-	\State Update trust region radius: 
+	% \State Update trust region radius: 
 	\State \quad $r^{(i+1)} \gets \begin{cases} \max(r^{(i)} / \alpha_1, r_{\mathrm{min}}) & \text{if } \rho^{(i)} < \rho_1 \\ r^{(i)} & \text{elseif } \rho^{(i)} < \rho_2 \\  \min(\alpha_2 r^{(i)}, r_{\mathrm{max}}) & \text{otherwise} \end{cases}$
 	\State $i \gets i + 1$
 \EndWhile

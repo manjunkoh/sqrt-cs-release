@@ -2,10 +2,11 @@
 \section{Preliminaries}
 
 \subsection{Notation}
-$\mathbb{L}^n$ ($\mathbb{L}_+^n$) denotes the space of $n \times n$ lower triangular matrices (with positive diagonal entries). $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric positive definite  matrices. The Cholesky factor of a matrix \( P \in \mathbb{S}_+^{n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \), and $\mathrm{diag}(a,b, \cdots)$ denotes the diagonal matrix with $a,b, \cdots$ on the diagonals. The linear matrix inequality $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \([N] := \{0, 1, \cdots, N\}\) for $N \in \N$.
+$\mathbb{L}^n$ ($\mathbb{L}_+^n$) denotes the space of $n \times n$ lower triangular (LT) matrices (with positive diagonal entries). $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric positive definite  matrices. The Cholesky factor of a matrix \( P \in \mathbb{S}_+^{n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \), and $\mathrm{diag}(a,b, \cdots)$ denotes the diagonal matrix with $a,b, \cdots$ on the diagonals. The linear matrix inequality $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \([N] := \{0, 1, \cdots, N\}\) for $N \in \N$.
 We refer to the ``square root" of the covariance matrix \(P\) to refer to (not necessarily square) matrices \(L\) that satisfy \(P = L L^\top\). 
+$\mathrm{tril}(\cdot)$ sets all but the LT part of a matrix to zero.
 $\mathrm{vec}(\cdot)$ vectorizes a matrix.
-$\mathrm{vectril}(\cdot)$ vectorizes the lower triangular part of a matrix.
+$\mathrm{vectril}(\cdot)$ vectorizes the LT part of a matrix.
 
 \subsection{Problem Formulation}
 We address the finite-horizon discrete-time CS problem for a linear time-varying system with additive Gaussian noise. The goal is to find a state feedback controller that steers the state mean and covariance from their initial values to desired terminal values while minimizing a cost function and obeying CCs. Mathematically, the problem is formulated as follows.
