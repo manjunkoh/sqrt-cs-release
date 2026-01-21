@@ -665,6 +665,10 @@ classdef SCvxStar < handle
             fprintf('Average time spent in YALMIP: %f seconds\n', time_yalmip_avg);
             fprintf('Average time spent in solver: %f seconds\n', time_solver_avg);
             fprintf('Average time spent in postprocessing: %f seconds\n', time_postprocessing_avg);
+
+            fprintf('Total time spent in YALMIP: %f seconds\n', sum(time_yalmip));
+            fprintf('Total time spent in solver: %f seconds\n', sum(time_solver));
+            fprintf('Total time spent in postprocessing: %f seconds\n', sum(time_postprocessing));
         end
 
         function plot_trust_region_history(obj)
