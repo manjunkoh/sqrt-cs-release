@@ -407,10 +407,10 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 					mu_k = vars.mu(:,k);
 					S_k = vars.S(:,:,k);
 					mu_ref_k = ref_vars.mu(:,k);
-					a = - (mu_ref_k(pos_idx) - center');
-					b = - 0.5 * norm(mu_ref_k(pos_idx) - center')^2  + 0.5 * radius^2 - a' * mu_ref_k(pos_idx);
+					a = - (mu_ref_k(pos_idx) - center);
+					b = - 0.5 * norm(mu_ref_k(pos_idx) - center)^2  + 0.5 * radius^2 - a' * mu_ref_k(pos_idx);
 					constraints = [constraints;
-						cone([ (- a' * mu_k(pos_idx) - b) / z; S_k(pos_idx,pos_idx)' * a]) % sign is flipped somewhere
+						cone([ (- a' * mu_k(pos_idx) - b) / z; S_k(pos_idx,pos_idx)' * a])
 						% a' * mu_k(pos_idx) + z * norm(a' * S_k(pos_idx,pos_idx)) + b <= 0
 					];
 				end
