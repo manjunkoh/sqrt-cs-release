@@ -1,10 +1,13 @@
 clc; clear;
+addpath(genpath('./utils'))
+addpath ./src
+addpath ./SCvxStar/src/
+figure_settings
 
-%%
-function plot_obstacles(centers, radius)
+function plot_obstacles(centers, radii)
     hold on
     for i = 1:size(centers, 1)
-        filled_circle(centers(i, :), radius);
+        filled_circle(centers(i, :), radii(i));
     end
 end
 
@@ -16,10 +19,10 @@ function plot_wall(wall_y_pos)
     yline(wall_y_pos, 'k');
 end
 
-function plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, options)
+function plot_problem(obstacle_center, obstacle_radii, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, options)
     arguments
         obstacle_center
-        obstacle_radius
+        obstacle_radii
         wall_y_pos
         mu_0
         Sigma_0
@@ -34,7 +37,7 @@ function plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_
         figure(options.fig);
     end
     axis equal
-    plot_obstacles(obstacle_center, obstacle_radius);
+    plot_obstacles(obstacle_center, obstacle_radii);
     plot_wall(wall_y_pos);
     plot3sigmaEllipse(mu_0, Sigma_0, Color='#D55E00', DisplayName='Start')
     plot3sigmaEllipse(mu_f, Sigma_f, Color='#D55E00', LineStyle=":", DisplayName='Goal')
@@ -42,11 +45,11 @@ function plot_problem(obstacle_center, obstacle_radius, wall_y_pos, mu_0, Sigma_
     ylabel('$y$')
 end
 
-function yn = is_collision_free(x_opt, obstacle_center, obstacle_radius)
+function yn = is_collision_free(x_opt, obstacle_center, obstacle_radii)
     yn = false;
     for k = 1:size(x_opt, 2)
         for i = 1:size(obstacle_center, 1)
-            if norm(x_opt(1:2,k) - obstacle_center(i,:)') < obstacle_radius
+            if norm(x_opt(1:2,k) - obstacle_center(i,:)') < obstacle_radii(i)
                 return
             end
         end
@@ -54,12 +57,16 @@ function yn = is_collision_free(x_opt, obstacle_center, obstacle_radius)
     yn = true;
 end
 
+
+%% Parameters
 wall_y_pos = 1.5;
 obstacle_centers = [3, 0.5; 7.5, -1];
-obstacle_radius = 1.2;
-num_obstacles = size(obstacle_centers, 1);
+obstacle_radii = [1, 1];
 
-plot_problem(obstacle_centers, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
+% obstacle_centers = [2.5, -1; 4.5, 0.5; 6, -1.5; 8, -0.1];
+% obstacle_radius = 1;
+
+num_obstacles = size(obstacle_centers, 1);
 
 num_nodes = 50;
 t_f = 30;
@@ -71,7 +78,8 @@ mu_0 = [0; 0; 0; 0];
 mu_f = [10; 0; 0; 0];
 
 Sigma_0 = diag([0.1, 0.1, 0.01, 0.01]);
-Sigma_f = Sigma_0;
+% Sigma_f = Sigma_0;
+Sigma_f = diag([0.1, 0.1, 0.01, 0.01]);
 
 Q = 0.001 * eye(nx);
 R = 0.01 * eye(nu);
@@ -79,9 +87,9 @@ R = 0.01 * eye(nu);
 A = [eye(2), dt*eye(2); zeros(2, 2), eye(2)];
 B = [0.5*dt^2*eye(2); dt*eye(2)];
 % G = 0.01 * [zeros(2, 2); eye(2)];
-G = [0.01 * eye(2); 0.01 * eye(2)];
-% q = 0.1;
-% G = sqrt(q * dt) * eye(4);
+% G = [0.01 * eye(2); 0.01 * eye(2)];
+q = 0.005;
+G = sqrt(q * dt) * eye(4);
 
 A_sys = repmat(A, [1,1,num_nodes]);
 B_sys = repmat(B, [1,1,num_nodes]);
@@ -98,46 +106,16 @@ chance_constraints_control={...
     struct('type', 'affine', 'alpha', [1; 0], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes), ...
     struct('type', 'affine', 'alpha', [-1; 0], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes)};
 
-circular_obstacles={struct('center', obstacle_centers(1,:)', 'radius', obstacle_radius, 'p', state_risk), ...
-                    struct('center', obstacle_centers(2,:)', 'radius', obstacle_radius, 'p', state_risk)};
-
+circular_obstacles = {};
+for i = 1:num_obstacles
+    circular_obstacles = [circular_obstacles, struct('center', obstacle_centers(i,:)', 'radius', obstacle_radii(i), 'p', state_risk)];
+end
 
 chance_constraints_state={struct('type', 'affine', 'alpha', ...
     [0; 1; 0; 0], 'beta', wall_y_pos, 'p', state_risk, 'nodes', 1:num_nodes+1)};
 
-%% Solve the obstacle-free deterministic problem
-yalmip('clear')
-x = sdpvar(nx, num_nodes+1, 'full');
-u = sdpvar(nu, num_nodes, 'full');
-
-constraints = [];
-objective = 0;
-
-for k = 1:num_nodes
-    constraints = [constraints, x(:,k+1) == A * x(:,k) + B * u(:,k)];
-    % constraints = [constraints, x(2,k) <= wall_y_pos];
-    constraints = [constraints, u(:,k) <= u_max];
-    constraints = [constraints, u(:,k) >= -u_max];
-end
-
-constraints = [constraints, x(:,1) == mu_0, x(:,num_nodes+1) == mu_f];
-
-for k = 1:num_nodes
-    objective = objective + x(:,k)' * Q * x(:,k) + u(:,k)' * R * u(:,k);
-end
-
-sol = optimize(constraints, objective);
-
-if sol.problem
-    disp('Unconstrained problem infeasible');
-    return
-end
-
-x_opt = value(x);
-u_opt = value(u);
-
-plot_problem(obstacle_centers, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
-plot(x_opt(1,:), x_opt(2,:), 'r.-');
+plot_scenario = @()plot_problem(obstacle_centers, obstacle_radii, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
+plot_scenario()
 
 %% Solve the constrained deterministic problem via iterative approach
 % Linearize the obstacles around the current state
@@ -172,13 +150,13 @@ for iter = 1:max_iters
     for k = 1:num_nodes
         for i = 1:size(obstacle_centers, 1)
             a = - (x_ref(1:2,k) - obstacle_centers(i,:)');
-            b = - 0.5 * norm(x_ref(1:2,k) - obstacle_centers(i,:)')^2  + 0.5 * obstacle_radius^2 - a' * x_ref(1:2,k);
+            b = - 0.5 * norm(x_ref(1:2,k) - obstacle_centers(i,:)')^2  + 0.5 * obstacle_radii(i)^2 - a' * x_ref(1:2,k);
             constraints = [constraints
                 a' * x(1:2,k) + b <= lambda(k)
             ];
         end
     end
-    
+
     constraints = [constraints, lambda >= 0];
 
     for k = 1:num_nodes
@@ -195,8 +173,7 @@ for iter = 1:max_iters
     x_opt = value(x);
     u_opt = value(u);
 
-    if norm(x_opt - x_ref) < 1e-3 && is_collision_free(x_opt, obstacle_centers, obstacle_radius)
-
+    if norm(x_opt - x_ref) < 1e-3 && is_collision_free(x_opt, obstacle_centers, obstacle_radii)
         fprintf('Converged in %d iterations\n', iter);
         break;
     end
@@ -210,16 +187,14 @@ for iter = 1:max_iters
 
 end
 
-
-        
 %% Plot the results
-plot_problem(obstacle_centers, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
+plot_scenario();
 plot(x_opt(1,:), x_opt(2,:), 'r.-');
 
 %% Solve the constrained stochastic problem via iterative approach
 max_iters = 100;
 penalty_scalar_x = 10000;
-penalty_scalar_u = 10;
+penalty_scalar_u = 100;
 convergence_tolerance = 1E-2;
 
 yalmip('clear')
@@ -231,11 +206,13 @@ Y = sdpvar(nu, nu, num_nodes);
 lambda = sdpvar(1, num_nodes, 'full'); % "virtual control"
 lambda_x = sdpvar(num_obstacles, num_nodes+1, 'full');
 
-Y_init_value = 1e-5;
+Y_init_value = 1e-3;
 % mu_ref = x_opt;
+% v_ref = u_opt;
 mu_ref = linspace_vec(mu_0, mu_f, num_nodes+1);
+v_ref = zeros(nu, num_nodes);
+
 P_ref = repmat(Sigma_0, [1,1,num_nodes+1]);
-v_ref = u_opt;
 Y_ref = repmat(Y_init_value * eye(nu), [1,1,num_nodes]); % This is really important!!!
 
 % Initialize tracking variables
@@ -293,8 +270,8 @@ for iter = 1:max_iters
     % State obstacle chance constraints
     for k = 1:num_nodes+1
         for i = 1:num_obstacles
-            a = - (x_ref(1:2,k) - obstacle_centers(i,:)');
-            b = - 0.5 * norm(x_ref(1:2,k) - obstacle_centers(i,:)')^2 + 0.5 * obstacle_radius^2 - a' * x_ref(1:2,k);
+            a = - (mu_ref(1:2,k) - obstacle_centers(i,:)');
+            b = - 0.5 * norm(mu_ref(1:2,k) - obstacle_centers(i,:)')^2 + 0.5 * obstacle_radii(i)^2 - a' * mu_ref(1:2,k);
             P_ref_pos_k = P_ref(1:2,1:2,k);
             sqrt_ref = sqrt(a' * P_ref_pos_k * a);
             if sqrt_ref <= 0
@@ -337,11 +314,12 @@ for iter = 1:max_iters
     P_opt = value(P);
     Y_opt = value(Y);
     lambda_opt = value(lambda);
+    lambda_x_opt = value(lambda_x);
     
     objective_full_covariance = value(objective);
 
-    if all(vecnorm(mu_opt - mu_ref, Inf) < convergence_tolerance) && is_collision_free(mu_opt, obstacle_centers, obstacle_radius)
-        is_collision_free
+    if all(vecnorm(mu_opt - mu_ref, Inf) < convergence_tolerance) 
+        % && is_collision_free(mu_opt, obstacle_centers, obstacle_radius)
         time_full_covariance = toc;
         fprintf('Converged in %d iterations in %.3f seconds\n', iter, time_full_covariance);
         break;
@@ -359,7 +337,7 @@ end
 iters_full_covariance = iter;
 
 %% Plot the results
-plot_problem(obstacle_centers, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
+plot_scenario();
 for k = 1:num_nodes
     fill3sigmaEllipse(mu_opt(:,k), P_opt(1:2,1:2,k), '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
 end
@@ -373,8 +351,32 @@ title(sprintf('$Y_{init} =$ %g, Objective: %.3f', Y_init_value, objective_full_c
 % exportgraphics(gcf, sprintf('figures/planning_with_obstacles_full_covariance_Y_init_%g.png', Y_init_value) , Resolution=300)
 % exportgraphics(gcf, 'figures/planning_with_obstacles_full_covariance.pdf', ContentType='vector')
 
+%% Plot the coordinate-wise control 
+figure;
+tiledlayout(nu, 1);
+for j = 1:nu
+    nexttile;
+    plot(v_opt(j,:), 'b.-');
+    hold on;
+    two_sigma_upper = v_opt(j,:) + 2 * sqrt(squeeze(Y_opt(j,j,:))');
+    two_sigma_lower = v_opt(j,:) - 2 * sqrt(squeeze(Y_opt(j,j,:))');
+    for k = 1:num_nodes
+        if ~isreal(two_sigma_upper(k))
+            two_sigma_upper(k) = NaN;
+        end
+        if ~isreal(two_sigma_lower(k))
+            two_sigma_lower(k) = NaN;
+        end
+    end
+    plot(two_sigma_upper, 'r--');
+    plot(two_sigma_lower, 'r--');
+    yline(u_max, 'k--')
+    yline(-u_max, 'k--')
+    ylabel(sprintf('$u_%d$', j));
+end
+xlabel('Node');
+
 %% Solve with SQRT QR method
-yalmip('clear')
 % x_ref = linspace_vec(mu_0, mu_f, num_nodes+1);
 
 init_guess = struct();
@@ -394,13 +396,16 @@ prob_qr = SqrtQRCovarianceSteering(init_guess, ...
     P_0=Sigma_0, P_f=Sigma_f, Q=Q, R=R, ...
     chance_constraints_state=chance_constraints_state, ...
     chance_constraints_control=chance_constraints_control,...
-    circular_obstacles=circular_obstacles);
+    circular_obstacles=circular_obstacles, ...
+    relax_obstacle_constraints=false);
 
 scp_params = SCPParams();
 scp_params.k_max = 100;
 scp_params.tol_opt = 1E-2;
-scp_params.tol_feas = 1E-4;
-scp_params.w_init = 100;
+scp_params.tol_feas = 1E-2;
+% scp_params.w_init = 1000;
+% scp_params.w_inexact = 10;
+% scp_params.r_init = 0.5;
 scp_params.linearization = 'inexact';
 
 flag_solved_qr = prob_qr.solve(scp_params=scp_params);
@@ -421,7 +426,7 @@ else
 end
 
 %% Plot the results
-plot_problem(obstacle_centers, obstacle_radius, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
+plot_problem(obstacle_centers, obstacle_radii, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
 for k = 1:num_nodes
     fill3sigmaEllipse(prob_qr.mu(:,k), prob_qr.P(:,:,k), '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
 end
