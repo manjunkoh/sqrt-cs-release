@@ -46,6 +46,17 @@ function plot_problem(obstacle_center, obstacle_radii, wall_y_pos, mu_0, Sigma_0
     ylabel('$y$')
 end
 
+function flags = is_collision_free_per_node_per_obstacle(x_hist, obstacle_centers, obstacle_radii)
+    flags = true(size(x_hist, 2), size(obstacle_centers, 1));
+    for k = 1:size(x_hist, 2)
+        for i = 1:size(obstacle_centers, 1)
+            if norm(x_hist(1:2,k) - obstacle_centers(i,:)') < obstacle_radii(i)
+                flags(k,i) = false;
+            end
+        end
+    end
+end
+
 function yn = is_collision_free(x_opt, obstacle_centers, obstacle_radii)
     yn = false;
     for k = 1:size(x_opt, 2)
@@ -326,8 +337,7 @@ for trial = 1:num_trials
         % State obstacle chance constraints
         for k = 1:num_nodes+1
             for i = 1:num_obstacles
-                a = - (mu_ref(pos_idx,k) - obstacle_centers(i,:)');
-                b = - 0.5 * norm(mu_ref(pos_idx,k) - obstacle_centers(i,:)')^2 + 0.5 * obstacle_radii(i)^2 - a' * mu_ref(pos_idx,k);
+                [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), mu_ref(pos_idx,k));
                 P_ref_pos_k = P_ref(pos_idx,pos_idx,k);
                 sqrt_ref = sqrt(a' * P_ref_pos_k * a);
                 if sqrt_ref <= 0
@@ -484,10 +494,7 @@ for trial = 1:num_trials
     plot_problem(results.obstacle_centers{trial}, results.obstacle_radii{trial}, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, fig=gcf);
 
     if ~isempty(results.prob_full_covariance{trial}) && ~isempty(results.prob_full_covariance{trial}.mu)
-        for k = 1:num_nodes
-            fill_confidence_ellipse(results.prob_full_covariance{trial}.mu(:,k), results.prob_full_covariance{trial}.P(:,:,k), 1-state_risk, '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
-        end
-        plot(results.prob_full_covariance{trial}.mu(1,:), results.prob_full_covariance{trial}.mu(2,:), 'k.-', DisplayName='mean', LineWidth=1);
+        plot_solution(results.prob_full_covariance{trial}.mu, results.prob_full_covariance{trial}.P, state_risk);
         plot(x_opt(1,:), x_opt(2,:), 'r.-', DisplayName='deterministic', LineWidth=1);
     end
 
@@ -500,11 +507,7 @@ for trial = 1:num_trials
     plot_problem(results.obstacle_centers{trial}, results.obstacle_radii{trial}, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, fig=gcf);
 
     if ~isempty(results.prob_qr{trial}) && ~isempty(results.prob_qr{trial}.mu)
-        plot(results.prob_full_covariance{trial}.mu(1,:), results.prob_full_covariance{trial}.mu(2,:), 'k.-', DisplayName='mean', LineWidth=1);
-        for k = 1:num_nodes
-            fill_confidence_ellipse(results.prob_qr{trial}.mu(:,k), results.prob_qr{trial}.P(:,:,k), 1-state_risk, '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
-        end
-        plot(results.prob_qr{trial}.mu(1,:), results.prob_qr{trial}.mu(2,:), 'k.-', DisplayName='mean', LineWidth=1);
+        plot_solution(results.prob_qr{trial}.mu, results.prob_qr{trial}.P, state_risk);
         plot(x_opt(1,:), x_opt(2,:), 'r.-', DisplayName='deterministic', LineWidth=1);
     end
     % legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
@@ -515,7 +518,78 @@ for trial = 1:num_trials
     exportgraphics(gcf, save_filename, ContentType='vector');
 
 end
-%% 
+
+function plot_solution(mu, P, state_risk)
+    for k = 1:size(mu, 2)
+        fill3sigmaEllipse(mu(:,k), P(:,:,k), '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
+    end
+    plot(mu(1,:), mu(2,:), 'k.-', DisplayName='mean', LineWidth=1);
+end
+
+%% Monte Carlo simulation
+num_trial = 3;
+num_simulations = 10000;
+
+mu = results.prob_qr{num_trial}.mu;
+K = results.prob_qr{num_trial}.K;
+v = results.prob_qr{num_trial}.v;
+obstacle_centers = results.obstacle_centers{num_trial};
+obstacle_radii = results.obstacle_radii{num_trial};
+
+[x_hist_all, u_hist_all] = simulate_samples(mu_0, Sigma_0, A_sys, B_sys, G_sys, K, mu, v, num_nodes, num_simulations);
+
+collision_flags_all = count_collision_samples(x_hist_all, obstacle_centers, obstacle_radii);
+
+figure
+plot_problem(results.obstacle_centers{num_trial}, results.obstacle_radii{num_trial}, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, fig=gcf);
+plot_simulations(x_hist_all)
+
+function [x_hist_all, u_hist_all] = simulate_samples(mu_0, Sigma_0, A_sys, B_sys, G_sys, K, mu, v, num_nodes, num_simulations)
+    disp('Simulating samples...');
+    x_hist_all = zeros(size(mu, 1), num_nodes+1, num_simulations);
+    u_hist_all = zeros(size(v, 1), num_nodes, num_simulations);
+    for i = 1:num_simulations
+        [x_hist, u_hist] = simulate_sample(mu_0, Sigma_0, A_sys, B_sys, G_sys, K, mu, v, num_nodes);
+        x_hist_all(:,:,i) = x_hist;
+        u_hist_all(:,:,i) = u_hist;
+    end
+    disp('Done simulating samples.');
+end
+
+function [x_hist, u_hist] = simulate_sample(mu_0, Sigma_0, A_sys, B_sys, G_sys, K, mu, v, num_nodes)
+    x_hist = zeros(size(mu_0, 1), num_nodes+1);
+    u_hist = zeros(size(v, 1), num_nodes);
+    x_k = mu_0 + chol(Sigma_0, 'lower') * randn(size(mu_0));
+    x_hist(:,1) = x_k;
+    for k = 1:num_nodes
+        u_k = v(:,k) + K(:,:,k) * (x_k - mu(:,k));
+        x_k = A_sys(:,:,k) * x_k + B_sys(:,:,k) * u_k + G_sys(:,:,k) * randn(size(G_sys, 2), 1);
+
+        x_hist(:,k+1) = x_k;
+        u_hist(:,k) = u_k;
+    end
+end
+
+function plot_simulations(x_hist_all)
+    for i = 1:size(x_hist_all, 3)
+        x_hist = x_hist_all(:,:,i);
+        plot(x_hist(1,:), x_hist(2,:), Color='g', LineWidth=0.5);
+    end
+end
+
+function [collision_flags_all] = count_collision_samples(x_hist_all, obstacle_centers, obstacle_radii)
+    collision_flags_all = false(size(x_hist_all, 2), size(obstacle_centers, 1), size(x_hist_all, 3));
+    for i = 1:size(x_hist_all, 3)
+        x_hist = x_hist_all(:,:,i);
+        collision_flags = ~is_collision_free_per_node_per_obstacle(x_hist, obstacle_centers, obstacle_radii);
+        collision_flags_all(:,:,i) = collision_flags;
+    end
+
+    collision_flags_all = sum(collision_flags_all, 3);
+end
+
+
+%% Tests
 
 num_trial = 1;
 [wall_safe_flag, obstacle_safe_flag] = check_probabilistic_collision(results.prob_full_covariance{num_trial}.mu, results.prob_full_covariance{num_trial}.P, results.obstacle_centers{num_trial}, results.obstacle_radii{num_trial}, wall_y_pos, state_risk);
@@ -524,15 +598,19 @@ fprintf('Obstacle safe flag: %d\n', obstacle_safe_flag);
 
 
 %%
-num_trial = 3;
-[wall_safe_flag, obstacle_safe_flag] = check_probabilistic_collision(results.prob_qr{num_trial}.mu, results.prob_qr{num_trial}.P, results.obstacle_centers{num_trial}, results.obstacle_radii{num_trial}, wall_y_pos, state_risk);
+num_trial = 1;
+[wall_safe_flag, obstacle_safe_flag, obstacle_safe_flags] = check_probabilistic_collision(results.prob_qr{num_trial}.mu, results.prob_qr{num_trial}.P, results.obstacle_centers{num_trial}, results.obstacle_radii{num_trial}, wall_y_pos, state_risk);
 fprintf('Wall safe flag: %d\n', wall_safe_flag);
 fprintf('Obstacle safe flag: %d\n', obstacle_safe_flag);
 
-function [wall_safe_flag, obstacle_safe_flag] = check_probabilistic_collision(mu, P, obstacle_centers, obstacle_radii, wall_y_pos, state_risk)
+function [wall_safe_flag, obstacle_safe_flag, obstacle_safe_flags] = check_probabilistic_collision(mu, P, obstacle_centers, obstacle_radii, wall_y_pos, state_risk)
 
+    if isempty(mu) || isempty(P)
+        wall_safe_flag = NaN;
+        obstacle_safe_flag = NaN;
+        return;
+    end
     wall_safe_flag = true;
-    obstacle_safe_flag = true;
     obstacle_safe_flags = true(size(obstacle_centers, 1), size(mu, 2));
     constraint_violations = zeros(size(obstacle_centers, 1), size(mu, 2));
     
@@ -541,10 +619,8 @@ function [wall_safe_flag, obstacle_safe_flag] = check_probabilistic_collision(mu
     for k = 1:size(mu, 2)
         for i = 1:size(obstacle_centers, 1)
             % consider a hyperplane that passes through the obstacle center and is perpendicular to the x-axis
-            a = - (mu(pos_idx,k) - obstacle_centers(i,:)');
-            b = - 0.5 * norm(mu(pos_idx,k) - obstacle_centers(i,:)')^2 + 0.5 * obstacle_radii(i)^2 - a' * mu(pos_idx,k);
-            P_pos_k = P(pos_idx,pos_idx,k);
-            constraint_violations(i,k) = a' * mu(pos_idx,k) + b + z * sqrt(a' * P_pos_k * a);
+            [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), mu(pos_idx,k));
+            constraint_violations(i,k) = a' * mu(pos_idx,k) + b + z * sqrt(a' * P(pos_idx,pos_idx,k) * a);
             obstacle_safe_flags(i,k) = constraint_violations(i,k) <= 0;
         end
 
@@ -552,7 +628,9 @@ function [wall_safe_flag, obstacle_safe_flag] = check_probabilistic_collision(mu
     end
 
     constraint_violations = max(0, constraint_violations);
-    % keyboard
+
+    obstacle_safe_flag = all(obstacle_safe_flags, 'all');
+
 
     figure(Position=[0, 0, 15, 15]);
     hold on
@@ -562,27 +640,67 @@ function [wall_safe_flag, obstacle_safe_flag] = check_probabilistic_collision(mu
 
     axis equal
 
-    xlim([-1.4, 11])
-    ylim([-3, 2.0])
+    % xlim([-1.4, 11])
+    % ylim([-3, 2.0])
 
     for k = 1:size(mu, 2)
-        for i = 1:size(obstacle_centers, 1)
-            if constraint_violations(i,k) > 0
-                fill_confidence_ellipse(mu(pos_idx,k), P(pos_idx,pos_idx,k), 1-state_risk, '', FaceColor='#0082B2', FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
-                a = - (mu(pos_idx,k) - obstacle_centers(i,:)');
-                b = - 0.5 * norm(mu(pos_idx,k) - obstacle_centers(i,:)')^2 + 0.5 * obstacle_radii(i)^2 - a' * mu(pos_idx,k);
-                plot_hyperplane(a, b, [1, 5], 'k-', LineWidth=1);
-                line([obstacle_centers(i,1), mu(1,k)], [obstacle_centers(i,2), mu(2,k)], 'Color', 'r', 'LineWidth', 1);
+        % for i = 1:size(obstacle_centers, 1)
+        for i = 2
+            % if constraint_violations(i,k) > 0
+                if constraint_violations(i,k) > 0
+                    FaceColor = 'r';
+                else
+                    FaceColor = '#0082B2';
+                end
+
+                fill_confidence_ellipse(mu(pos_idx,k), P(pos_idx,pos_idx,k), 1-state_risk, '', FaceColor=FaceColor, FaceAlpha=0.5, EdgeColor='none', DisplayName="$3 \sigma$ ellipse");
+
+                [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), mu(pos_idx,k));
+                constraint_violation = a' * mu(pos_idx,k) + b + z * sqrt(a' * P(pos_idx, pos_idx, k) * a);
+                % plot_hyperplane(a, b, [3, 7], 'k-', LineWidth=1);
+                % line([obstacle_centers(i,1), mu(1,k)], [obstacle_centers(i,2), mu(2,k)], 'Color', 'r', 'LineWidth', 1);
                 drawnow
-            end
+                keyboard
+            % end
 
         end
     end
 
 end
+
             
+
+%%
+num_trial = 1;
+figure
+hold on
+plot_problem(results.obstacle_centers{num_trial}, results.obstacle_radii{num_trial}, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, fig=gcf);
+% plot_solution(results.prob_qr{num_trial}.mu, results.prob_qr{num_trial}.P, state_risk);
+plot(results.prob_qr{num_trial}.mu(1,:), results.prob_qr{num_trial}.mu(2,:), 'r.-')
+plot(results.prob_qr{num_trial}.scp.this_iter.ref_vars.mu(1,:), results.prob_qr{num_trial}.scp.this_iter.ref_vars.mu(2,:), 'b.-')
+
+%%
 function plot_hyperplane(a, b, xlim, varargin)
     x = linspace(xlim(1), xlim(2), 100);
     y = (-a(1) * x - b) / a(2);
     plot(x, y, varargin{:});
 end
+
+p = 0.99;
+mu = [0, 1]';
+a = [0, 1]';
+b = -4;
+P = [1, 0; 0, 0.09];
+
+% y = mu - a / norm(a) * norminv(p) * sqrt(a' * P * a);
+
+constraintLHS = a' * mu + b + norminv(p) * sqrt(a' * P * a) % want this to be <= 0
+
+figure
+hold on
+% plot1sigmaEllipse(mu, P)
+plot_confidence_ellipse(mu, P, p)
+plot_hyperplane(a, b, [-2, 3])
+% plot(y(1), y(2), 'g.')
+
+axis equal
