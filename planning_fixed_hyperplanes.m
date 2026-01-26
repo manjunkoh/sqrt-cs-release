@@ -8,10 +8,10 @@ figure_settings
 %% Parameters
 basic_parameters;
 
-% obstacle_centers = [5, 0];
-% obstacle_radii = 1.2;
-% num_obstacles = 1;
-% 
+obstacle_centers = [5, 0];
+obstacle_radii = 1.2;
+num_obstacles = 1;
+
 % obstacle_centers = [3, 0.5; 7.5, -1];
 % obstacle_radii = [1, 1];
 % num_obstacles = 2;
@@ -20,9 +20,9 @@ basic_parameters;
 % obstacle_radii = 0.9 * [1, 1, 1, 1];
 % num_obstacles = 4;
 
-obstacle_centers = [7, -1.5; 1, -2; 3.5, 0.5];
-obstacle_radii = obstacle_radius * ones(1, 3);
-num_obstacles = 3;
+% obstacle_centers = [7, -1.5; 1, -2; 3.5, 0.5];
+% obstacle_radii = obstacle_radius * ones(1, 3);
+% num_obstacles = 3;
 
 plot_problem(obstacle_centers, obstacle_radii, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
 
@@ -67,7 +67,7 @@ for iter = 1:max_iters
 
     constraints = [constraints, x(:,1) == mu_0, x(:,num_nodes+1) == mu_f];
 
-    % constraints = [constraints, x(2,:) <= wall_y_pos];
+    constraints = [constraints, x(2,:) <= wall_y_pos];
 
     for k = 1:num_nodes
         for i = 1:size(obstacle_centers, 1)
@@ -291,9 +291,9 @@ end
 % fc_unconstrained.solve(Y_ref=Y_ref);
 
 %
-max_iters = 100;
-penalty_scalar_x = 100;
-penalty_scalar_u = 1000;
+max_iters = 30;
+penalty_scalar_x = 10;
+penalty_scalar_u = 100;
 penalty_increase_ratio = 2;
 max_penalty = 1e8;
 feasibility_tolerance = 1E-4;
@@ -357,9 +357,7 @@ for iter = 1:max_iters
             z = norminv(1 - p);
             % sqrt_ref = sqrt(a' * Y_ref_k * a);
             constraints = [constraints
-                % z / (2 * sqrt_ref) * (a' * Y_k * a) + a' * v_k - b + z * sqrt_ref / 2 <= lambda(k)
-                % z^2 * (a' * Y(:,:,k) * a) <= (b - a'*v_ref(:,k))^2 + 2 * (b - a'*v(:,k)) + lambda_u(i,k)
-                z^2 * (a' * Y(:,:,k) * a) <= (b - a' * v_ref(:,k))^2 + 2 * (b - a'* (v(:,k) - v_ref(:,k))) + lambda_u(i,k)
+                z^2 * (a' * Y(:,:,k) * a) <= (b - a' * v_ref(:,k))^2 - 2 * (b - a'* v_ref(:,k)) * a' * (v(:,k) - v_ref(:,k)) + lambda_u(i,k)
                 b - a' * v(:,k) >= 0
             ];
         end
@@ -391,12 +389,9 @@ for iter = 1:max_iters
             [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), x_opt(pos_idx,k));
             a = [a; 0; 0];
             b = -b;
-            % sqrt_ref = sqrt(a' * Sigma_f(pos_idx, pos_idx) * a);
-            % constraints = [constraints, z / (2 * sqrt_ref) * (a' * P(pos_idx,pos_idx,k) * a) + z * sqrt_ref / 2 + a' * mu(pos_idx,k) + b <= lambda_x(i,k)];
-            
+
             constraints = [constraints
-                z^2 * (a' * P(:,:,k) * a) <= (b - a'*mu_ref(:,k))^2 + 2 * (b - a'* (mu(:,k) - mu_ref(:,k))) + lambda_x(i,k)
-                % z^2 * (a' * P(:,:,k) * a) <= (b - a'*mu_ref(:,k))^2 + 2 * (b - a'*mu(:,k)) + lambda_x(i,k)
+                z^2 * (a' * P(:,:,k) * a) <= (b - a'*mu_ref(:,k))^2 - 2 * (b - a'* mu_ref(:,k)) * a' * (mu(:,k) - mu_ref(:,k)) + lambda_x(i,k)
                 b - a' * mu(:,k) >= 0
             ];
         end
@@ -468,8 +463,8 @@ for iter = 1:max_iters
         break;
     end
 
+    v_ref = v_opt;
     mu_ref = mu_opt;
-    P_ref = P_opt;
 
 	penalty_scalar_x_prev = penalty_scalar_x;
 	penalty_scalar_u_prev = penalty_scalar_u;
