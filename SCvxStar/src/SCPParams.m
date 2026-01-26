@@ -22,6 +22,7 @@ classdef SCPParams < handle
         k_max {mustBeInteger}       = 2000; % maximum number of iterations
         w_const {mustBePositive}    = 1e4; % penalty when using constant penalty as in Mao et al.
         w_TR {mustBePositive}       = 100; % penalty for soft trust region. not used if trust region is not imposed on any variable
+        w_inexact {mustBePositive}  = 1000; % (constant)penalty for convexified nonconvex inequality constraints that are relaxed with slack variables
         penalty_method {ismember(penalty_method, {'AL', 'ALwithL1', 'L1', 'AL_with_softTR'})} = 'AL';
         superlinear {mustBeNumericOrLogical} = false; % superlinear convergence
         yalmip_options struct                = sdpsettings('verbose', 0, 'solver', 'mosek', 'warning', 1, 'beeponproblem', 1, 'savesolveroutput', 1);

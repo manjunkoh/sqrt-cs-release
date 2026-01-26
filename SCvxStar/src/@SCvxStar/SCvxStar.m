@@ -198,9 +198,13 @@ classdef SCvxStar < handle
                 % convexified nonconvex inequality constraints
                 obj.scp_prob.sdp_noncvx_ineq_relaxed
                 % convexified nonconvex equality constraints that are imposed without slack variables
-                obj.scp_prob.sdp_convexified_exact
+                obj.scp_prob.sdp_convexified_inexact
+                % convexified nonconvex inequality constraints that are relaxed with slack variables
+                obj.scp_prob.sdp_convexified_inexact_ineq_relaxed
                 % nonconvex inequality slack variables are positive
                 obj.scp_prob.slack_noncvx_ineq >= 0
+                % convexified nonconvex inequality slack variables are positive
+                obj.scp_prob.slack_convexified_inexact_ineq >= 0
                 % trust region constraint
                 trust_region_constraint_lhs <= 0
             ];
@@ -208,6 +212,7 @@ classdef SCvxStar < handle
             J0 = obj.scp_prob.sdp_objective;
             P_cvx = obj.penalty_function(obj.scp_prob.slack_noncvx_eq, ...
                                         obj.scp_prob.slack_noncvx_ineq, ...
+                                        obj.scp_prob.slack_convexified_inexact_ineq, ...
                                         DeltaZ=DeltaZ, ...
                                         trust_region_constraint_lhs=trust_region_constraint_lhs);
 
@@ -232,17 +237,19 @@ classdef SCvxStar < handle
             obj.this_iter.trust_region_constraint_lhs = value(trust_region_constraint_lhs);
             obj.this_iter.slack_noncvx_eq      = value(obj.scp_prob.slack_noncvx_eq);
             obj.this_iter.slack_noncvx_ineq    = value(obj.scp_prob.slack_noncvx_ineq);
+            obj.this_iter.slack_convexified_inexact_ineq = value(obj.scp_prob.slack_convexified_inexact_ineq);
             obj.this_iter.time_solver = diagnostics.solvertime;
             obj.this_iter.time_yalmip = diagnostics.yalmiptime;
         end
 
         % Compute the augmented penalty function
-        function P = penalty_function(obj, xi, zeta, options)
+        function P = penalty_function(obj, xi, zeta, zeta_inexact, options)
 
             arguments
                 obj
                 xi
                 zeta
+                zeta_inexact
                 options.DeltaZ = []
                 options.trust_region_constraint_lhs = []
             end
@@ -258,7 +265,7 @@ classdef SCvxStar < handle
 
             switch obj.constParams.penalty_method
                 case {'AL'}
-                    P = dot(lambda, xi) + w/2 * dot(xi,xi) + dot(mu,zeta_pos) + w/2 * dot(zeta_pos, zeta_pos);
+                    P = dot(lambda, xi) + w/2 * dot(xi,xi) + dot(mu,zeta_pos) + w/2 * dot(zeta_pos, zeta_pos) + obj.constParams.w_inexact * norm(zeta_inexact, 1);
 
                 % l1 penalty as seen in Mao et al. 2018
                 case {'L1'}
@@ -296,11 +303,11 @@ classdef SCvxStar < handle
             obj.this_iter.chi = norm([obj.this_iter.g; max(0, obj.this_iter.h)]);
 
             % Augmented cost of the newest solution evaluated with the nonconvex constraints
-            obj.this_iter.P = obj.penalty_function(obj.this_iter.g, obj.this_iter.h, DeltaZ=obj.this_iter.DeltaZ);
+            obj.this_iter.P = obj.penalty_function(obj.this_iter.g, obj.this_iter.h, obj.this_iter.slack_convexified_inexact_ineq, DeltaZ=obj.this_iter.DeltaZ);
             J = obj.this_iter.J0 + obj.this_iter.P;
 
             % Augmented cost of the reference with the current w, lambda, mu values
-            obj.this_iter.P_ref = obj.penalty_function(obj.this_iter.g_ref, obj.this_iter.h_ref, DeltaZ=obj.this_iter.DeltaZ);
+            obj.this_iter.P_ref = obj.penalty_function(obj.this_iter.g_ref, obj.this_iter.h_ref, obj.this_iter.slack_convexified_inexact_ineq, DeltaZ=obj.this_iter.DeltaZ);
             J_ref = obj.this_iter.J0_ref + obj.this_iter.P_ref;
 
             % Evaluate the nonconvex/relaxed versions of improvement in augmented cost
@@ -466,26 +473,39 @@ classdef SCvxStar < handle
                 r = obj.this_iter.r
             end
             constraintLHS = [];
-            
-            if isempty(obj.scp_prob.D)
-                D = 1;
-            else
-                D = obj.scp_prob.D;
-            end
-            
-            for k = 1:size(vars.L, 3)
-                A = obj.scp_prob.A_sys(:,:,k);
-                B = obj.scp_prob.B_sys(:,:,k);
-                S = vars.S(:,:,k);
-                L = vars.L(:,:,k);
-                S_ref = ref_vars.S(:,:,k);
-                L_ref = ref_vars.L(:,:,k);
-                F = A*S + B*L;
-                F_ref = A*S_ref + B*L_ref;
 
-                constraintLHS = [constraintLHS
-                    norm(vec(D * (F - F_ref)), obj.constParams.trust_region_norm) - r
-                    ];
+            if obj.scp_prob.use_standard_trust_region
+                for i = 1:length(obj.var_names)
+                    field = obj.var_names{i};
+                    if obj.scp_prob.impose_trust_region_struct.(field)
+                        constraintLHS = [constraintLHS
+                            obj.scp_prob.trust_region_scaling.(field) ...
+                            .* norm(reshape(vars.(field) - obj.this_iter.ref_vars.(field), [], 1), obj.constParams.trust_region_norm) ...
+                            - obj.this_iter.r
+                            ];
+                    end
+                end
+            else
+                if isempty(obj.scp_prob.D)
+                    D = 1;
+                else
+                    D = obj.scp_prob.D;
+                end
+                
+                for k = 1:size(vars.L, 3)
+                    A = obj.scp_prob.A_sys(:,:,k);
+                    B = obj.scp_prob.B_sys(:,:,k);
+                    S = vars.S(:,:,k);
+                    L = vars.L(:,:,k);
+                    S_ref = ref_vars.S(:,:,k);
+                    L_ref = ref_vars.L(:,:,k);
+                    F = A*S + B*L;
+                    F_ref = A*S_ref + B*L_ref;
+
+                    constraintLHS = [constraintLHS
+                        norm(vec(D * (F - F_ref)), obj.constParams.trust_region_norm) - r
+                        ];
+                end
             end
         end
 

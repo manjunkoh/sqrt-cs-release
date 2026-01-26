@@ -21,11 +21,14 @@ classdef SCPProblem < handle
         sdp_convex_ineq {is_sdpvar}
         sdp_noncvx_eq_relaxed {is_sdpvar}
         sdp_noncvx_ineq_relaxed {is_sdpvar}
-        sdp_convexified_exact {is_sdpvar}
+        sdp_convexified_inexact {is_sdpvar}
+        sdp_convexified_inexact_ineq_relaxed {is_sdpvar}
         size_noncvx_eq double
         size_noncvx_ineq double
+        size_convexified_inexact_ineq double
         slack_noncvx_eq = []; % yalmip objects or empty
         slack_noncvx_ineq = []; % yalmip objects or empty
+        slack_convexified_inexact_ineq = []; % yalmip objects or empty
         trust_region_scaling = []; % Trust region scaling for each field. Can be scalar or vector of the same size as the number of variables
             % trust_region_scaling can be updated iteratively if the trust region is adaptive (e.g. state-dependent)
         D = []; % Trust region scaling matrix. If empty, defaults to scalar 1
@@ -52,7 +55,7 @@ classdef SCPProblem < handle
             % Automatically determine the size of nonconvex constraints
             obj.size_noncvx_eq = length(obj.noncvx_eq(obj.init_guess_struct));
             obj.size_noncvx_ineq = length(obj.noncvx_ineq(obj.init_guess_struct));
-
+            obj.size_convexified_inexact_ineq = length(obj.convexified_inexact_ineq_relaxed(obj.init_guess_struct, obj.init_guess_struct));
             obj.set_fixed_sdp_objects();
 
             % Automatically handle auxiliary variables: exclude them from trust regions
@@ -121,6 +124,10 @@ classdef SCPProblem < handle
                 obj.slack_noncvx_ineq = sdpvar(obj.size_noncvx_ineq, 1);
             end
 
+            if obj.size_convexified_inexact_ineq > 0
+                obj.slack_convexified_inexact_ineq = sdpvar(obj.size_convexified_inexact_ineq, 1);
+            end
+
             obj.sdp_vars        = obj.define_vars();
             obj.sdp_objective   = obj.objective(obj.sdp_vars);
             obj.sdp_convex_eq   = obj.convex_eq(obj.sdp_vars);
@@ -168,7 +175,8 @@ classdef SCPProblem < handle
             % Inherit this function and modify to your needs; e.g. calculating STMs
             obj.sdp_noncvx_eq_relaxed = obj.noncvx_eq_relaxed(obj.sdp_vars, ref_vars) == obj.slack_noncvx_eq;
             obj.sdp_noncvx_ineq_relaxed = obj.noncvx_ineq_relaxed(obj.sdp_vars, ref_vars) <= obj.slack_noncvx_ineq;
-            obj.sdp_convexified_exact = obj.convexified_exact(obj.sdp_vars, ref_vars);
+            obj.sdp_convexified_inexact = obj.convexified_inexact(obj.sdp_vars, ref_vars);
+            obj.sdp_convexified_inexact_ineq_relaxed = obj.convexified_inexact_ineq_relaxed(obj.sdp_vars, ref_vars) <= obj.slack_convexified_inexact_ineq;
         end
 
         function save_to_mat(obj)
@@ -228,11 +236,16 @@ classdef SCPProblem < handle
 
     % Optional methods that can be overwritten by the user
     methods
-        function constraint = convexified_exact(obj, vars, ref_vars)
-            % Convex/convexified constraints that are imposed exactly but change with the reference variables
+        function constraint = convexified_inexact(obj, vars, ref_vars)
+            % Convexified constraints that are imposed exactly (without slack variables) but change with the reference variables
             % WARNING: In general, this breaks the convergence guarantee of SCvx/SCvx* and causes Delta L to become negative
             % Use with caution
             constraint = [];
+        end
+
+        function constraintLHS = convexified_inexact_ineq_relaxed(obj, vars, ref_vars)
+            % Convexified constraints that are relaxed with slack variables. The constraints change with the reference variables.
+            constraintLHS = [];
         end
 
         function pre_iteration(obj)

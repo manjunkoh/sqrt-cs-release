@@ -7,6 +7,10 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 		impose_trust_region_struct = struct('S', true, 'L', true, 'mu', false, 'v', false);
 	end
 
+	properties (Constant)
+		use_standard_trust_region = false
+	end
+
 	properties
 		N % Horizon length
 		nx % State dimension
@@ -36,7 +40,7 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 		waypoints = {}  % cell array of waypoint structs with fields: 'node' (scalar, 1:N+1) and 'mu' (nx x 1 vector)
 		mu % state mean trajectory, set after solving
 		v  % control mean trajectory, set after solving
-
+		relax_obstacle_constraints = false % if true, relax the obstacle constraints by adding slack variables
 	end
 
 	methods
@@ -59,6 +63,7 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 				options.waypoints = {}
 				options.D = [] % Trust region scaling matrix. If empty, defaults to scalar 1
 				options.circular_obstacles = {}
+				options.relax_obstacle_constraints = false
 			end
 			obj@SCPProblem();
 			obj.init_guess_struct = init_guess_struct;
@@ -84,7 +89,7 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			% Trust region scaling matrix
 			obj.D = options.D;
 			obj.circular_obstacles = options.circular_obstacles;
-
+			obj.relax_obstacle_constraints = options.relax_obstacle_constraints;
 			yalmip('clear');
 			obj.initialize();
 
@@ -389,11 +394,42 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 			constraintLHS = [];
 		end
 
-		function constraints = convexified_exact(obj, vars, ref_vars)
-			% Convex/convexified constraints that are imposed exactly but change with the reference variables
+		function constraints = convexified_inexact(obj, vars, ref_vars)
+			% Convexified constraints that are imposed exactly (without slack variables) but change with the reference variables
 			% WARNING: In general, this breaks the convergence guarantee of SCvx/SCvx* and causes Delta L to become negative
 			% Use this for handling circular keep-out zones which are linearized around the reference mean and covariance
 			constraints = [];
+
+			if obj.relax_obstacle_constraints
+				return;
+			end
+
+			pos_idx = 1:2;
+
+			for i = 1:length(obj.circular_obstacles)
+				obstacle = obj.circular_obstacles{i};
+				center = obstacle.center;
+				radius = obstacle.radius;
+				p = obstacle.p;
+				z = norminv(1 - p);
+				for k = 1:obj.N+1
+					mu_k = vars.mu(:,k);
+					S_k = vars.S(:,:,k);
+					mu_ref_k = ref_vars.mu(:,k);
+					[a, b] = hyperplane_from_circular_obstacle(center, radius, mu_ref_k(pos_idx));
+					constraints = [constraints;
+						cone([ (- a' * mu_k(pos_idx) - b) / z; S_k(pos_idx,pos_idx)' * a])
+						% a' * mu_k(pos_idx) + z * norm(a' * S_k(pos_idx,pos_idx)) + b <= 0
+					];
+				end
+			end
+		end
+
+		function constraintLHS = convexified_inexact_ineq_relaxed(obj, vars, ref_vars)
+			constraintLHS = [];
+			if ~obj.relax_obstacle_constraints
+				return;
+			end
 
 			pos_idx = 1:2;
 
@@ -409,10 +445,10 @@ classdef SqrtQRCovarianceSteering < SCPProblem
 					mu_ref_k = ref_vars.mu(:,k);
 					a = - (mu_ref_k(pos_idx) - center);
 					b = - 0.5 * norm(mu_ref_k(pos_idx) - center)^2  + 0.5 * radius^2 - a' * mu_ref_k(pos_idx);
-					constraints = [constraints;
-						cone([ (- a' * mu_k(pos_idx) - b) / z; S_k(pos_idx,pos_idx)' * a])
-						% a' * mu_k(pos_idx) + z * norm(a' * S_k(pos_idx,pos_idx)) + b <= 0
-					];
+					constraintLHS = [constraintLHS;
+						% cone([ (- a' * mu_k(pos_idx) - b) / z; S_k(pos_idx,pos_idx)' * a])
+						a' * mu_k(pos_idx) + z * norm(a' * S_k(pos_idx,pos_idx)) + b
+						];
 				end
 			end
 		end

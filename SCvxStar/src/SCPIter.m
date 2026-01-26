@@ -24,6 +24,7 @@ classdef SCPIter < handle
         trust_region_constraint_lhs = NaN
         slack_noncvx_eq = NaN
         slack_noncvx_ineq = NaN
+        slack_convexified_inexact_ineq = NaN
         solve_flag  = NaN
         time_yalmip = NaN
         time_solver = NaN
