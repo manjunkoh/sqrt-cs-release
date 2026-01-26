@@ -82,7 +82,6 @@ for iter = 1:max_iters
     constraints = [constraints, slack_u >= 0];
 
     for k = 1:num_nodes
-        % objective = objective + x(:,k)' * Q * x(:,k) + u(:,k)' * R * u(:,k) + penalty_scalar_obstacle * lambda_u(k);
         objective = objective + norm(u(:,k)) + penalty_scalar_obstacle * slack_u(k);
     end
 
@@ -121,13 +120,9 @@ plot(x_opt(1,:), x_opt(2,:), 'r.-')
     % [0; 1; 0; 0], 'beta', wall_y_pos, 'p', state_risk, 'nodes', 1:num_nodes+1)};
 chance_constraints_state = {};
 
-% a_all = NaN(2, num_nodes);
-% b_all = NaN(1, num_nodes);
 for k = 1:num_nodes
     for i = 1:num_obstacles
         [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), x_opt(pos_idx,k));
-        % a_all(:,k) = a;
-        % b_all(k) = b;
         a = [a; 0; 0];
         b = -b;
 
@@ -135,27 +130,8 @@ for k = 1:num_nodes
 	end
 end
 
-%%
-%
-%
-% figure;
-% plot_problem(obstacle_centers, obstacle_radii, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
-% hold on 
-% ymax = 1;
-% ymin = -1;
-% % axis equal
-% for k = 1:num_nodes
-% 	plot(x_opt(1,k), x_opt(2,k), 'r.', 'MarkerSize', 10)
-%     for i = 1:num_obstacles
-%         [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), x_opt(pos_idx,k));
-% 		xlim = [(ymax - b) / a(2), (ymin - b) / a(2)];
-%         plot_hyperplane(a, b, xlim, 'k-', LineWidth=1)
-%         drawnow
-%         keyboard
-%     end
-% end
 
-% Solve with SQRT QR method
+%% Solve with SQRT QR method
 scp_params = SCPParams();
 scp_params.k_max = 300;
 scp_params.tol_opt = 1E-2;
@@ -168,7 +144,6 @@ relax_obstacle_constraints = false;
 init_guess = struct();
 init_guess.S = interpolate_lower_triangular(chol(Sigma_0, 'lower'), chol(Sigma_f, 'lower'), num_nodes+1, 'log-cholesky');
 init_guess.L = zeros(nu, nx, num_nodes);
-% init_guess.L = 1E-2 * ones(nu, nx, num_nodes);
 init_guess.mu = x_opt;
 init_guess.v = u_opt;
 
@@ -180,17 +155,6 @@ prob_qr = SqrtQRCovarianceSteering(init_guess, ...
 	P_0=Sigma_0, P_f=Sigma_f, Q=Q, R=R, ...
 	chance_constraints_state=chance_constraints_state, ...
 	chance_constraints_control=chance_constraints_control);
-
-% prob_qr = SqrtQRCovarianceSteering(init_guess, ...
-% 	N=num_nodes, ...
-% 	A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
-% 	objective_type='LQR', ...
-% 	mu_0=mu_0, mu_f=mu_f, ...
-% 	P_0=Sigma_0, P_f=Sigma_f, Q=Q, R=R, ...
-% 	chance_constraints_state=chance_constraints_state, ...
-% 	chance_constraints_control=chance_constraints_control,...
-% 	circular_obstacles=circular_obstacles, ...
-% 	relax_obstacle_constraints=relax_obstacle_constraints);
 
 flag_solved_qr = prob_qr.solve(scp_params=scp_params);
 
@@ -221,76 +185,7 @@ axis equal
 % xlim([-1.4, 11])
 % ylim([-3, 2.0])
 
-%%
-fc_iterative = FullCovarianceSteeringIterative(...
-	N = num_nodes, ...
-	A=A_sys, B=B_sys, G=G_sys, ...
-	P_0=Sigma_0, P_f=Sigma_f, Q=Q, R=R, ...
-	chance_constraints_state=chance_constraints_state, ...
-	chance_constraints_control=chance_constraints_control, ...
-	mu_0=mu_0, mu_f=mu_f, ...
-	objective_type = 'DV99');
-
-Y_init_value = 1e-4; % This is really important!!!
-P_ref = interpolate_lower_triangular(chol(Sigma_0, 'lower'), chol(Sigma_f, 'lower'), num_nodes+1, 'log-cholesky');
-Y_ref = repmat(Y_init_value * eye(nu), [1,1,num_nodes]); 
-% fc_iterative.solve(Y_ref=Y_ref, P_ref=P_ref, solve_unconstrained_first=false);
-fc_iterative.solve(Y_ref=Y_ref);
-
-%%
-figure;
-hold on
-plot_problem(obstacle_centers, obstacle_radii, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, fig=gcf);
-plot_solution(fc_iterative.mu, fc_iterative.P, state_risk)
-plot(x_opt(1,:), x_opt(2,:), 'r.-')
-% plot(x_opt(1,1:15), x_opt(2,1:15), 'b.-')
-% plot(prob_qr.mu(1,1:15), prob_qr.mu(2,1:15), 'g.-')
-
-%% Plot the state components' sigmas
-formulations = {fc_iterative, prob_qr};
-formulation_names = {'FullCov', 'SqrtQR'};
-figure;
-tiledlayout(nx, 1);
-for i = 1:nx
-	nexttile;
-    hold on
-	for formulation_idx = 1:length(formulations)
-		formulation = formulations{formulation_idx};
-		one_sigma_plus = formulation.mu(i,:) + sqrt(squeeze(formulation.P(i,i,:)))';
-		% one_sigma_minus = formulation.mu(i,:) - sqrt(squeeze(formulation.P(i,i,:))');
-		plot(0:num_nodes, one_sigma_plus, DisplayName=sprintf('%s', formulation_names{formulation_idx}));
-		% plot(0:num_nodes, one_sigma_minus, 'b-', DisplayName=sprintf('%s', formulation_names{formulation_idx}));
-	end
-	legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
-end
-
-%% Plot the control components' sigmas
-figure;
-tiledlayout(nu, 1);
-for i = 1:nu
-	nexttile;
-	hold on
-	for formulation_idx = 1:length(formulations)
-		formulation = formulations{formulation_idx};
-		one_sigma_plus = formulation.v(i,:) + sqrt(squeeze(formulation.P_u(i,i,:)))';
-		% one_sigma_minus = formulation.v(i,:) - sqrt(squeeze(formulation.P_u(i,i,:))');
-		stairs(0:num_nodes-1, one_sigma_plus, DisplayName=sprintf('%s', formulation_names{formulation_idx}));
-		% plot(0:num_nodes, one_sigma_minus, 'b-', DisplayName=sprintf('%s', formulation_names{formulation_idx}));
-	end
-	legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
-end
-
 %% Solve the constrained stochastic problem via iterative approach
-
-% Solve the unconstrained problem to obtain the initial guess
-% Y_ref = repmat(1e-2 * eye(nu), [1,1,num_nodes]);
-% fc_unconstrained = FullCovarianceSteering(A=A_sys, B=B_sys, G=G_sys, ...
-% 	P_0=Sigma_0, P_f=Sigma_f, Q=Q, R=R, ...
-% 	mu_0=mu_0, mu_f=mu_f, ...
-% 	objective_type = 'DV99');
-% fc_unconstrained.solve(Y_ref=Y_ref);
-
-%
 max_iters = 30;
 penalty_scalar_x = 10;
 penalty_scalar_u = 100;
@@ -311,11 +206,7 @@ slack_J = sdpvar(1, num_nodes);
 
 mu_ref = x_opt;
 v_ref = u_opt;
-slack_J_ref = u_max^2 * ones(1, num_nodes);
-
-% Y_init_value = 1e-2; % This is really important!!!
-% P_ref = interpolate_lower_triangular(chol(Sigma_0, 'lower'), chol(Sigma_f, 'lower'), num_nodes+1, 'log-cholesky');
-% Y_ref = repmat(Y_init_value * eye(nu), [1,1,num_nodes]); 
+slack_J_ref = (u_max*0.1)^2 * ones(1, num_nodes);
 
 % Initialize tracking variables
 objective_full_covariance = NaN;
@@ -340,15 +231,6 @@ for iter = 1:max_iters
 
     constraints = [constraints, mu(:,1) == mu_0, mu(:,num_nodes+1) == mu_f, P(:,:,1) == Sigma_0, P(:,:,num_nodes+1) <= Sigma_f];
 
-
-    % % State wall chance constraints
-    % for k = 1:num_nodes
-    %     sqrt_ref = sqrt(P_ref(2,2,k));
-    %     constraints = [constraints,
-    %         z / (2 * sqrt_ref) * (P(2,2,k)) + z * sqrt_ref / 2 + mu(2,k) - wall_y_pos <= 0
-    %     ];
-    % end
-
     % Control chance constraints
     for k = 1:num_nodes
         % Y_ref_k = Y_ref(:,:,k);
@@ -357,33 +239,12 @@ for iter = 1:max_iters
             b = chance_constraints_control{i}.beta;
             p = chance_constraints_control{i}.p;
             z = norminv(1 - p);
-            % sqrt_ref = sqrt(a' * Y_ref_k * a);
             constraints = [constraints
                 z^2 * (a' * Y(:,:,k) * a) <= (b - a' * v_ref(:,k))^2 - 2 * (b - a'* v_ref(:,k)) * a' * (v(:,k) - v_ref(:,k)) + slack_u(i,k)
                 b - a' * v(:,k) >= 0
             ];
         end
     end
-
-    % State obstacle chance constraints
-    % for k = 1:num_nodes+1
-    %     for i = 1:num_obstacles
-    %         [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), mu_ref(pos_idx,k));
-    % 
-    %         P_ref_pos_k = P_ref(pos_idx,pos_idx,k);
-    %         sqrt_ref = sqrt(a' * P_ref_pos_k * a);
-    %         if sqrt_ref <= 0
-    %             % numerically, the covariance can be non-PSD; in this case
-    %             % simply set this value to a small positive number
-    %             % Using nearestSPD sometimes does not terminate for a long
-    %             % time, so it isn't used here
-    %             sqrt_ref = 0.0001;
-    %         end
-    %         constraints = [constraints
-    %             z / (2 * sqrt_ref) * (a' * P(pos_idx,pos_idx,k) * a) + z * sqrt_ref / 2 + a' * mu(pos_idx,k) + b <= lambda_x(i,k)
-    %         ];
-    %     end
-    % end
 
     z = norminv(1 - state_risk);
 	for i = 1:num_obstacles
@@ -432,12 +293,14 @@ for iter = 1:max_iters
     v_opt = value(v);
     P_opt = value(P);
     Y_opt = value(Y);
-    lambda_u_opt = value(slack_u);
-    lambda_x_opt = value(slack_x);
+    slack_u_opt = value(slack_u);
+    slack_x_opt = value(slack_x);
     
     objective_full_covariance = value(objective);
 	objective_augmented = value(objective_augmented);
-	objective_with_previous_penalty = objective_full_covariance + penalty_scalar_x_prev * sum(lambda_x_opt, 'all') + penalty_scalar_u_prev * sum(lambda_u_opt, 'all');
+	objective_with_previous_penalty = objective_full_covariance ...
+        + penalty_scalar_x_prev * sum(slack_x_opt, 'all') ...
+        + penalty_scalar_u_prev * sum(slack_u_opt, 'all');
 
 	control_constraint_values = check_control_constraint_satisfaction(v_opt, Y_opt, chance_constraints_control, num_nodes);
 
@@ -447,8 +310,8 @@ for iter = 1:max_iters
 	fprintf("Largest state violation: %f\n", max(state_constraint_values(:)));
 
     if iter > 1 ...
-        && (all(lambda_x_opt(:) <= feasibility_tolerance) ...
-        && all(lambda_u_opt(:) <= feasibility_tolerance)) ...
+        && (all(slack_x_opt(:) <= feasibility_tolerance) ...
+        && all(slack_u_opt(:) <= feasibility_tolerance)) ...
 		&& all(control_constraint_values(:) <= feasibility_tolerance) ...
 		&& all(state_constraint_values(:) <= feasibility_tolerance)
         % && objective_augmented_prev - objective_with_previous_penalty < convergence_tolerance
@@ -461,8 +324,8 @@ for iter = 1:max_iters
         prob_fc.P = P_opt;
         prob_fc.Y = Y_opt;
         prob_fc.P_u = Y_opt;
-        prob_fc.lambda_u = lambda_u_opt;
-        prob_fc.lambda_x = lambda_x_opt;
+        prob_fc.lambda_u = slack_u_opt;
+        prob_fc.lambda_x = slack_x_opt;
 
         prob_fc.dv99 = 0;
         for k = 1:num_nodes
@@ -499,8 +362,7 @@ iters_full_covariance = iter;
 figure;
 hold on
 plot_problem(obstacle_centers, obstacle_radii, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, fig=gcf);
-% plot_solution(prob_fc.mu, prob_fc.P, state_risk)
-plot_solution(mu_opt, P_opt, state_risk)
+plot_solution(prob_fc.mu, prob_fc.P, state_risk)
 plot(x_opt(1,:), x_opt(2,:), 'r.-')
 
 axis equal
