@@ -48,7 +48,7 @@ max_iters = 50;
 yalmip('clear')
 x = sdpvar(nx, num_nodes+1, 'full');
 u = sdpvar(nu, num_nodes, 'full');
-lambda_u = sdpvar(1, num_nodes, 'full');
+slack_u = sdpvar(1, num_nodes, 'full');
 
 x_ref = linspace_vec(mu_0, mu_f, num_nodes+1);
 
@@ -74,16 +74,16 @@ for iter = 1:max_iters
             a = - (x_ref(pos_idx,k) - obstacle_centers(i,:)');
             b = - 0.5 * norm(x_ref(pos_idx,k) - obstacle_centers(i,:)')^2  + 0.5 * obstacle_radii(i)^2 - a' * x_ref(pos_idx,k);
             constraints = [constraints
-                a' * x(pos_idx,k) + b <= lambda_u(k)
+                a' * x(pos_idx,k) + b <= slack_u(k)
             ];
         end
     end
 
-    constraints = [constraints, lambda_u >= 0];
+    constraints = [constraints, slack_u >= 0];
 
     for k = 1:num_nodes
         % objective = objective + x(:,k)' * Q * x(:,k) + u(:,k)' * R * u(:,k) + penalty_scalar_obstacle * lambda_u(k);
-        objective = objective + norm(u(:,k)) + penalty_scalar_obstacle * lambda_u(k);
+        objective = objective + norm(u(:,k)) + penalty_scalar_obstacle * slack_u(k);
     end
 
     sol = optimize(constraints, objective, sdpsettings('verbose', 0));
@@ -305,11 +305,13 @@ v = sdpvar(nu, num_nodes, 'full');
 P = sdpvar(nx, nx, num_nodes+1);
 U = sdpvar(nu, nx, num_nodes, 'full');
 Y = sdpvar(nu, nu, num_nodes);
-lambda_u = sdpvar(4, num_nodes, 'full'); % "virtual control"
-lambda_x = sdpvar(num_obstacles, num_nodes+1, 'full');
+slack_u = sdpvar(4, num_nodes, 'full'); % "virtual control"
+slack_x = sdpvar(num_obstacles, num_nodes+1, 'full');
+slack_J = sdpvar(1, num_nodes);
 
 mu_ref = x_opt;
 v_ref = u_opt;
+slack_J_ref = u_max^2 * ones(1, num_nodes);
 
 % Y_init_value = 1e-2; % This is really important!!!
 % P_ref = interpolate_lower_triangular(chol(Sigma_0, 'lower'), chol(Sigma_f, 'lower'), num_nodes+1, 'log-cholesky');
@@ -357,7 +359,7 @@ for iter = 1:max_iters
             z = norminv(1 - p);
             % sqrt_ref = sqrt(a' * Y_ref_k * a);
             constraints = [constraints
-                z^2 * (a' * Y(:,:,k) * a) <= (b - a' * v_ref(:,k))^2 - 2 * (b - a'* v_ref(:,k)) * a' * (v(:,k) - v_ref(:,k)) + lambda_u(i,k)
+                z^2 * (a' * Y(:,:,k) * a) <= (b - a' * v_ref(:,k))^2 - 2 * (b - a'* v_ref(:,k)) * a' * (v(:,k) - v_ref(:,k)) + slack_u(i,k)
                 b - a' * v(:,k) >= 0
             ];
         end
@@ -391,20 +393,26 @@ for iter = 1:max_iters
             b = -b;
 
             constraints = [constraints
-                z^2 * (a' * P(:,:,k) * a) <= (b - a'*mu_ref(:,k))^2 - 2 * (b - a'* mu_ref(:,k)) * a' * (mu(:,k) - mu_ref(:,k)) + lambda_x(i,k)
+                z^2 * (a' * P(:,:,k) * a) <= (b - a'*mu_ref(:,k))^2 - 2 * (b - a'* mu_ref(:,k)) * a' * (mu(:,k) - mu_ref(:,k)) + slack_x(i,k)
                 b - a' * mu(:,k) >= 0
             ];
         end
+    end
+
+    for k = 1:num_nodes
+        constraints = [constraints
+            lambda_max(Y(:,:,k)) <= slack_J_ref(k)^2 + 2 * slack_J_ref(k) * (slack_J(k) - slack_J_ref(k))
+        ];
 	end
 
-    constraints = [constraints, lambda_u(:) >= 0, lambda_x(:) >= 0];
+    constraints = [constraints, slack_u(:) >= 0, slack_x(:) >= 0, slack_J >= 0];
 
     for k = 1:num_nodes
         % objective = objective + v(:,k)' * R * v(:,k) + trace(R * Y(:,:,k));
-        objective = objective + norm(v(:,k)) + sqrt(chi2inv(0.99, nu)) * lambda_max(Y(:,:,k)) + 1E-2 * trace(Y(:,:,k));
+        objective = objective + norm(v(:,k)) + sqrt(chi2inv(0.99, nu)) * slack_J(k);
     end
 
-    objective_augmented = objective + penalty_scalar_u * sum(lambda_u, 'all') + penalty_scalar_x * sum(lambda_x, 'all');
+    objective_augmented = objective + penalty_scalar_u * sum(slack_u, 'all') + penalty_scalar_x * sum(slack_x, 'all');
 
     fprintf("Iteration %d    ", iter)
 
@@ -424,8 +432,8 @@ for iter = 1:max_iters
     v_opt = value(v);
     P_opt = value(P);
     Y_opt = value(Y);
-    lambda_u_opt = value(lambda_u);
-    lambda_x_opt = value(lambda_x);
+    lambda_u_opt = value(slack_u);
+    lambda_x_opt = value(slack_x);
     
     objective_full_covariance = value(objective);
 	objective_augmented = value(objective_augmented);
@@ -452,8 +460,14 @@ for iter = 1:max_iters
         prob_fc.v = v_opt;
         prob_fc.P = P_opt;
         prob_fc.Y = Y_opt;
+        prob_fc.P_u = Y_opt;
         prob_fc.lambda_u = lambda_u_opt;
         prob_fc.lambda_x = lambda_x_opt;
+
+        prob_fc.dv99 = 0;
+        for k = 1:num_nodes
+            prob_fc.dv99 = prob_fc.dv99 + norm(v_opt) + sqrt(chi2inv(0.99, nu)) * sqrt(lambda_max(Y_opt(:,:,k)));
+        end
 
         prob.K = zeros(nu, nx, num_nodes);
         for k = 1:num_nodes
@@ -625,3 +639,38 @@ function constraint_values = check_state_constraint_satisfaction(mu, P, obstacle
     end
 	constraint_values = max(constraint_values, 0);
 end
+
+%% Plot the state components' sigmas
+formulations = {prob_fc, prob_qr};
+formulation_names = {'FullCov', 'SqrtQR'};
+figure;
+tiledlayout(nx, 1);
+for i = 1:nx
+	nexttile;
+    hold on
+	for formulation_idx = 1:length(formulations)
+		formulation = formulations{formulation_idx};
+		one_sigma_plus = formulation.mu(i,:) + sqrt(squeeze(formulation.P(i,i,:)))';
+		% one_sigma_minus = formulation.mu(i,:) - sqrt(squeeze(formulation.P(i,i,:))');
+		plot(0:num_nodes, one_sigma_plus, DisplayName=sprintf('%s', formulation_names{formulation_idx}));
+		% plot(0:num_nodes, one_sigma_minus, 'b-', DisplayName=sprintf('%s', formulation_names{formulation_idx}));
+	end
+	legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
+end
+
+%% Plot the control components' sigmas
+figure;
+tiledlayout(nu, 1);
+for i = 1:nu
+	nexttile;
+	hold on
+	for formulation_idx = 1:length(formulations)
+		formulation = formulations{formulation_idx};
+		one_sigma_plus = formulation.v(i,:) + sqrt(squeeze(formulation.P_u(i,i,:)))';
+		% one_sigma_minus = formulation.v(i,:) - sqrt(squeeze(formulation.P_u(i,i,:))');
+		stairs(0:num_nodes-1, one_sigma_plus, DisplayName=sprintf('%s', formulation_names{formulation_idx}));
+		% plot(0:num_nodes, one_sigma_minus, 'b-', DisplayName=sprintf('%s', formulation_names{formulation_idx}));
+	end
+	legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
+end
+
