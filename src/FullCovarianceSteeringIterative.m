@@ -46,6 +46,11 @@ classdef FullCovarianceSteeringIterative < handle
 		% Results
 		prob  % Final FullCovarianceSteering problem instance
 		iter_history = struct('iter', {}, 'P_ref', {}, 'Y_ref', {}, 'objective', {}, 'diagnostic', {}, 'change_objective', {}, 'max_violation', {})
+
+		mu % state mean trajectory, set after solving (if applicable)
+		v  % control mean trajectory, set after solving (if applicable)
+		P  % state covariance matrices, set after solving (nx x nx x N+1)
+		P_u % control covariance matrices, set after solving (nu x nu x N)
 	end
 	
 	methods
@@ -99,7 +104,7 @@ classdef FullCovarianceSteeringIterative < handle
 			obj.verbose = options.verbose;
 		end
 		
-		function [diagnostic, prob] = solve(obj, sdp_settings)
+		function [diagnostic, prob] = solve(obj, options)
 			% Solve the problem iteratively
 			% 
 			% Inputs:
@@ -109,9 +114,18 @@ classdef FullCovarianceSteeringIterative < handle
 			%   diagnostic - Final diagnostic from YALMIP
 			%   prob - Final FullCovarianceSteering problem instance
 			
-			if nargin < 2 || isempty(sdp_settings)
-				sdp_settings = sdpsettings('verbose', 0, 'solver', 'mosek');
+			arguments
+				obj
+				options.sdp_settings = sdpsettings('verbose', 0, 'solver', 'mosek');
+				options.Y_ref = []
+				options.P_ref = []
+				options.solve_unconstrained_first = true
 			end
+
+			sdp_settings = options.sdp_settings;
+			Y_ref = options.Y_ref;
+			P_ref = options.P_ref;
+			solve_unconstrained_first = options.solve_unconstrained_first;
 			
 			% Check if chance constraints are provided
 			has_chance_constraints = ~isempty(obj.chance_constraints_state) || ~isempty(obj.chance_constraints_control);
@@ -145,49 +159,55 @@ classdef FullCovarianceSteeringIterative < handle
 				return;
 			end
 			
-			% Step 1: Solve without chance constraints to get initial reference
-			if obj.verbose
-				fprintf('=== Iteration 0: Solving without chance constraints ===\n');
+			iter = 1;
+			% Step 0: Solve without chance constraints to get initial reference
+			if solve_unconstrained_first
+				if obj.verbose
+					fprintf('=== Iteration 0: Solving without chance constraints ===\n');
+				end
+				
+				prob_init = FullCovarianceSteering(...
+					'A', obj.A, 'B', obj.B, 'G', obj.G, ...
+					'P_0', obj.P_0, 'P_f', obj.P_f, ...
+					'Q', obj.Q, 'R', obj.R, ...
+					'N', obj.N, ...
+					'mu_0', obj.mu_0, 'mu_f', obj.mu_f, ...
+					'P_ref', P_ref, 'Y_ref', Y_ref, ...
+					'waypoints', obj.waypoints, ...
+					'objective_type', obj.objective_type, ...
+					'covariance_scaling', obj.covariance_scaling);
+				
+				diagnostic_init = prob_init.solve(sdp_settings);
+				
+				if obj.verbose
+					fprintf('  Exit status: %s\n', yalmiperror(diagnostic_init.problem));
+				end
+				
+				if diagnostic_init.problem ~= 0 && diagnostic_init.problem ~= 4
+					error('Initial solve (without chance constraints) failed: %s', yalmiperror(diagnostic_init.problem));
+				end
+				
+				% Extract reference from initial solution
+				P_ref = prob_init.P;
+				Y_ref = prob_init.P_u;
+				if obj.verbose
+					fprintf('  Initial objective: %.6f\n', prob_init.optimal_objective);
+				end
+				
+				% Store initial iteration
+				obj.iter_history(iter).iter = 0;
+				obj.iter_history(iter).P_ref = P_ref;
+				obj.iter_history(iter).Y_ref = Y_ref;
+				obj.iter_history(iter).objective = prob_init.optimal_objective;
+				obj.iter_history(iter).diagnostic = diagnostic_init;
+				obj.iter_history(iter).change_objective = NaN;
+				obj.iter_history(iter).max_violation = NaN;
+
+                iter = iter + 1;
 			end
-			
-			prob_init = FullCovarianceSteering(...
-				'A', obj.A, 'B', obj.B, 'G', obj.G, ...
-				'P_0', obj.P_0, 'P_f', obj.P_f, ...
-				'Q', obj.Q, 'R', obj.R, ...
-				'N', obj.N, ...
-				'mu_0', obj.mu_0, 'mu_f', obj.mu_f, ...
-				'waypoints', obj.waypoints, ...
-				'objective_type', obj.objective_type, ...
-				'covariance_scaling', obj.covariance_scaling);
-			
-			diagnostic_init = prob_init.solve(sdp_settings);
-			
-			if obj.verbose
-				fprintf('  Exit status: %s\n', yalmiperror(diagnostic_init.problem));
-			end
-			
-			if diagnostic_init.problem ~= 0 && diagnostic_init.problem ~= 4
-				error('Initial solve (without chance constraints) failed: %s', yalmiperror(diagnostic_init.problem));
-			end
-			
-			% Extract reference from initial solution
-			P_ref = prob_init.P;
-			Y_ref = prob_init.P_u;
-			if obj.verbose
-				fprintf('  Initial objective: %.6f\n', prob_init.optimal_objective);
-			end
-			
-			% Store initial iteration
-			obj.iter_history(1).iter = 0;
-			obj.iter_history(1).P_ref = P_ref;
-			obj.iter_history(1).Y_ref = Y_ref;
-			obj.iter_history(1).objective = prob_init.optimal_objective;
-			obj.iter_history(1).diagnostic = diagnostic_init;
-			obj.iter_history(1).change_objective = NaN;
-			obj.iter_history(1).max_violation = NaN;
-			
-			% Step 2: Iteratively solve with chance constraints
-			for iter = 1:obj.max_iters
+				
+			% Step 1: Iteratively solve with chance constraints
+			while iter <= obj.max_iters
 				if obj.verbose
 					fprintf('\n=== Iteration %d: Solving with chance constraints ===\n', iter);
 				end
@@ -218,19 +238,19 @@ classdef FullCovarianceSteeringIterative < handle
 						fprintf('Iteration %d failed: %s. Exiting iterative loop.\n', iter, yalmiperror(diagnostic.problem));
 					end
 					% Store failed iteration in history
-					obj.iter_history(iter+1).iter = iter;
-					obj.iter_history(iter+1).P_ref = P_ref;
-					obj.iter_history(iter+1).Y_ref = Y_ref;
-					obj.iter_history(iter+1).objective = NaN;
-					obj.iter_history(iter+1).diagnostic = diagnostic;
-					obj.iter_history(iter+1).change_objective = NaN;
-					obj.iter_history(iter+1).max_violation = NaN;
+					obj.iter_history(iter).iter = iter;
+					obj.iter_history(iter).P_ref = P_ref;
+					obj.iter_history(iter).Y_ref = Y_ref;
+					obj.iter_history(iter).objective = NaN;
+					obj.iter_history(iter).diagnostic = diagnostic;
+					obj.iter_history(iter).change_objective = NaN;
+					obj.iter_history(iter).max_violation = NaN;
 					break;
 				end
 				
 				% Compute objective function change
 				obj_current = obj.prob.optimal_objective;
-				obj_prev = obj.iter_history(iter).objective;
+				obj_prev = obj.iter_history(iter-1).objective;
 				if abs(obj_prev) > 1e-10
 					change_objective = abs(obj_current - obj_prev) / abs(obj_prev);
 				else
@@ -375,25 +395,30 @@ classdef FullCovarianceSteeringIterative < handle
 				end
 				
 				% Store iteration history
-				obj.iter_history(iter+1).iter = iter;
-				obj.iter_history(iter+1).P_ref = P_ref;
-				obj.iter_history(iter+1).Y_ref = Y_ref;
-				obj.iter_history(iter+1).objective = obj_current;
-				obj.iter_history(iter+1).diagnostic = diagnostic;
-				obj.iter_history(iter+1).change_objective = change_objective;
-				obj.iter_history(iter+1).max_violation = max_violation;
+				obj.iter_history(iter).iter = iter;
+				obj.iter_history(iter).P_ref = P_ref;
+				obj.iter_history(iter).Y_ref = Y_ref;
+				obj.iter_history(iter).objective = obj_current;
+				obj.iter_history(iter).diagnostic = diagnostic;
+				obj.iter_history(iter).change_objective = change_objective;
+				obj.iter_history(iter).max_violation = max_violation;
 				
 				% Check convergence
 				if change_objective < obj.tol_opt && max_violation < obj.tol_feas
 					if obj.verbose
 						fprintf('\nConverged after %d iterations.\n', iter);
 					end
+					obj.mu = obj.prob.mu;
+					obj.v = obj.prob.v;
+					obj.P = obj.prob.P;
+					obj.P_u = obj.prob.P_u;
 					break;
 				end
 				
 				% Update reference for next iteration
 				P_ref = obj.prob.P;
 				Y_ref = obj.prob.P_u;
+				iter = iter + 1;
 			end
 			
 			if iter >= obj.max_iters && obj.verbose

@@ -15,12 +15,9 @@ chance_constraints_control={...
     struct('type', 'affine', 'alpha', [1; 0], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes), ...
     struct('type', 'affine', 'alpha', [-1; 0], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes)};
 
-chance_constraints_state={struct('type', 'affine', 'alpha', ...
-    [0; 1; 0; 0], 'beta', wall_y_pos, 'p', state_risk, 'nodes', 1:num_nodes+1)};
-
 num_simulations = 10000;
 %% Load generated obstacle environments
-load_filename = './data/obstacle_cases.mat';
+load_filename = './data/obstacle_cases_2norm.mat';
 if ~exist(load_filename, 'file')
     error('Obstacle cases file not found: %s\nPlease run generate_and_save_obstacles.m first', load_filename);
 end
@@ -86,137 +83,150 @@ for trial = 1:num_trials
     results.x_opt_deterministic{trial} = x_opt;
     results.u_opt_deterministic{trial} = u_opt;
         
-    % Create circular obstacles structure for stochastic problem
-    circular_obstacles = {};
-    for i = 1:num_obstacles
-        circular_obstacles = [circular_obstacles, struct('center', obstacle_centers(i,:)', 'radius', obstacle_radii(i), 'p', state_risk)];
+    % Create linearized hyperplane constraints
+    chance_constraints_state = {};
+    for k = 1:num_nodes
+        for i = 1:num_obstacles
+            [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), x_opt(pos_idx,k));
+            a = [a; 0; 0];
+            b = -b;
+    
+            chance_constraints_state = [chance_constraints_state, struct('type', 'affine', 'alpha', a, 'beta', b, 'p', state_risk, 'nodes', k)];
+	    end
     end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %% Solve with Full Covariance formulation
-    max_iters = 100;
-    penalty_scalar_x = 1000;
+    %% Solve the constrained stochastic problem via iterative approach
+    max_iters = 30;
+    penalty_scalar_x = 10;
     penalty_scalar_u = 100;
-    convergence_tolerance = 1E-4;
-
+    penalty_increase_ratio = 2;
+    max_penalty = 1e8;
+    feasibility_tolerance = 1E-4;
+    convergence_tolerance = 1E-3;
+    
     yalmip('clear')
     mu = sdpvar(nx, num_nodes+1, 'full');
     v = sdpvar(nu, num_nodes, 'full');
     P = sdpvar(nx, nx, num_nodes+1);
     U = sdpvar(nu, nx, num_nodes, 'full');
     Y = sdpvar(nu, nu, num_nodes);
-    lambda = sdpvar(1, num_nodes, 'full'); % "virtual control"
-    lambda_x = sdpvar(num_obstacles, num_nodes+1, 'full');
-
+    slack_u = sdpvar(4, num_nodes, 'full'); % "virtual control"
+    slack_x = sdpvar(num_obstacles, num_nodes+1, 'full');
+    slack_J = sdpvar(1, num_nodes);
+    
     mu_ref = x_opt;
     v_ref = u_opt;
-
-    Y_init_value = 1e-2; % This value is really important for optimality
-    P_ref = interpolate_lower_triangular(chol(Sigma_0, 'lower'), chol(Sigma_f, 'lower'), num_nodes+1, 'log-cholesky');
-    Y_ref = repmat(Y_init_value * eye(nu), [1,1,num_nodes]); 
-
+    slack_J_ref = (u_max*0.1)^2 * ones(1, num_nodes);
+    
     % Initialize tracking variables
     objective_full_covariance = NaN;
     time_full_covariance = NaN;
-
+    
+    penalty_scalar_x_prev = NaN;
+    penalty_scalar_u_prev = NaN;
+    objective_augmented_prev = Inf;
+    
     tic;
     for iter = 1:max_iters
         constraints = [];
         objective = 0;
-
+    
         for k = 1:num_nodes
             constraints = [constraints, mu(:,k+1) == A * mu(:,k) + B * v(:,k)];
             constraints = [constraints, P(:,:,k+1) == A * P(:,:,k) * A' + B * Y(:,:,k) * B' + A * U(:,:,k)' * B' + B * U(:,:,k) * A' + G * G'];
-            constraints = [constraints, [P(:,:,k) , U(:,:,k)' ;
-                                        U(:,:,k) , Y(:,:,k)] >= 0];
-            constraints = [constraints, P(:,:,k) >= 0, Y(:,:,k) >= 0];
+            constraints = [constraints, [P(:,:,k) , U(:,:,k)';
+                U(:,:,k) , Y(:,:,k)] >= 0];
+            constraints = [constraints, Y(:,:,k) >= 0];
         end
-
-        for k = 1:num_nodes + 1
-            constraints = [constraints, P(:,:,k) >= 0];
-        end
-
+    
         constraints = [constraints, mu(:,1) == mu_0, mu(:,num_nodes+1) == mu_f, P(:,:,1) == Sigma_0, P(:,:,num_nodes+1) <= Sigma_f];
-
-        z = norminv(1 - state_risk);
-
-        % State wall chance constraints
-        for k = 1:num_nodes
-            sqrt_ref = sqrt(P_ref(2,2,k));
-            constraints = [constraints,
-                z / (2 * sqrt_ref) * (P(2,2,k)) + z * sqrt_ref / 2 + mu(2,k) - wall_y_pos <= 0
-            ];
-        end
-
+    
         % Control chance constraints
         for k = 1:num_nodes
-            v_k = v(:,k);
-            Y_k = Y(:,:,k);
-            v_ref_k = v_ref(:,k);
-            Y_ref_k = Y_ref(:,:,k);
+            % Y_ref_k = Y_ref(:,:,k);
             for i = 1:length(chance_constraints_control)
                 a = chance_constraints_control{i}.alpha;
                 b = chance_constraints_control{i}.beta;
                 p = chance_constraints_control{i}.p;
                 z = norminv(1 - p);
-                sqrt_ref = sqrt(a' * Y_ref_k * a);
                 constraints = [constraints
-                    z / (2 * sqrt_ref) * (a' * Y_k * a) + a' * v_k - b + z * sqrt_ref / 2 <= lambda(k)
-                ];
+                    z^2 * (a' * Y(:,:,k) * a) <= (b - a' * v_ref(:,k))^2 - 2 * (b - a'* v_ref(:,k)) * a' * (v(:,k) - v_ref(:,k)) + slack_u(i,k)
+                    b - a' * v(:,k) >= 0
+                    ];
             end
         end
-
-        % State obstacle chance constraints
-        for k = 1:num_nodes+1
-            for i = 1:num_obstacles
-                [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), mu_ref(pos_idx,k));
-                P_ref_pos_k = P_ref(pos_idx,pos_idx,k);
-                sqrt_ref = sqrt(a' * P_ref_pos_k * a);
-                if sqrt_ref <= 0
-                    % numerically, the covariance can be non-PSD; in this case
-                    % simply set this value to a small positive number
-                    % Using nearestSPD sometimes does not terminate for a long
-                    % time, so it isn't used here
-                    sqrt_ref = 0.0001;
-                end
+    
+        z = norminv(1 - state_risk);
+        for i = 1:num_obstacles
+            for k = 1:num_nodes
+                [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), x_opt(pos_idx,k));
+                a = [a; 0; 0];
+                b = -b;
+    
                 constraints = [constraints
-                    z / (2 * sqrt_ref) * (a' * P(pos_idx,pos_idx,k) * a) + z * sqrt_ref / 2 + a' * mu(pos_idx,k) + b <= lambda_x(i,k)
-                ];
+                    z^2 * (a' * P(:,:,k) * a) <= (b - a'*mu_ref(:,k))^2 - 2 * (b - a'* mu_ref(:,k)) * a' * (mu(:,k) - mu_ref(:,k)) + slack_x(i,k)
+                    b - a' * mu(:,k) >= 0
+                    ];
             end
         end
-
-        constraints = [constraints, lambda >= 0, lambda_x(:) >= 0];
-
+    
         for k = 1:num_nodes
-            objective = objective + mu(:,k)' * Q * mu(:,k) + v(:,k)' * R * v(:,k) + trace(Q * P(:,:,k)) + trace(R * Y(:,:,k));
+            constraints = [constraints
+                lambda_max(Y(:,:,k)) <= slack_J_ref(k)^2 + 2 * slack_J_ref(k) * (slack_J(k) - slack_J_ref(k))
+                ];
         end
-
-        objective_augmented = objective + penalty_scalar_u * sum(lambda) + penalty_scalar_x + sum(lambda_x, 'all');
-
+    
+        constraints = [constraints, slack_u(:) >= 0, slack_x(:) >= 0, slack_J >= 0];
+    
+        for k = 1:num_nodes
+            % objective = objective + v(:,k)' * R * v(:,k) + trace(R * Y(:,:,k));
+            objective = objective + norm(v(:,k)) + sqrt(chi2inv(0.99, nu)) * slack_J(k);
+        end
+    
+        objective_augmented = objective + penalty_scalar_u * sum(slack_u, 'all') + penalty_scalar_x * sum(slack_x, 'all');
+    
         fprintf("Iteration %d    ", iter)
-
+    
         sol = optimize(constraints, objective_augmented, sdpsettings('verbose', 0));
-
-
+    
+    
         if sol.problem
             time_full_covariance = toc;
+            iters_full_covariance = iter;
             fprintf('Infeasible at iteration %d\n', iter);
             break;
         end
-
-        fprintf("Objective: %f\n",  value(objective))
-
+    
+        fprintf("Objective: %f ",  value(objective))
+    
         mu_opt = value(mu);
         v_opt = value(v);
         P_opt = value(P);
-        U_opt = value(U);
         Y_opt = value(Y);
-        lambda_opt = value(lambda);
-        lambda_x_opt = value(lambda_x);
-        
+        slack_u_opt = value(slack_u);
+        slack_x_opt = value(slack_x);
+    
         objective_full_covariance = value(objective);
-
-        if all(vecnorm(mu_opt - mu_ref, Inf) < convergence_tolerance) 
+        objective_augmented = value(objective_augmented);
+        objective_with_previous_penalty = objective_full_covariance ...
+            + penalty_scalar_x_prev * sum(slack_x_opt, 'all') ...
+            + penalty_scalar_u_prev * sum(slack_u_opt, 'all');
+    
+        control_constraint_values = check_control_constraint_satisfaction(v_opt, Y_opt, chance_constraints_control, num_nodes);
+    
+        state_constraint_values = check_state_constraint_satisfaction(mu_opt, P_opt, obstacle_centers, obstacle_radii, x_opt, pos_idx, num_nodes, num_obstacles, state_risk);
+    
+        fprintf("Largest cntrl violation: %f   ", max(control_constraint_values(:)));
+        fprintf("Largest state violation: %f\n", max(state_constraint_values(:)));
+    
+        if iter > 1 ...
+                && (all(slack_x_opt(:) <= feasibility_tolerance) ...
+                && all(slack_u_opt(:) <= feasibility_tolerance)) ...
+                && all(control_constraint_values(:) <= feasibility_tolerance) ...
+                && all(state_constraint_values(:) <= feasibility_tolerance)...
+                && objective_augmented_prev - objective_with_previous_penalty < convergence_tolerance
+    
             time_full_covariance = toc;
             fprintf('Converged in %d iterations in %.3f seconds\n', iter, time_full_covariance);
             prob_fc = struct();
@@ -224,38 +234,36 @@ for trial = 1:num_trials
             prob_fc.v = v_opt;
             prob_fc.P = P_opt;
             prob_fc.Y = Y_opt;
-            prob_fc.lambda = lambda_opt;
-            prob_fc.lambda_x = lambda_x_opt;
-            % Compute feedback gain K for Monte Carlo simulation
+            prob_fc.P_u = Y_opt;
+            prob_fc.lambda_u = slack_u_opt;
+            prob_fc.lambda_x = slack_x_opt;
+    
+            prob_fc.dv99 = 0;
+            for k = 1:num_nodes
+                prob_fc.dv99 = prob_fc.dv99 + norm(v_opt) + sqrt(chi2inv(0.99, nu)) * sqrt(lambda_max(Y_opt(:,:,k)));
+            end
+    
             prob_fc.K = zeros(nu, nx, num_nodes);
             for k = 1:num_nodes
-                prob_fc.K(:,:,k) = U_opt(:,:,k) / P_opt(:,:,k);
+                prob_fc.K(:,:,k) = value(U(:,:,k)) / value(P(:,:,k));
             end
-            results.solved_full_covariance(trial) = true;
+    
             break;
         end
-
+    
+        v_ref = v_opt;
         mu_ref = mu_opt;
-        P_ref = P_opt;
-
+    
+        penalty_scalar_x_prev = penalty_scalar_x;
+        penalty_scalar_u_prev = penalty_scalar_u;
+        penalty_scalar_x = min(max_penalty, penalty_scalar_x * penalty_increase_ratio);
+        penalty_scalar_u = min(max_penalty, penalty_scalar_u * penalty_increase_ratio);
+        objective_augmented_prev = objective_augmented;
+    
+    
         if iter == max_iters
             time_full_covariance = toc;
             fprintf('Reached maximum iterations\n')
-            % Store solution even if max iterations reached
-            if ~exist('prob_fc', 'var') || isempty(prob_fc)
-                prob_fc = struct();
-                prob_fc.mu = mu_opt;
-                prob_fc.v = v_opt;
-                prob_fc.P = P_opt;
-                prob_fc.Y = Y_opt;
-                prob_fc.lambda = lambda_opt;
-                prob_fc.lambda_x = lambda_x_opt;
-                % Compute feedback gain K for Monte Carlo simulation
-                prob_fc.K = zeros(nu, nx, num_nodes);
-                for k = 1:num_nodes
-                    prob_fc.K(:,:,k) = U_opt(:,:,k) / P_opt(:,:,k);
-                end
-            end
         end
     end
 
@@ -278,13 +286,11 @@ for trial = 1:num_trials
     prob_qr = SqrtQRCovarianceSteering(init_guess, ...
         N=num_nodes, ...
         A_sys=A_sys, B_sys=B_sys, G_sys=G_sys, ...
-        objective_type='LQR', ...
+        objective_type='DV99', ...
         mu_0=mu_0, mu_f=mu_f, ...
         P_0=Sigma_0, P_f=Sigma_f, Q=Q, R=R, ...
         chance_constraints_state=chance_constraints_state, ...
-        chance_constraints_control=chance_constraints_control,...
-        circular_obstacles=circular_obstacles, ...
-        relax_obstacle_constraints=false);
+        chance_constraints_control=chance_constraints_control);
 
     flag_solved_qr = prob_qr.solve(scp_params=scp_params);
 
@@ -388,7 +394,7 @@ fprintf('Results saved successfully!\n');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Inspect individual Monte Carlo trials
-trial = 1;
+trial = 3;
 prob = results.prob_full_covariance{trial};
 [x_hist_all_qr, u_hist_all_qr] = simulate_samples(mu_0, Sigma_0, A_sys, B_sys, G_sys, prob.K, prob.mu, prob.v, num_nodes, num_simulations);
 

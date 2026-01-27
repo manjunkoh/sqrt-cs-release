@@ -5,10 +5,15 @@ addpath ./SCvxStar/src/
 addpath ./obstacle_path_planning
 figure_settings
 
-function [obstacle_centers, obstacle_radii] = generate_random_environment(num_obstacles, obstacle_radius, wall_y_pos, mu_0, mu_f, Sigma_0, Sigma_f)
+function [obstacle_centers, obstacle_radii] = generate_random_environment(num_obstacles, obstacle_radius, mu_0, mu_f, Sigma_0, Sigma_f)
     is_valid = false;
+    xmax = 8.5;
+    xmin = 1.5;
+    ymax = 3;
+    ymin = -3;
+
     while ~is_valid
-        obstacle_centers = [rand(num_obstacles, 1) * 10, rand(num_obstacles, 1) * (wall_y_pos - (-3)) + (-3)];
+        obstacle_centers = [rand(num_obstacles, 1) * (xmax - xmin) + xmin, rand(num_obstacles, 1) * (ymax - ymin) + ymin];
         obstacle_radii = obstacle_radius * ones(1, num_obstacles);
         is_valid = is_valid_environment(obstacle_centers, obstacle_radii, mu_0, mu_f, Sigma_0, Sigma_f);
     end
@@ -17,10 +22,10 @@ end
 %% Parameters
 basic_parameters;
 
-num_obstacles = 3;
+num_obstacles = 4;
 
 % Number of cases to generate (will keep only those that solve)
-num_cases_to_generate = 50;
+num_cases_to_generate = 10;
 max_attempts_per_case = 5; % Maximum attempts to find a solvable case
 
 % Storage for valid cases
@@ -47,7 +52,7 @@ while case_counter < num_cases_to_generate && total_attempts < max_attempts_per_
     end
     
     % Generate random environment
-    [obstacle_centers, obstacle_radii] = generate_random_environment(num_obstacles, obstacle_radius, wall_y_pos, mu_0, mu_f, Sigma_0, Sigma_f);
+    [obstacle_centers, obstacle_radii] = generate_random_environment(num_obstacles, obstacle_radius, mu_0, mu_f, Sigma_0, Sigma_f);
     
     % Try to solve with deterministic method
     penalty_scalar_obstacle = 100;
@@ -72,7 +77,7 @@ while case_counter < num_cases_to_generate && total_attempts < max_attempts_per_
         end
         
         constraints = [constraints, x(:,1) == mu_0, x(:,num_nodes+1) == mu_f];
-        constraints = [constraints, x(2,:) <= wall_y_pos];
+        % constraints = [constraints, x(2,:) <= wall_y_pos];
         
         for k = 1:num_nodes
             for i = 1:size(obstacle_centers, 1)
@@ -87,7 +92,7 @@ while case_counter < num_cases_to_generate && total_attempts < max_attempts_per_
         constraints = [constraints, lambda >= 0];
         
         for k = 1:num_nodes
-            objective = objective + x(:,k)' * Q * x(:,k) + u(:,k)' * R * u(:,k) + penalty_scalar_obstacle * lambda(k);
+            objective = objective + norm(u(:,k)) + penalty_scalar_obstacle * lambda(k);
         end
         
         sol = optimize(constraints, objective, sdpsettings('verbose', 0));
@@ -137,7 +142,7 @@ if case_counter == 0
 end
 
 % Save to mat file
-save_filename = './data/obstacle_cases.mat';
+save_filename = './data/obstacle_cases_2norm.mat';
 fprintf('\nSaving to %s...\n', save_filename);
 
 % Create data directory if it doesn't exist
