@@ -101,6 +101,8 @@ results.fullcov_success = false(length(N_list), num_trials);
 results.blockcholesky_success = false(length(N_list), num_trials);
 results.deterministic_time = zeros(length(N_list), 1);
 results.deterministic_iters = zeros(length(N_list), 1);
+results.deterministic_x_opt = cell(length(N_list), 1);
+results.deterministic_u_opt = cell(length(N_list), 1);
 results.fullcov_iters = zeros(length(N_list), num_trials);
 results.sqrtqr_iters = zeros(length(N_list), num_trials);
 % Store covariance trajectories (first successful trial for each N x method)
@@ -309,6 +311,10 @@ for iN = 1:length(N_list)
         continue;
     end
     fprintf('done (%.2fs)\n', det_time);
+    
+    % Store deterministic solution
+    results.deterministic_x_opt{iN} = x_opt;
+    results.deterministic_u_opt{iN} = u_opt;
 
     % Generate hyperplane constraints for each node&obstacle based on the solution
     chance_constraints_state = {};
@@ -893,82 +899,16 @@ exportgraphics(gcf, 'figures/horizon_size_iterations_single_obstacle.png', Resol
 exportgraphics(gcf, 'figures/horizon_size_iterations_single_obstacle.pdf', ContentType='vector')
 
 %% Plot trajectories for each N x method combination
-% Store deterministic solution for plotting
-results.deterministic_x_opt = cell(length(N_list), 1);
-results.deterministic_u_opt = cell(length(N_list), 1);
-
 for iN = 1:length(N_list)
     N = N_list(iN);
     
-    % Recompute deterministic solution for this N (needed for plotting)
-    dt = T_total / N;
-    I2 = eye(2);
-    Z2 = zeros(2);
-    A = [I2, dt * I2; Z2, I2];
-    B = [0.5 * dt^2 * I2; dt * I2];
-    
-    yalmip('clear')
-    x = sdpvar(nx, N+1, 'full');
-    u = sdpvar(nu, N, 'full');
-    slack = sdpvar(1, N, 'full');
-    
-    x_ref = linspace_vec(mu_0, mu_f, N+1);
-    slack_penalty_obstacle = 100;
-    max_iters_det = 50;
-    flag_deterministic = false;
-    
-    for iter = 1:max_iters_det
-        constraints = [];
-        objective = 0;
-        
-        for k = 1:N
-            constraints = [constraints, x(:,k+1) == A * x(:,k) + B * u(:,k)];
-            constraints = [constraints, u(:,k) <= u_max];
-            constraints = [constraints, u(:,k) >= -u_max];
-        end
-        
-        constraints = [constraints, x(:,1) == mu_0, x(:,N+1) == mu_f];
-        constraints = [constraints, x(2,:) <= wall_y_pos];
-        
-        for k = 1:N
-            for i = 1:size(obstacle_centers, 1)
-                a = - (x_ref(pos_idx,k) - obstacle_centers(i,:)');
-                b = - 0.5 * norm(x_ref(pos_idx,k) - obstacle_centers(i,:)')^2  + 0.5 * obstacle_radii(i)^2 - a' * x_ref(pos_idx,k);
-                constraints = [constraints
-                    a' * x(pos_idx,k) + b <= slack(k)
-                ];
-            end
-        end
-        
-        constraints = [constraints, slack >= 0];
-        
-        for k = 1:N
-            objective = objective + norm(u(:,k)) + slack_penalty_obstacle * slack(k);
-        end
-        
-        sol = optimize(constraints, objective, sdpsettings('verbose', 0));
-        
-        if sol.problem
-            break;
-        end
-        
-        x_opt = value(x);
-        u_opt = value(u);
-        
-        if norm(x_opt - x_ref) < 1e-3 && is_collision_free(x_opt, obstacle_centers, obstacle_radii)
-            flag_deterministic = true;
-            break;
-        end
-        
-        x_ref = x_opt;
-    end
-    
-    if ~flag_deterministic
+    % Skip if deterministic solution not available
+    if isempty(results.deterministic_x_opt{iN})
         continue;
     end
     
-    results.deterministic_x_opt{iN} = x_opt;
-    results.deterministic_u_opt{iN} = u_opt;
+    dt = T_total / N;
+    x_opt = results.deterministic_x_opt{iN};
     
     % Get covariance boundary conditions for this N
     Sigma_0 = diag([0.1, 0.1, 0.01, 0.01]);
