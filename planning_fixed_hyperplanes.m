@@ -33,22 +33,14 @@ chance_constraints_control={...
     struct('type', 'affine', 'alpha', [0; 1], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes), ...
     struct('type', 'affine', 'alpha', [0; -1], 'beta', u_max, 'p', control_risk, 'nodes', 1:num_nodes)};
 
-chance_constraints_state={struct('type', 'affine', 'alpha', ...
-    [0; 1; 0; 0], 'beta', wall_y_pos, 'p', state_risk, 'nodes', 1:num_nodes+1)};
-
-circular_obstacles = {};
-for i = 1:num_obstacles
-    circular_obstacles = [circular_obstacles, struct('center', obstacle_centers(i,:)', 'radius', obstacle_radii(i), 'p', state_risk)];
-end
-
 %% Solve the deterministic problem
-penalty_scalar_obstacle = 100;
+slack_penalty_obstacle = 100;
 max_iters = 50;
 
 yalmip('clear')
 x = sdpvar(nx, num_nodes+1, 'full');
 u = sdpvar(nu, num_nodes, 'full');
-slack_u = sdpvar(1, num_nodes, 'full');
+slack = sdpvar(1, num_nodes, 'full');
 
 x_ref = linspace_vec(mu_0, mu_f, num_nodes+1);
 
@@ -74,15 +66,15 @@ for iter = 1:max_iters
             a = - (x_ref(pos_idx,k) - obstacle_centers(i,:)');
             b = - 0.5 * norm(x_ref(pos_idx,k) - obstacle_centers(i,:)')^2  + 0.5 * obstacle_radii(i)^2 - a' * x_ref(pos_idx,k);
             constraints = [constraints
-                a' * x(pos_idx,k) + b <= slack_u(k)
+                a' * x(pos_idx,k) + b <= slack(k)
             ];
         end
     end
 
-    constraints = [constraints, slack_u >= 0];
+    constraints = [constraints, slack >= 0];
 
     for k = 1:num_nodes
-        objective = objective + norm(u(:,k)) + penalty_scalar_obstacle * slack_u(k);
+        objective = objective + norm(u(:,k)) + slack_penalty_obstacle * slack(k);
     end
 
     sol = optimize(constraints, objective, sdpsettings('verbose', 0));
@@ -137,7 +129,6 @@ scp_params.k_max = 300;
 scp_params.tol_opt = 1E-2;
 scp_params.tol_feas = 1E-4;
 scp_params.linearization = 'inexact';
-% scp_params.w_inexact = 1E4;
 
 relax_obstacle_constraints = false;
 
@@ -179,13 +170,11 @@ hold on
 plot_problem(obstacle_centers, obstacle_radii, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, fig=gcf);
 plot_solution(prob_qr.mu, prob_qr.P, state_risk)
 plot(x_opt(1,:), x_opt(2,:), 'r.-')
-% plot(x_opt(1,1:15), x_opt(2,1:15), 'b.-')
-% plot(prob_qr.mu(1,1:15), prob_qr.mu(2,1:15), 'g.-')
 axis equal
 % xlim([-1.4, 11])
 % ylim([-3, 2.0])
 
-%% Solve the constrained stochastic problem via iterative approach
+%% Solve the constrained stochastic problem via convex-concave procedure
 max_iters = 30;
 penalty_scalar_x = 10;
 penalty_scalar_u = 100;
@@ -233,7 +222,6 @@ for iter = 1:max_iters
 
     % Control chance constraints
     for k = 1:num_nodes
-        % Y_ref_k = Y_ref(:,:,k);
         for i = 1:length(chance_constraints_control)
             a = chance_constraints_control{i}.alpha;
             b = chance_constraints_control{i}.beta;
@@ -282,7 +270,6 @@ for iter = 1:max_iters
 
     if sol.problem
         time_full_covariance = toc;
-        iters_full_covariance = iter;
         fprintf('Infeasible at iteration %d\n', iter);
         break;
     end
@@ -366,8 +353,8 @@ plot_solution(prob_fc.mu, prob_fc.P, state_risk)
 plot(x_opt(1,:), x_opt(2,:), 'r.-')
 
 axis equal
-xlim([-1.4, 11])
-ylim([-3, 2.0])
+% xlim([-1.4, 11])
+% ylim([-3, 2.0])
 
 %% Monte Carlo simulation
 rng(1)
@@ -431,25 +418,6 @@ else
     fprintf('Control violation probability is greater than confidence level. Failure.\n');
 end
 
-
-function control_flags_all = count_control_violations(u_hist_all, u_max)
-    control_flags_all = false(4, size(u_hist_all, 2), size(u_hist_all, 3));
-    for constraint_idx = 1:4
-		switch constraint_idx
-			case 1
-				control_flags = u_hist_all(1,:,:) > u_max;
-			case 2
-				control_flags = u_hist_all(1,:,:) < -u_max;
-			case 3
-				control_flags = u_hist_all(2,:,:) > u_max;
-			case 4
-				control_flags = u_hist_all(2,:,:) < -u_max;
-		end
-        control_flags_all(constraint_idx,:,:) = control_flags;
-    end
-    control_flags_all = sum(control_flags_all, 3);
-end
-
 %%
 figure;
 tiledlayout(nu, 1)
@@ -459,47 +427,6 @@ for i = 1:nu
 	for sample_idx = 1:num_simulations
 		plot(u_hist_all(i,:,sample_idx));
 	end
-end
-
-%% Check constraint satisfaction
-
-control_constraint_values = check_control_constraint_satisfaction(v_opt, Y_opt, chance_constraints_control, num_nodes)
-
-
-function constraint_values = check_control_constraint_satisfaction(v, Y, chance_constraints_control, num_nodes)
-    constraint_values = NaN(4, num_nodes);
-    for k = 1:num_nodes
-	    for i = 1:length(chance_constraints_control)
-		    a = chance_constraints_control{i}.alpha;
-		    b = chance_constraints_control{i}.beta;
-		    p = chance_constraints_control{i}.p;
-		    z = norminv(1 - p);
-		    constraint_values(i,k) = [
-			    z^2 * (a' * Y(:,:,k) * a) - (b - a'*v(:,k))^2
-			    ];
-	    end
-    end
-	constraint_values = max(constraint_values, 0);
-end
-
-
-function constraint_values = check_state_constraint_satisfaction(mu, P, obstacle_centers, obstacle_radii, x_opt, pos_idx, num_nodes, num_obstacles, state_risk, mu_ref)
-    constraint_values = NaN(num_obstacles, num_nodes);
-	constraint_values_linearized = NaN(num_obstacles, num_nodes);
-	z = norminv(1 - state_risk);
-    for k = 1:num_nodes+1
-        for i = 1:num_obstacles
-            [a, b] = hyperplane_from_circular_obstacle(obstacle_centers(i,:)', obstacle_radii(i), x_opt(pos_idx,k));
-            a = [a; 0; 0];
-            b = -b;
-            constraint_values(i,k) = [
-                z^2 * (a' * P(:,:,k) * a) - (b - a'*mu(:,k))^2
-            ];
-			% constraint_values_linearized(i,k) = [
-				% z^2 * (a' * P(:,:,k) * a) - (b - a'*mu_ref(pos_idx,k))^2 - 
-        end
-    end
-	constraint_values = max(constraint_values, 0);
 end
 
 %% Plot the state components' sigmas
