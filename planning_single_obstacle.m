@@ -12,18 +12,6 @@ obstacle_centers = [5, 0];
 obstacle_radii = 1.2;
 num_obstacles = 1;
 
-% obstacle_centers = [3, 0.5; 7.5, -1];
-% obstacle_radii = [1, 1];
-% num_obstacles = 2;
-% 
-% obstacle_centers = [2.5, -1; 4.5, 0.5; 6, -1.5; 8, -0.1];
-% obstacle_radii = 0.9 * [1, 1, 1, 1];
-% num_obstacles = 4;
-
-% obstacle_centers = [7, -1.5; 1, -2; 3.5, 0.5];
-% obstacle_radii = obstacle_radius * ones(1, 3);
-% num_obstacles = 3;
-
 plot_problem(obstacle_centers, obstacle_radii, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f);
 
 % Define the chance constraints
@@ -128,9 +116,6 @@ scp_params = SCPParams();
 scp_params.k_max = 300;
 scp_params.tol_opt = 1E-2;
 scp_params.tol_feas = 1E-4;
-% scp_params.linearization = 'inexact';
-
-relax_obstacle_constraints = false;
 
 init_guess = struct();
 init_guess.S = interpolate_lower_triangular(chol(Sigma_0, 'lower'), chol(Sigma_f, 'lower'), num_nodes+1, 'log-cholesky');
@@ -197,7 +182,6 @@ mu_ref = x_opt;
 v_ref = u_opt;
 slack_J_ref = (u_max*0.1)^2 * ones(1, num_nodes);
 
-% Initialize tracking variables
 objective_full_covariance = NaN;
 time_full_covariance = NaN;
 
@@ -356,110 +340,42 @@ axis equal
 % xlim([-1.4, 11])
 % ylim([-3, 2.0])
 
-%% Monte Carlo simulation
-rng(1)
-num_simulations = 10000;
-
-% QR method
-mu = prob_qr.mu;
-K = prob_qr.K;
-v = prob_qr.v;
-
-[x_hist_all, u_hist_all] = simulate_samples(mu_0, Sigma_0, A_sys, B_sys, G_sys, K, mu, v, num_nodes, num_simulations);
-
-collision_flags_all = count_collision_samples(x_hist_all, obstacle_centers, obstacle_radii);
-if all(collision_flags_all <= state_risk * num_simulations)
-    fprintf('Collision probability is less than confidence level. Success.\n');
-else
-    fprintf('Collision probability is greater than confidence level. Failure.\n');
-end
-
-control_flags_all = count_control_violations(u_hist_all, u_max);
-if all(control_flags_all <= control_risk * num_simulations)
-    fprintf('Control violation probability is less than confidence level. Success.\n');
-else
-    fprintf('Control violation probability is greater than confidence level. Failure.\n');
-end
 
 % figure
 % plot_problem(obstacle_centers, obstacle_radii, wall_y_pos, mu_0, Sigma_0, mu_f, Sigma_f, fig=gcf);
 % plot_simulations(x_hist_all)
 
-%%
-figure;
-tiledlayout(nu, 1)
-for i = 1:nu
-    nexttile
-	hold on
-	for sample_idx = 1:num_simulations
-		plot(u_hist_all(i,:,sample_idx));
-	end
-end
 
-%% Full covariance
-num_simulations = 10000;
-mu = prob_fc.mu;
-K = prob_fc.K;
-v = prob_fc.v;
+% %% Plot the state components' sigmas
+% formulations = {prob_fc, prob_qr};
+% formulation_names = {'FullCov', 'SqrtQR'};
+% figure;
+% tiledlayout(nx, 1);
+% for i = 1:nx
+% 	nexttile;
+%     hold on
+% 	for formulation_idx = 1:length(formulations)
+% 		formulation = formulations{formulation_idx};
+% 		one_sigma_plus = formulation.mu(i,:) + sqrt(squeeze(formulation.P(i,i,:)))';
+% 		% one_sigma_minus = formulation.mu(i,:) - sqrt(squeeze(formulation.P(i,i,:))');
+% 		plot(0:num_nodes, one_sigma_plus, DisplayName=sprintf('%s', formulation_names{formulation_idx}));
+% 		% plot(0:num_nodes, one_sigma_minus, 'b-', DisplayName=sprintf('%s', formulation_names{formulation_idx}));
+% 	end
+% 	legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
+% end
 
-[x_hist_all, u_hist_all] = simulate_samples(mu_0, Sigma_0, A_sys, B_sys, G_sys, K, mu, v, num_nodes, num_simulations);
-
-collision_flags_all = count_collision_samples(x_hist_all, obstacle_centers, obstacle_radii);
-if all(collision_flags_all <= state_risk * num_simulations)
-    fprintf('Collision probability is less than confidence level. Success.\n');
-else
-    fprintf('Collision probability is greater than confidence level. Failure.\n');
-end
-
-control_flags_all = count_control_violations(u_hist_all, u_max);
-if all(control_flags_all <= control_risk * num_simulations)
-    fprintf('Control violation probability is less than confidence level. Success.\n');
-else
-    fprintf('Control violation probability is greater than confidence level. Failure.\n');
-end
-
-%%
-figure;
-tiledlayout(nu, 1)
-for i = 1:nu
-    nexttile
-	hold on
-	for sample_idx = 1:num_simulations
-		plot(u_hist_all(i,:,sample_idx));
-	end
-end
-
-%% Plot the state components' sigmas
-formulations = {prob_fc, prob_qr};
-formulation_names = {'FullCov', 'SqrtQR'};
-figure;
-tiledlayout(nx, 1);
-for i = 1:nx
-	nexttile;
-    hold on
-	for formulation_idx = 1:length(formulations)
-		formulation = formulations{formulation_idx};
-		one_sigma_plus = formulation.mu(i,:) + sqrt(squeeze(formulation.P(i,i,:)))';
-		% one_sigma_minus = formulation.mu(i,:) - sqrt(squeeze(formulation.P(i,i,:))');
-		plot(0:num_nodes, one_sigma_plus, DisplayName=sprintf('%s', formulation_names{formulation_idx}));
-		% plot(0:num_nodes, one_sigma_minus, 'b-', DisplayName=sprintf('%s', formulation_names{formulation_idx}));
-	end
-	legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
-end
-
-%% Plot the control components' sigmas
-figure;
-tiledlayout(nu, 1);
-for i = 1:nu
-	nexttile;
-	hold on
-	for formulation_idx = 1:length(formulations)
-		formulation = formulations{formulation_idx};
-		one_sigma_plus = formulation.v(i,:) + sqrt(squeeze(formulation.P_u(i,i,:)))';
-		% one_sigma_minus = formulation.v(i,:) - sqrt(squeeze(formulation.P_u(i,i,:))');
-		stairs(0:num_nodes-1, one_sigma_plus, DisplayName=sprintf('%s', formulation_names{formulation_idx}));
-		% plot(0:num_nodes, one_sigma_minus, 'b-', DisplayName=sprintf('%s', formulation_names{formulation_idx}));
-	end
-	legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
-end
-
+% %% Plot the control components' sigmas
+% figure;
+% tiledlayout(nu, 1);
+% for i = 1:nu
+% 	nexttile;
+% 	hold on
+% 	for formulation_idx = 1:length(formulations)
+% 		formulation = formulations{formulation_idx};
+% 		one_sigma_plus = formulation.v(i,:) + sqrt(squeeze(formulation.P_u(i,i,:)))';
+% 		% one_sigma_minus = formulation.v(i,:) - sqrt(squeeze(formulation.P_u(i,i,:))');
+% 		stairs(0:num_nodes-1, one_sigma_plus, DisplayName=sprintf('%s', formulation_names{formulation_idx}));
+% 		% plot(0:num_nodes, one_sigma_minus, 'b-', DisplayName=sprintf('%s', formulation_names{formulation_idx}));
+% 	end
+% 	legend(legendUnq(), Location='northoutside', Orientation='horizontal', IconColumnWidth=15, FontSize=25)
+% end
