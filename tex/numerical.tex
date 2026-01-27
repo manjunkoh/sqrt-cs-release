@@ -16,10 +16,10 @@ The SCP parameters are from \cite{oguriSuccessiveConvexificationFeasibility2023a
 	\end{tabular}
 \end{table}
 
-\subsection{Optimality and Scalability}
+\subsection{Optimality and Scalability for the Unconstrained Case} \label{sec:comparison_unconstrained}
 Here, we compare the horizon-length scalability and solution optimality of our method against Liu et al. \cite{liuOptimalCovarianceSteering2025} and Okamoto and Tsiotras \cite{okamotoOptimalStochasticVehicle2019}. We consider a three-dimensional double integrator system with a total horizon time of \(T = 3\) seconds, and vary the horizon length from 10 to 160 (so the step size is \(\Delta t = T / N\)). 
 The time-invariant dynamics are given by
-\begin{equation} 
+\begin{equation} \label{eq:double_integrator_equations}
 	A = \smqty[
 		I_3 & \Delta t I_3 \\
 		0_{3 \times 3} & I_3
@@ -34,7 +34,7 @@ with \( q = 0.05 \) being the process noise spectral density.
 The initial and terminal state covariance are \(I_6\) and \(0.5 I_6\), respectively. We use a quadratic cost function with \(Q = 0.1 I_6\) and \(R = I_3\).
 For our method, we set the convergence and feasibility tolerance to \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-4}\) and scaling matrix \(D_X\) to identity. To time the solutions, we perform 5 trials for each case. The results are shown in \cref{fig:comparison_of_methods}.
 
-For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers fast and optimal solutions. The computational complexity of \cite{okamotoOptimalStochasticVehicle2019} grows quickly, which matches the observations in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Due to its specific feedback policy, it also compromises optimality. In comparison, our approach has moderate computational complexity, with rate of growth similar to \cite{liuOptimalCovarianceSteering2025}. The optimality empirically validates \cref{th:global_optimality}.
+For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers fast and optimal solutions. The computational complexity of \cite{okamotoOptimalStochasticVehicle2019} grows quickly, which matches the observations in \cite{rapakouliasDiscreteTimeOptimalCovariance2023}. Due to its specific feedback policy, it also compromises optimality. In comparison, our approach has moderate computational complexity, with rate of growth similar to \cite{liuOptimalCovarianceSteering2025}. The optimality empirically validates \cref{th:global_optimality}. Note that the original chance-constrained CS method \cite{okamotoOptimalCovarianceControl2018} using state history feedback has much rapid growth and is not included in this comparison.
 
 \begin{figure}[ht]
 	\centering
@@ -46,14 +46,14 @@ For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers f
 		\centering
 		\includegraphics[width=\textwidth]{horizon_size_cost_comparision_small.pdf}	
 	\end{subfigure}
-	\caption{(\textbf{Left}) Comparison of the average (in solid lines) and the min-max range (in shaded regions) of the solution times between \cite{liuOptimalCovarianceSteering2025,okamotoOptimalStochasticVehicle2019}, and the proposed method (\textbf{Right}) Comparison of the costs for \cite{okamotoOptimalStochasticVehicle2019} and the proposed method, relative to \cite{liuOptimalCovarianceSteering2025}}
+	\caption{Comparisons for the unconstrained case. (\textbf{Left}) Comparison of the average (in solid lines) and the min-max range (in shaded regions) of the solution times between \cite{liuOptimalCovarianceSteering2025,okamotoOptimalStochasticVehicle2019}, and the proposed method (\textbf{Right}) Comparison of the costs for \cite{okamotoOptimalStochasticVehicle2019} and the proposed method, relative to \cite{liuOptimalCovarianceSteering2025}}
 	\label{fig:comparison_of_methods}
 \end{figure}
 
-\begin{remark}
+% \begin{remark}
 	% We further tested global optimality for unconstrained problems by randomly generating the system matrices. We observed that depending on the dynamics and algorithm hyperparameters, the algorithm may require a large number of iterations (few hundreds) to converge to the global optimum. Furthermore, if using rather large tolerance parameters (e.g. $10^{-4}$), the algorithm may terminate at a suboptimal point; in this case, continuing until convergence with a smaller value (e.g. $10^{-7}$) will more likely achieve global optimality. 
-	\textr{Add some analysis}
-\end{remark}
+	% \textr{Add some analysis}
+% \end{remark}
 
 \subsection{Numerical Reliability}
 Here, we demonstrate the numerical reliability of the proposed method when the variance of some state components are small. We consider the problem from \cite{oguriChanceConstrainedControlSafe2024a} which uses CS for a spacecraft rendezvous setting. We greatly simplify the problem, using the same system dynamics and boundary condition; we also consider continuous control instead of impulsive control. The problem considers a QoN type objective function with $W_k^x = 0$ and $W_k^u = I$ for all $k$ \cref{eq:objective_function} which is common for optimizing the quantile of the spacecraft's necessary fuel. We emphasize that the parameters of uncertainty are rather realistic for a spacecraft rendezvous setting, and not artificial. The problem parameters are summarized in \cref{tab:cwh_parameters} for completeness.
@@ -110,3 +110,74 @@ These results support our hypothesis: by working with the square root of the cov
 	\caption{Covariance propagation loss for the spacecraft rendezvous problem}
 	\label{fig:example_cwh_covariance_propagation_loss}
 \end{figure}
+
+\subsection{Path Planning with Obstacles}
+Next, we perform a comparison of the same methods in \cref{sec:comparison_unconstrained} for path planning in an environment with circular obstacles which render the state space nonconvex. A common approach to handling circular obstacle avoidance is to conservatively approximate it as a hyperplane constraint which is tangent to the obstacle and has normal vector pointing in the direction of the obstacle center to the reference position \cite{dicairanoModelPredictiveControl2012}. We then apply the deterministic reformulation for affine CCs. 
+The setting is a 2D double integrator with $q = 0.005$ in \cref{eq:double_integrator_equations}. Between the boundary positions, there is a circular obstacle with its center at $[5, 0]$ and radius $1.2$. We define the nonconvex state CC
+\begin{equation} \label{eq:chance_constraint_obstacle}
+	\P{\norm{p - [5, 0]}_2 \geq 1.2} \geq 1 - 0.005
+\end{equation}
+for each node, where $p = [x, y]^\top$ is the position vector.
+The control is chance-constrained as
+\begin{equation}
+	\P{|u| \leq 0.15} \geq 1 - 0.005
+\end{equation}
+for each control component and node. The other parameters are: $ \mu_{\mathrm{init}} = [0, 0, 0, 0]^\top$, $ \mu_{\mathrm{fin}} = [10, 0, 0, 0]^\top$, $P_{\mathrm{init}} =\diag{0.1, 0.1, 0.01, 0.01}$, $P_{\mathrm{fin}} = \diag{0.04, 0.04, 0.01, 0.01}$, $T = 30$.
+
+When using Liu's formulation \cite{liuOptimalCovarianceSteering2025}, affine chance constraints are nonconvex in the variables due to the square root term that appears. Two methods exist for handling this nonconvexity; 1. providing a constant reference covariance matrix for all nodes \cite{rapakouliasDiscreteTimeOptimalCovariance2023}, and to 2. rewrite the constraint as a difference-of-convex constraint, solved using the convex-concave procedure (CCP)\cite{pilipovskyComputationallyEfficientChance2024}. We use the latter method, as the former method conservatively approximates the available solution space; this resulted in \textit{artificial infeasibility}. A naive CCP also encounters this issue. Hence, we apply the Penalty CCP method \cite{lippVariationsExtensionConvex2016} which introduces positive slack variables and augments a penalty term in the objective function. The implementation of the Penalty CCP method follows the algorithm of \cite{lippVariationsExtensionConvex2016}. The iterative procedure ends with similar criteria as the proposed method: 1. the nonconvex chance constraint violation is smaller than $\epsilon_{\mathrm{feas}}$, 2. the slack variables are all smaller than $\epsilon_{\mathrm{feas}}$, and 3. difference of the augmented objective function with the previous step is smaller than $\epsilon_{\mathrm{opt}}$. The last two criteria are taken directly from the Penalty CCP algorithm of \cite{lippVariationsExtensionConvex2016}, and the first criterion is for consistency with \cref{alg:sqrt_qr_covariance_steering}. The slack variables are multiplied a factor $\tau$ and added to the objective function. $\tau$ is initially 100 and increased by a factor of 2 at each iteration. For this formulation and the proposed method, we set $\epsilon_{\mathrm{opt}} = 10^{-2}$, $\epsilon_{\mathrm{feas}} = 10^{-4}$.
+
+\begin{remark}
+	The proposed method handles affine/norm CCs with approximately the same computational effort as unconstrained CS problems.
+\end{remark}
+
+\begin{figure}[t]
+	\centering
+	\begin{subfigure}{0.333\linewidth}
+		\centering
+		\includegraphics[width=\textwidth]{horizon_size_scalability_single_obstacle.pdf}	
+	\end{subfigure}%
+	\begin{subfigure}{0.333\linewidth}
+		\centering
+		\includegraphics[width=\textwidth]{horizon_size_cost_comparison_single_obstacle.pdf}	
+	\end{subfigure}%
+	\begin{subfigure}{0.333\linewidth}
+		\centering
+		\includegraphics[width=\textwidth]{horizon_size_iterations_single_obstacle.pdf}
+	\end{subfigure}
+	\caption{Comparisons for the obstacle-avoidance case. (\textbf{Left}) Average (in solid lines) and the min-max range (in shaded regions) of the solution times (\textbf{Middle}) Objective function divided by the number of nodes $N$ (\textbf{Right}) Number of SCP/CCP iterations}
+	\label{fig:comparison_of_methods_obstacle}
+\end{figure}
+
+\begin{figure}[t]
+	\centering
+	\begin{subfigure}{0.5\linewidth}
+		\centering
+		\includegraphics[width=\textwidth]{trajectory_fullcov_N40.pdf}
+	\end{subfigure}%
+	\begin{subfigure}{0.5\linewidth}
+		\centering
+		\includegraphics[width=\textwidth]{trajectory_sqrtqr_N40.pdf}
+	\end{subfigure}
+	\caption{Obstacle avoidance with Liu's formulation with Penalty CCP (left) and proposed method (right) for the case with $N=40$}
+	\label{fig:planning_with_obstacles_comparison}
+\end{figure}
+
+\begin{figure*}[tb]
+	\centering
+	\begin{subfigure}{0.5\linewidth}
+		\centering
+		\includegraphics[width=\textwidth]{control_fullcov_N40.pdf}
+	\end{subfigure}%
+	\begin{subfigure}{0.5\linewidth}
+		\centering
+		\includegraphics[width=\textwidth]{control_sqrtqr_N40.pdf}
+	\end{subfigure}
+	\caption{Control profiles for obstacle avoidance with Liu's formulation with $N=40$ for Penalty CCP (left) and proposed method (right)}
+	\label{fig:planning_with_obstacles_comparison_control}
+\end{figure*}
+
+The comparison results are shown in \cref{fig:comparison_of_methods_obstacle}. 
+The block-matrix method \cite{okamotoOptimalStochasticVehicle2019} is infeasible for all cases, which highlights the limited solution space using its specific feedback control policy. Nevertheless, we include the computation time, which still grows quickly as $N$ increases.
+For this constrained problem, the proposed method and CCP-based method have similar computational complexity. The proposed method achieves lower cost. The CCP requires less iterations until convergence.
+\cref{fig:planning_with_obstacles_comparison} compares the trajectory and covariance ellipses for the case with $N=40$. The two methods converge to different solutions, with a difference in how large the position covariance is allowed to grow. The control profiles are shown in \cref{fig:planning_with_obstacles_comparison_control}. A notable difference is seen in the profile of the nominal control magnitude. While the CCP-based method shows a continuous control profile, the proposed method shows large changes in the nominal control magnitude, similar to the deterministic reference case.
+
