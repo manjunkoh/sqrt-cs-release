@@ -17,7 +17,7 @@ function plot_problem(obstacle_center, obstacle_radii, wall_y_pos, mu_0, Sigma_0
     end
     axis equal
     plot_obstacles(obstacle_center, obstacle_radii);
-    plot_wall(wall_y_pos);
+    % plot_wall(wall_y_pos);
     plot3sigmaEllipse(mu_0, Sigma_0, Color='#D55E00', DisplayName='Start')
     plot3sigmaEllipse(mu_f, Sigma_f, Color='#D55E00', LineStyle=":", DisplayName='Goal')
     xlabel('$x$')

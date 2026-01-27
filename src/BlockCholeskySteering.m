@@ -101,7 +101,7 @@ classdef BlockCholeskySteering < CovarianceSteeringBase
 		function set_constraints(obj)
 			% Set constraints for block Cholesky method
 			% Following Okamoto et al. (2019) formulation
-			[A_blk, B_blk, Ex, ~, ~, chol_S] = obj.get_block_matrices();
+			[A_blk, B_blk, Ex, Eu, ~, chol_S] = obj.get_block_matrices();
 			
 			I = eye((obj.N+1) * obj.nx);
 			
