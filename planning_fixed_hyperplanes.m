@@ -128,7 +128,7 @@ scp_params = SCPParams();
 scp_params.k_max = 300;
 scp_params.tol_opt = 1E-2;
 scp_params.tol_feas = 1E-4;
-scp_params.linearization = 'inexact';
+% scp_params.linearization = 'inexact';
 
 relax_obstacle_constraints = false;
 
