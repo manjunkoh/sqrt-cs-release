@@ -84,8 +84,7 @@ Then, this QR decomposition is unique.
 \end{proof}
 \cref{lemma:sqrt_propagation} ensures that $S_{k+1}$ obtained from \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control} provides a unique matrix in $\mathbb{L}_n^+$ such that \cref{eq:full_covariance_propagation} is satisfied.
 
-Observing \cref{eq:X_definition,eq:square_root_covariance_propagation_nonlinear_feedback_control}, since both $S_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \); for the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is positive definite by \cref{assump:positive_definite_state}.
-So we get
+Observing \cref{eq:X_definition,eq:square_root_covariance_propagation_nonlinear_feedback_control}, since both $S_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \); for the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is positive definite by \cref{assump:positive_definite_state}. Note that $L_k L_k^\top$ represents the covariance matrix of the input $u_k$. With this chance of variables, we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
 	S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top, \ X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix}
 \end{equation}
@@ -103,13 +102,15 @@ After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and performing some s
 	\quad + \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(EoQ)} \\
 	\sum_{k=0}^{N-1} 
 	\norm{W_k^x x_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_{w_x}}(p_J)} \ \norm{W_k^x S_k}_2 \\
-	\quad + \norm{W_k^u v_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_{w_u}}(p_J)} \ \norm{W_k^x L_k}_2 & \text{(QoN)}.
+	\quad + \norm{W_k^u v_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_{w_u}}(p_J)} \ \norm{W_k^u L_k}_2 & \text{(QoN)}.
 	\end{cases}
 \end{equation}
-The QoN cost is a conservative approximation based on the triangle inequality \cite{oguriChanceConstrainedControlSafe2024a}; \( \mathcal{Q}_{\chi^2_d}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( d \) degrees of freedom.
+The QoN cost is a convex upper bound based on the triangle inequality \cite{oguriChanceConstrainedControlSafe2024a}; \( \mathcal{Q}_{\chi^2_d}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( d \) degrees of freedom.
 
 \begin{remark} \label{remark:convexifying_term}
-	Although it is an approximation, the QoN cost is easily handled in the proposed method as a convex function of the variables (also by the block matrix methods \cite{ridderhofChanceConstrainedCovarianceControl2020,oguriChanceConstrainedControlSafe2024a}). The seminal work \cite{liuOptimalCovarianceSteering2025}, due to relying on the EoQ cost for convexification, cannot straightforwardly handle other costs. A natural workaround is to 1. linearize the square root that appears when using the full covariance matrix ($Y_k$ in the notation of \cite{liuOptimalCovarianceSteering2025}) and 2. add a ``convexifying term'' \(\eta \trace(Y_k)\) with small \( \eta > 0 \), to ensure the partial of the Lagrangian with respect to \(Y_k\) is strictly positive definite, as we do in \cite{kumagaiRobustCislunarLowThrust2025} ($\eta$ is originally $\epsilon_Y$ in the reference).
+	Although an approximation, the QoN cost is easily handled in the proposed method as a convex function of the variables (also by the block matrix methods \cite{ridderhofChanceConstrainedCovarianceControl2020,oguriChanceConstrainedControlSafe2024a}). The seminal work \cite{liuOptimalCovarianceSteering2025} relies on an assumption on the objective function for convexification, and we are not aware of a convex upper bound for this formulation. Depending on the problem, two differerent approaches can be taken.
+
+	In unconstrained scenarios, a reference matrix $Y_k = L_k L_k^\top$ can be provided for linearizing the square root term. In scenarios where an SCP approach is required due to other constraints (e.g. involving CCs or nonlinear dynamics \cite{kumagaiRobustCislunarLowThrust2025}), we can replace the square-root term with an auxiliary variable $t \geq 0$ and ensure that the nonconvex relationship $\lambda_{\max}(W_k^u Y_k (W_k^u)^\top) \leq t^2$ is imposed iteratively via successive linearization. In either case, such objective functions break the proof of lossless convexification in \cite{liuOptimalCovarianceSteering2025}. To retain the convexification results, i.e. to ensure that the partial of the Lagrangian with respect to \(Y_k\) is strictly positive definite, an extra regularization term \(\eta \trace(Y_k)\) with small \( \eta > 0 \), can be added, as we do in \cite{kumagaiRobustCislunarLowThrust2025}.
 \end{remark}
 
 \subsection{Constraints}
