@@ -6,20 +6,13 @@ Since the state is controlled by the affine feedback control law, the closed-loo
 \begin{equation}
 	x_{k+1} = A_k x_k + B_k (v_k + K_k (x_k - \E{x_k})) + G_k w_k.
 \end{equation}
-Taking the expectation, the mean dynamics are given by
-\begin{equation} \label{eq:mean_dynamics}
-	\mu_{k+1} = A_k \mu_k + B_k v_k
-\end{equation}
-where $\mu_k := \E{x_k}$.
-% By defining 
-% \begin{equation} \label{eq:covariance_definition}
-% 	P_k := \E{(x_k - \E{x_k})(x_k - \E{x_k})^\top},
-% \end{equation}
-The covariance dynamics are given by:
-\begin{equation} \label{eq:full_covariance_propagation}
-	P_{k+1} = (A_k + B_k K_k) P_k (A_k + B_k K_k)^\top + G_k G_k^\top.
-\end{equation}
-Recalling that $S_k S_k^\top = P_k$, define the following matrix:
+It is straightforward to derive the mean/covariance dynamics:
+\begin{align} \label{eq:mean_dynamics}
+	\mu_{k+1} &= A_k \mu_k + B_k v_k , \quad \mu_k := \E{x_k}\\
+\label{eq:full_covariance_propagation}
+	P_{k+1}& = (A_k + B_k K_k) P_k (A_k + B_k K_k)^\top + G_k G_k^\top.
+\end{align}
+Letting $S_k := P_k^{1/2}$, define the following matrix:
 \begin{equation} \label{eq:X_definition}
 	X_{k+1} := \begin{bmatrix} (A_k + B_k K_k) S_k & G_k \end{bmatrix}.
 \end{equation}
@@ -70,16 +63,17 @@ The covariance propagation can be expressed as:
 \end{equation}
 Note that we want $S_{k+1} \in \mathbb{L}_+^n$, while $X_{k+1} \in \mathbb{R}^{n \times (n+m)}$.
 For a matrix $Q_{k} \in \R^{(n+m) \times n}$ such that $Q_{k}^\top Q_k= I_n$,
-\begin{equation} \label{eq:Q_S_X_relation}
-\begin{split}
-     X_{k+1}^\top &= Q_{k} S_{k+1}^\top \\
+\begin{subequations}
+\begin{align}
+     X_{k+1}^\top &= Q_{k} S_{k+1}^\top  \label{eq:Q_S_X_relation_1}\\
 	\Rightarrow X_{k+1} X_{k+1}^\top &= S_{k+1} Q_{k}^\top Q_{k} S_{k+1}^\top = S_{k+1} S_{k+1}^\top.
-\end{split}
-\end{equation}
-Since $S_{k+1} \in \mathbb{L}_+^n$, its transpose is upper triangular, so the first equality in \cref{eq:Q_S_X_relation} is a QR decomposition of $X_{k+1}^\top$. 
-Recall that by \cref{lemma:existence_and_uniqueness_of_economy_size_qr_decomposition}, if $X_{k+1}^\top$ is full rank, there exists a unique set of matrices $(Q_{k}, S_{k+1})$ that satisfy the equation.
-Combining \cref{lemma:rank_X_n_iff_P_succ_0} and \cref{assump:positive_definite_state}, $X_{k+1}$ is indeed full rank.
-Then, this QR decomposition is unique. 
+\end{align}%
+\label{eq:Q_S_X_relation}
+\end{subequations}%
+Since $S_{k+1} \in \mathbb{L}_+^n$, its transpose is upper triangular, so \cref{eq:Q_S_X_relation_1} is a QR decomposition of $X_{k+1}^\top$. 
+Combining \cref{lemma:rank_X_n_iff_P_succ_0} and \cref{assump:positive_definite_state}, $X_{k+1}$ is full rank.
+Then, from \cref{lemma:existence_and_uniqueness_of_economy_size_qr_decomposition}, there exists a unique set of matrices $(Q_{k}, S_{k+1})$ that satisfy the equation.
+Thus, this QR decomposition is unique. 
 \end{proof}
 \cref{lemma:sqrt_propagation} ensures that $S_{k+1}$ obtained from \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control} provides a unique matrix in $\mathbb{L}_n^+$ such that \cref{eq:full_covariance_propagation} is satisfied.
 
@@ -89,9 +83,10 @@ Since both $S_k$ and $K_k$ are unknowns, \cref{eq:square_root_covariance_propaga
 \end{equation}
 with its first-order approximation given by:
 \begin{equation} \label{eq:square_root_covariance_propagation_linearized}
-	\hspace{-1pt}S_{k+1} \approx \mathrm{qr}(\bar{X}_{k+1}^\top)^\top + \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1})^\top
+	\hspace{-1pt}S_{k+1} \approx \mathrm{qr}(\bar{X}_{k+1}^\top)^\top + \dd R( \Delta X_{k+1}^\top , \bar{Q}_{k+1}, \bar{R}_{k+1})^\top
 \end{equation}
 with \( \bar{X}_{k+1} := \begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix} \), \(\bar{S}_k\), and \(\bar{L}_k\) being the reference values, and \(\bar{Q}_{k+1} \bar{R}_{k+1} = \bar{X}_{k+1}\) being the QR decomposition of \(\bar{X}_{k+1}\). 
+Define $\Delta X_{k} := X_k - \bar{X}_k$.
 
 \subsection{Objective Function}
 After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and performing some standard manipulations, the objective function can be expressed as deterministic convex functions of \( L_k \) and \( S_k \):
@@ -99,17 +94,14 @@ After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and performing some s
 	J = \begin{cases}
 	\sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k & \\
 	\quad + \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(EoQ)} \\
-	\sum_{k=0}^{N-1} 
-	\norm{W_k^x x_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_{w_x}}(p_J)} \ \norm{W_k^x S_k}_2 \\
+	\sum_{k=0}^{N-1} \norm{W_k^x x_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_{w_x}}(p_J)} \ \norm{W_k^x S_k}_2 & \\
 	\quad + \norm{W_k^u v_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_{w_u}}(p_J)} \ \norm{W_k^u L_k}_2 & \text{(QoN)}.
 	\end{cases}
 \end{equation}
 The QoN cost is a convex upper bound based on the triangle inequality \cite{oguriChanceConstrainedControlSafe2024a}; \( \mathcal{Q}_{\chi^2_d}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( d \) degrees of freedom.
 
 \begin{remark} \label{remark:convexifying_term}
-	Although an approximation, the QoN cost is easily handled in the proposed method as a convex function of the variables (also by the block matrix methods \cite{ridderhofChanceConstrainedCovarianceControl2020,oguriChanceConstrainedControlSafe2024a}). The seminal work \cite{liuOptimalCovarianceSteering2025} relies on an assumption on the objective function for convexification, and we are not aware of a convex upper bound for this formulation. Depending on the problem, two differerent approaches can be taken.
-
-	In unconstrained scenarios, a reference matrix $Y_k = L_k L_k^\top$ can be provided for linearizing the square root term. In scenarios where an SCP approach is required due to other constraints (e.g. involving CCs or nonlinear dynamics \cite{kumagaiRobustCislunarLowThrust2025}), we can replace the square-root term with an auxiliary variable $t \geq 0$ and ensure that the nonconvex relationship $\lambda_{\max}(W_k^u Y_k (W_k^u)^\top) \leq t^2$ is imposed iteratively via successive linearization. In either case, such objective functions break the proof of lossless convexification in \cite{liuOptimalCovarianceSteering2025}. To retain the convexification results, i.e. to ensure that the partial of the Lagrangian with respect to \(Y_k\) is strictly PD, an extra regularization term \(\eta \trace(Y_k)\) with small \( \eta > 0 \), can be added, as we do in \cite{kumagaiRobustCislunarLowThrust2025}.
+	Although an approximation, the QoN cost is easily handled in the proposed method as a convex function of the variables (also by the block matrix methods \cite{ridderhofChanceConstrainedCovarianceControl2020,oguriChanceConstrainedControlSafe2024a}). The seminal work \cite{liuOptimalCovarianceSteering2025} relies on an assumption on the objective function for convexification, and we are not aware of a convex upper bound for this formulation. Depending on the problem, two differerent approaches can be taken. In unconstrained scenarios, a reference matrix $Y_k = L_k L_k^\top$ can be provided for linearizing the square root term. In scenarios where an SCP approach is required due to other constraints (e.g. involving CCs or nonlinear dynamics \cite{kumagaiRobustCislunarLowThrust2025}), we can replace the square-root term with an auxiliary variable $t \geq 0$ and ensure that the nonconvex relationship $\lambda_{\max}(W_k^u Y_k (W_k^u)^\top) \leq t^2$ is imposed iteratively via successive linearization. In either case, such objective functions break the proof of lossless convexification in \cite{liuOptimalCovarianceSteering2025}. To retain the convexification results, i.e. to ensure that the partial of the Lagrangian w.r.t. \(Y_k\) is strictly PD, an extra regularization term \(\eta \trace(Y_k)\) with small \( \eta > 0 \), can be added, as we do in \cite{kumagaiRobustCislunarLowThrust2025}.
 \end{remark}
 
 \subsection{Constraints}

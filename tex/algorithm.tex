@@ -1,19 +1,20 @@
 \section{Algorithm Overview}
-In order to take advantage of the convex representation of the objective and constraints, we use the SCP algorithm \texttt{SCvx*} \cite{oguriSuccessiveConvexificationFeasibility2023a} to solve \cref{eq:nonconvex_problem_statement}; this ensures that the nonlinear dynamics are obeyed at convergence, and the converged solution is locally optimal. In general, any SCP algorithm can be used to ensure the satisfaction of nonlinear dynamics, but local optimality must be met in order to apply the results of \cref{th:global_optimality,th:local_optimality}. At each iteration, the linearized dynamics \cref{eq:square_root_covariance_propagation_linearized} are imposed with penalization of violations:
+In order to take advantage of the convex representation of the objective and constraints, we use the SCP algorithm \texttt{SCvx*} \cite{oguriSuccessiveConvexificationFeasibility2023a} to solve \cref{eq:nonconvex_problem_statement}; this ensures that the converged solution obeys nonlinear dynamics \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control}and is locally optimal. In general, any SCP algorithm can be used to ensure the satisfaction of \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control}, but local optimality must be met in order to apply the results of \cref{th:global_optimality,th:local_optimality}. At each iteration, the linearized dynamics \cref{eq:square_root_covariance_propagation_linearized} are imposed with slack variables,
 \begin{equation} \label{eq:linearized_dynamics}
 \begin{split}
 	&\mathrm{vectril} \left\{ S_{k+1} - \mathrm{qr}(\bar{X}_{k+1}^\top)^\top \right. \\
-	&\left. - \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1})^\top \right\} = \xi_k
+	&\left. - \dd R(\Delta X_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1})^\top \right\} = \xi_k
 \end{split}
+% \mathrm{vectril} \{ S_{k+1} - \mathrm{qr}(\bar{X}_{k+1}^\top)^\top {-} \dd R(\Delta X_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1})^\top \} = \xi_k
 \end{equation}
-where \( \xi_k \in \mathbb{R}^{n(n+1)/2}\) is a slack variable, penalized in the objective function to promote constraint satisfaction. 
+where \( \xi_k \in \mathbb{R}^{n(n+1)/2}\) is penalized in the objective function to promote constraint satisfaction. 
 The reference QR matrices $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\}, k \in [N{-}1]$ are computed at initialization and updated when a step is accepted:
 \begin{equation} \label{eq:reference_update}
 	\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix}).
 \end{equation}
 To avoid artificial infeasibility/unboundedness\cite{maoSuccessiveConvexificationNonConvex2016} due to linearization, we impose a trust region constraint:
 \begin{align} \label{eq:trust_region_constraint}
-	\|\mathrm{vec}(D_X(X_k - \bar{X}_k))\|_\infty &\leq r, \quad k \in [N{-}1]
+	\|\mathrm{vec}(D_X\cdot \Delta X_k)\|_\infty &\leq r, \quad k \in [N{-}1]
 \end{align}
 where \( r > 0 \) is the trust region radius, and \( D_X \) is a scaling matrix.
 Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only appear in the convex constraints.
@@ -21,7 +22,7 @@ Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only ap
 
 The objective function is augmented with a penalty term using the augmented Lagrangian method. The penalty function for the constraint violations is defined as:
 \begin{equation} \label{eq:penalty_function}
-	P(\bm{\xi}; w, \bm{\lambda}) = \sum_{k=0}^{N-1} \left( \lambda_k^\top \xi_k + \frac{w}{2} \|\xi_k\|_2^2 \right)
+	P(\bm{\xi}; w, \bm{\lambda}) = \sum\nolimits_{k=0}^{N-1} \lambda_k^\top \xi_k + \frac{w}{2} \|\xi_k\|_2^2 
 \end{equation}
 where \( \lambda_k \in \mathbb{R}^{n(n+1)/2} \) are Lagrange multipliers, \( w > 0\) is the penalty weight, and \(\bm{\xi} := \{\xi_k\}_{k=0}^{N-1}\) are the slack variables from \cref{eq:linearized_dynamics}. For convenience, define \(\bm{z} := \{\bm{v}, \bm{L}, \bm{\mu}, \bm{S} \} \). The augmented objective function is then:
 \begin{equation} \label{eq:objective_augmented}
@@ -36,7 +37,45 @@ The subproblem is then given by:
 	\text{\cref{eq:S_structure_constraint,eq:mean_dynamics,eq:linearized_dynamics,eq:initial_distributional_constraint,eq:terminal_distributional_constraint,eq:linear_chance_constraint_deterministic,eq:norm_chance_constraint_deterministic,eq:trust_region_constraint}}.
 \end{equation}
 
-The complete solution process is summarized in Algorithm \ref{alg:sqrt_qr_covariance_steering}. At each iteration, the algorithm solves the convex subproblem \cref{eq:subproblem} to obtain a candidate solution. 
+\begin{algorithm}[thbp]
+\caption{Square Root QR Covariance Steering via \texttt{SCvx*}}
+\label{alg:sqrt_qr_covariance_steering}
+\begin{algorithmic}[1]
+\Require Initial guess $(\bar{\bm{L}}, \bar{\bm{S}})$, SCP parameters ($\epsilon_{\mathrm{feas}}$, $\epsilon_{\mathrm{opt}}$, $\rho_0$, $\rho_1$, $\rho_2$, $\alpha_1$, $\alpha_2$, $\beta$, $\gamma$, $r_{\mathrm{min}}$, $r_{\mathrm{max}}$, $r_{\mathrm{init}}$, $w_{\mathrm{init}}$)
+\State $i {\gets} 1$, $r^{(1)} {\gets} r_{\mathrm{init}}$, $w^{(1)} {\gets} w_{\mathrm{init}}$, $\delta^{(1)} {\gets} \infty$, $\bm{\lambda}^{(1)} {\gets} \bm{0}$
+\State Compute reference QR matrices using \cref{eq:reference_update}
+\While{$|\Delta J^{(i)}| > \epsilon_{\mathrm{opt}}$ or $\chi^{(i)} > \epsilon_{\mathrm{feas}}$}
+	\State $(\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*, \bm{\xi}^*) \gets \arg\min$ \cref{eq:subproblem}
+	\State Compute $\Delta J^{(i)}$, $\Delta L^{(i)}$, and $\chi^{(i)}$ using \cref{eq:delta_J,eq:delta_L,eq:chi}
+	\State Compute step acceptance ratio: $\rho^{(i)} \gets \Delta J^{(i)} / \Delta L^{(i)}$
+	\If{$\rho^{(i)} \geq \rho_0$} \Comment{Accept step}
+		\State $(\bar{\bm{v}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{S}}) \gets (\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*)$
+		\State Update reference QR matrices using \cref{eq:reference_update}
+		\If{$|\Delta J^{(i)}| < \delta^{(i)}$}
+			% \State $\lambda_k^{(i+1)} \gets \lambda_k^{(i)} + w^{(i)} \xi_k^*$ for $k \in [N{-}1]$
+			% \State $\delta^{(i+1)} \gets \begin{cases}
+			% 	|\Delta J^{(i)}| & \text{if } \delta^{(i)} = \infty \\
+			% 	\gamma \delta^{(i)} & \text{otherwise}
+			% \end{cases}$
+			% \State $w^{(i+1)} \gets \beta w^{(i)}$
+            \State Set $\bm{\lambda}^{(i+1)}$, $\delta^{(i+1)}$, $w^{(i+1)}$ with \cite[Eq. (3)]{oguriSuccessiveConvexificationFeasibility2023a}
+		\Else
+			\State $\bm{\lambda}^{(i+1)} \gets \bm{\lambda}^{(i)}$, $\delta^{(i+1)} \gets \delta^{(i)}$, $w^{(i+1)} \gets w^{(i)}$
+		\EndIf
+	\Else
+		\State $\bm{\lambda}^{(i+1)} \gets \bm{\lambda}^{(i)}$, $\delta^{(i+1)} \gets \delta^{(i)}$, $w^{(i+1)} \gets w^{(i)}$
+	\EndIf
+	% \State Update trust region radius: 
+	% \State \quad $r^{(i+1)} \gets \begin{cases} \max(r^{(i)} / \alpha_1, r_{\mathrm{min}}) & \text{if } \rho^{(i)} < \rho_1 \\ r^{(i)} & \text{elseif } \rho^{(i)} < \rho_2 \\  \min(\alpha_2 r^{(i)}, r_{\mathrm{max}}) & \text{otherwise} \end{cases}$
+    \State Update $r^{(i+1)}$ with \cite[Eq. (17)]{oguriSuccessiveConvexificationFeasibility2023a}
+	\State $i \gets i + 1$
+\EndWhile
+\State Recover feedback gains: $K_k^* \gets L_k^* (S_k^*)^{-1}$ for $k \in [N{-}1]$
+\State \Return $\bm{v}^*, \bm{K}^*, \bm{\mu}^*, \bm{S}^*$
+\end{algorithmic}
+\end{algorithm}
+
+The solution process is summarized in Algorithm \ref{alg:sqrt_qr_covariance_steering}. At each iteration, the algorithm solves the convex subproblem \cref{eq:subproblem} to obtain a candidate solution. 
 The algorithm then evaluates the following quantities to determine step acceptance and parameter updates:
 \begin{align}
 	\widetilde{\bm{\xi}}(\bm{z}) & := \begin{bmatrix}
@@ -50,44 +89,7 @@ The algorithm then evaluates the following quantities to determine step acceptan
 	\chi^{(i)} &:= \|\widetilde{\bm{\xi}}(\bm{z})\|_2 \label{eq:chi}
 \end{align}
 where the superscript $(i)$ denotes the SCP iteration number, and $^*$ denotes the solution obtained at the current iteration. Here, $\widetilde{\bm{\xi}}$ is the vector of infeasibility of the nonlinear square root covariance dynamics, $\mathcal{J}$ is the augmented cost penalizing the nonlinear infeasibility,  $\Delta J^{(i)}$ is the actual cost reduction, $\Delta L^{(i)}$ is the predicted cost reduction from the linearized subproblem, and $\chi^{(i)}$ measures the norm of nonlinear infeasibility. The step acceptance ratio $\rho^{(i)} = \Delta J^{(i)} / \Delta L^{(i)}$ is computed, where $\Delta L^{(i)} \geq 0$ is guaranteed by the convexity of the subproblem \cite{oguriSuccessiveConvexificationFeasibility2023a}. If $\Delta L = 0$, one can set $\rho^{(i)} = 1$. The step is accepted if $\rho^{(i)} \geq \rho_0$ for some $\rho_0 \in (0,1)$.
+When the step is accepted and $|\Delta J^{(i)}| < \delta^{(i)}$ for a stationarity tolerance $\delta^{(i)} > 0$, $\bm{\lambda}$ and $\delta$ are updated. The trust region radius and penalty weight are updated based on the step acceptance ratio, where $\alpha_1 > 1$, $\alpha_2 > 1$, $\beta > 1$, and $0 < \rho_0 < \rho_1 < \rho_2 < 1$ are algorithm parameters.
+% The algorithm terminates when both $|\Delta J^{(i)}| \leq \epsilon_{\mathrm{opt}}$ and $\chi^{(i)} \leq \epsilon_{\mathrm{feas}}$ are satisfied, where $\epsilon_{\mathrm{opt}} > 0$ and $\epsilon_{\mathrm{feas}} > 0$ are user-specified tolerances. 
+Readers are referred to \cite{oguriSuccessiveConvexificationFeasibility2023a} for more details of the $\texttt{SCvx*}$ algorithm, including its proof of convergence to a local minimum.
 
-When the step is accepted and $|\Delta J^{(i)}| < \delta^{(i)}$ for a stationarity tolerance $\delta^{(i)} > 0$, the Lagrange multipliers and stationarity tolerance are updated. The trust region radius and penalty weight are updated based on the step acceptance ratio, where $\alpha_1 > 1$, $\alpha_2 > 1$, $\beta > 1$, and $0 < \rho_0 < \rho_1 < \rho_2 < 1$ are algorithm parameters.
-
-The algorithm terminates when both $|\Delta J^{(i)}| \leq \epsilon_{\mathrm{opt}}$ and $\chi^{(i)} \leq \epsilon_{\mathrm{feas}}$ are satisfied, where $\epsilon_{\mathrm{opt}} > 0$ and $\epsilon_{\mathrm{feas}} > 0$ are user-specified tolerances. Ref. \cite{oguriSuccessiveConvexificationFeasibility2023a} provides more details of the $\texttt{SCvx*}$ algorithm, including its proof of convergence to a local minimum.
-
-\begin{algorithm}[thbp]
-\caption{Square Root QR Covariance Steering via \texttt{SCvx*}}
-\label{alg:sqrt_qr_covariance_steering}
-\begin{algorithmic}[1]
-\Require Initial guess $\bar{\bm{L}}, \bar{\bm{S}}$
-\Require SCP parameters: $\epsilon_{\mathrm{feas}}$, $\epsilon_{\mathrm{opt}}$, $\rho_0$, $\rho_1$, $\rho_2$, $\alpha_1$, $\alpha_2$, $\beta$, $\gamma$, $r_{\mathrm{min}}$, $r_{\mathrm{max}}$, $r_{\mathrm{init}}$, $w_{\mathrm{init}}$
-\State $i {\gets} 1$, $r^{(1)} {\gets} r_{\mathrm{init}}$, $w^{(1)} {\gets} w_{\mathrm{init}}$, $\delta^{(1)} {\gets} \infty$, $\bm{\lambda}^{(1)} {\gets} \bm{0}$
-\State Compute reference QR matrices using \cref{eq:reference_update}
-\While{$|\Delta J^{(i)}| > \epsilon_{\mathrm{opt}}$ or $\chi^{(i)} > \epsilon_{\mathrm{feas}}$}
-	\State Solve convex subproblem: $(\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*, \bm{\xi}^*) \gets \arg\min$ \cref{eq:subproblem}
-	\State Compute $\Delta J^{(i)}$, $\Delta L^{(i)}$, and $\chi^{(i)}$ using \cref{eq:delta_J,eq:delta_L,eq:chi}
-	\State Compute step acceptance ratio: $\rho^{(i)} \gets \Delta J^{(i)} / \Delta L^{(i)}$
-	\If{$\rho^{(i)} \geq \rho_0$} \Comment{Accept step}
-		\State $(\bar{\bm{v}}, \bar{\bm{L}}, \bar{\bm{\mu}}, \bar{\bm{S}}) \gets (\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*)$
-		\State Update reference QR matrices using \cref{eq:reference_update}
-		\If{$|\Delta J^{(i)}| < \delta^{(i)}$}
-			\State $\lambda_k^{(i+1)} \gets \lambda_k^{(i)} + w^{(i)} \xi_k^*$ for $k \in [N{-}1]$
-			\State $\delta^{(i+1)} \gets \begin{cases}
-				|\Delta J^{(i)}| & \text{if } \delta^{(i)} = \infty \\
-				\gamma \delta^{(i)} & \text{otherwise}
-			\end{cases}$
-			\State $w^{(i+1)} \gets \beta w^{(i)}$
-		\Else
-			\State $\bm{\lambda}^{(i+1)} \gets \bm{\lambda}^{(i)}$, $\delta^{(i+1)} \gets \delta^{(i)}$, $w^{(i+1)} \gets w^{(i)}$
-		\EndIf
-	\Else
-		\State $\bm{\lambda}^{(i+1)} \gets \bm{\lambda}^{(i)}$, $\delta^{(i+1)} \gets \delta^{(i)}$, $w^{(i+1)} \gets w^{(i)}$
-	\EndIf
-	% \State Update trust region radius: 
-	\State \quad $r^{(i+1)} \gets \begin{cases} \max(r^{(i)} / \alpha_1, r_{\mathrm{min}}) & \text{if } \rho^{(i)} < \rho_1 \\ r^{(i)} & \text{elseif } \rho^{(i)} < \rho_2 \\  \min(\alpha_2 r^{(i)}, r_{\mathrm{max}}) & \text{otherwise} \end{cases}$
-	\State $i \gets i + 1$
-\EndWhile
-\State Recover feedback gains: $K_k^* \gets L_k^* (S_k^*)^{-1}$ for $k \in [N{-}1]$
-\State \Return $\bm{v}^*, \bm{K}^*, \bm{\mu}^*, \bm{S}^*$
-\end{algorithmic}
-\end{algorithm}

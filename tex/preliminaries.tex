@@ -1,8 +1,8 @@
 
 \section{Preliminaries}
 
-\subsection{Notation}
-$\mathbb{L}^n$ ($\mathbb{L}_+^n$) denotes the space of $n \times n$ lower triangular (LT) matrices (with positive diagonal entries). $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric PD  matrices. The Cholesky factor of a matrix \( P \in \mathbb{S}_+^{n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \), and $\mathrm{diag}(a,b, \cdots)$ denotes the diagonal matrix with $a,b, \cdots$ on the diagonals. The linear matrix inequality $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \([N] := \{0, 1, \cdots, N\}\) for $N \in \N$.
+\subsection{Notation and Preliminaries}
+$\mathbb{L}^n$ ($\mathbb{L}_+^n$) denotes the space of $n \times n$ lower triangular (LT) matrices (with positive diagonal entries). $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric PD  matrices. The Cholesky factor of a matrix \( P \in \mathbb{S}_+^{n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \), and $\mathrm{diag}(a,b, \cdots)$ denotes the diagonal matrix with $a,b, \cdots$ on the diagonals. $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \([N] := \{0, 1, \cdots, N\}\) for $N \in \N$.
 We refer to the ``square root" of the covariance matrix \(P\) to refer to (not necessarily square) matrices \(L\) that satisfy \(P = L L^\top\). 
 $\mathrm{tril}(\cdot)$ sets all but the LT part of a matrix to zero.
 $\mathrm{vec}(\cdot)$ vectorizes a matrix.
@@ -14,7 +14,7 @@ We address the finite-horizon discrete-time CS problem for a linear time-varying
 \begin{subequations}
 \label{eq:problem_statement}
 \begin{align}
-	& \mathrlap{\minimize_{\bm{v}, \bm{K}} \quad J = \sum_{k=0}^{N-1} J_k (x_k, u_k) }\\
+	& \mathrlap{\minimize_{\bm{v}, \bm{K}} \quad J = \sum\nolimits_{k=0}^{N-1} J_k (x_k, u_k) }\\
 	& \suchthat &&x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad k \in [N{-}1] \\
 	& && u_k = v_k + K_k (x_k - \E{x_k}), \quad k \in [N{-}1] \label{eq:feedback_control_law}\\
 	& &&x_0 \sim \mathcal{N}(\mu_{\mathrm{init}}, P_{\mathrm{init}}) \\
@@ -49,7 +49,7 @@ The sets \( \mathcal{X} \) and \( \mathcal{U} \) represent state and control fea
 \end{align}
 with \( \alpha_j \in \mathbb{R}^n \), \( \beta_j \in \mathbb{R} \), \(\gamma\in \mathbb{R}\), \( \gamma > 0 \) and violation probabilities  \( p_j \), \( p_\gamma \). The same forms apply to the input \( u_k \).
 
-The state covariance matrix is defined as $P_k := \E{(x_k - \E{x_k})(x_k - \E{x_k})^\top}$. 
+Let $P_k$ denote the state covariance matrix.
 We make the following assumption which is reasonable in practical applications and also required in \cite{liuOptimalCovarianceSteering2025}:
 \begin{assumption} \label{assump:positive_definite_state}
 	$P_k \succ 0,\quad \forall k \in [N].$
@@ -58,7 +58,7 @@ We make the following assumption which is reasonable in practical applications a
 
 \subsection{QR Decomposition}
 
-The QR decomposition is a key element of propagating the square root of the covariance matrix, \textit{while keeping the square root to be in \(\mathbb{L}^n\)}. Various algorithms have been proposed for the time update of the square root Kalman filter, but many can be expressed as a QR decomposition \cite{tapleyStatisticalOrbitDetermination2004}.
+The QR decomposition is a key element of propagating the square root of the covariance matrix, \textit{while keeping the square root to be in \(\mathbb{L}^n\)}. Various algorithms have been proposed for the time update of the square root Kalman filter, but many can be expressed as an ``economy-size'' QR decomposition \cite{tapleyStatisticalOrbitDetermination2004}.
 
 \begin{lemma}[Ch. 3.8 of \cite{ipsenNumericalMatrixAnalysis2009}]\label{lemma:existence_and_uniqueness_of_economy_size_qr_decomposition}
 	Let \( M \in \mathbb{R}^{p \times q} \), \(p \geq q\).
@@ -67,8 +67,7 @@ The QR decomposition is a key element of propagating the square root of the cova
 		\item (Uniqueness) If \(M\) has full rank, i.e. \(\mathrm{rank}(M) = q\), then the matrices \(Q\) and \(R\) are unique up to a sign change of the diagonal entries of \(R\). If we require the diagonal entries of \( R \) to be positive, then the decomposition is unique.
 	\end{itemize}
 \end{lemma}
-From here on, ``QR decomposition'' will refer to the economy-size QR decomposition with positive diagonal entries.
-\footnote{In MATLAB, this requires using $\mathrm{qr}(M, \text{``econ"})$. Then, to ensure uniqueness, if the function returns an \( R \) matrix with negative diagonal entries, multiply the corresponding columns of \( Q \) and rows of \( R \) by -1 to ensure positive diagonals.}
+From here on, ``QR decomposition'' refers to the economy-size QR decomposition with positive diagonal entries\footnote{In MATLAB, this requires using $\mathrm{qr}(M, \text{``econ"})$. Then, to ensure uniqueness, if the function returns an \( R \) matrix with negative diagonal entries, multiply the corresponding columns of \( Q \) and rows of \( R \) by -1 to ensure positive diagonals.}.
 Note that when \(M\) is full rank, then so is \(R\), hence \(R\) is invertible.
 
 \subsection{QR Decomposition Derivative}
