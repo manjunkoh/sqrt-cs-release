@@ -1,21 +1,19 @@
 \section{Algorithm Overview}
-In order to take advantage of the convex representation of the objective and constraints, we use a sequential convex programming (SCP) algorithm \texttt{SCvx*} \cite{oguriSuccessiveConvexificationFeasibility2023a} to solve \cref{eq:nonconvex_problem_statement}; this ensures that the nonlinear dynamics are obeyed at convergence, and the converged solution is locally optimal. In general, any SCP algorithm can be used to ensure the satisfaction of nonlinear dynamics, but local optimality must be met in order to apply the results of \cref{th:global_optimality,th:local_optimality}. At each iteration, the linearized dynamics \cref{eq:square_root_covariance_propagation_linearized} are imposed with penalization of violations:
+In order to take advantage of the convex representation of the objective and constraints, we use the SCP algorithm \texttt{SCvx*} \cite{oguriSuccessiveConvexificationFeasibility2023a} to solve \cref{eq:nonconvex_problem_statement}; this ensures that the nonlinear dynamics are obeyed at convergence, and the converged solution is locally optimal. In general, any SCP algorithm can be used to ensure the satisfaction of nonlinear dynamics, but local optimality must be met in order to apply the results of \cref{th:global_optimality,th:local_optimality}. At each iteration, the linearized dynamics \cref{eq:square_root_covariance_propagation_linearized} are imposed with penalization of violations:
 \begin{equation} \label{eq:linearized_dynamics}
 \begin{split}
 	&\mathrm{vectril} \left\{ S_{k+1} - \mathrm{qr}(\bar{X}_{k+1}^\top)^\top \right. \\
 	&\left. - \dd R(X_{k+1}^\top - \bar{X}_{k+1}^\top, \bar{Q}_{k+1}, \bar{R}_{k+1})^\top \right\} = \xi_k
 \end{split}
 \end{equation}
-where \( \xi_k \in \mathbb{R}^{\frac{n(n+1)}{2}}\) is a slack variable, penalized in the objective function to promote constraint satisfaction. 
-
+where \( \xi_k \in \mathbb{R}^{n(n+1)/2}\) is a slack variable, penalized in the objective function to promote constraint satisfaction. 
 The reference QR matrices $\{\bar{Q}_{k+1}, \bar{R}_{k+1}\}, k \in [N{-}1]$ are computed at initialization and updated when a step is accepted:
 \begin{equation} \label{eq:reference_update}
 	\{\bar{Q}_{k+1}, \bar{R}_{k+1}\} \gets \mathrm{qr}(\begin{bmatrix} A_k \bar{S}_k + B_k \bar{L}_k & G_k \end{bmatrix}).
 \end{equation}
-
-To ensure that the linearization process does not cause artificial infeasibility/unboundedness \cite{maoSuccessiveConvexificationNonConvex2016}, we impose a trust region constraint:
+To avoid artificial infeasibility/unboundedness\cite{maoSuccessiveConvexificationNonConvex2016} due to linearization, we impose a trust region constraint:
 \begin{align} \label{eq:trust_region_constraint}
-	\norm{\mathrm{vec}(D_X(X_k - \bar{X}_k))}_\infty &\leq r, \quad k \in [N{-}1]
+	\|\mathrm{vec}(D_X(X_k - \bar{X}_k))\|_\infty &\leq r, \quad k \in [N{-}1]
 \end{align}
 where \( r > 0 \) is the trust region radius, and \( D_X \) is a scaling matrix.
 Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only appear in the convex constraints.
@@ -25,12 +23,12 @@ The objective function is augmented with a penalty term using the augmented Lagr
 \begin{equation} \label{eq:penalty_function}
 	P(\bm{\xi}; w, \bm{\lambda}) = \sum_{k=0}^{N-1} \left( \lambda_k^\top \xi_k + \frac{w}{2} \|\xi_k\|_2^2 \right)
 \end{equation}
-where \( \lambda_k \in \mathbb{R}^{\frac{n(n+1)}{2}} \) are Lagrange multipliers, \( w > 0\) is the penalty weight, and \(\bm{\xi} := \{\xi_k\}_{k=0}^{N-1}\) with \(\xi_k \in \mathbb{R}^{\frac{n(n+1)}{2}}\) are the slack variables from \cref{eq:linearized_dynamics}. For convenience, define \(\bm{z} := \{\bm{v}, \bm{L}, \bm{\mu}, \bm{S} \} \). The augmented objective function is then:
+where \( \lambda_k \in \mathbb{R}^{n(n+1)/2} \) are Lagrange multipliers, \( w > 0\) is the penalty weight, and \(\bm{\xi} := \{\xi_k\}_{k=0}^{N-1}\) are the slack variables from \cref{eq:linearized_dynamics}. For convenience, define \(\bm{z} := \{\bm{v}, \bm{L}, \bm{\mu}, \bm{S} \} \). The augmented objective function is then:
 \begin{equation} \label{eq:objective_augmented}
 	\mathcal{L}(\bm{z}, \bm{\xi}; w, \bm{\lambda}) := 
 	J(\bm{z}) + P(\bm{\xi}; w, \bm{\lambda})
 \end{equation}
-where \( \bm{\lambda} := \{\lambda_k\}_{k=0}^{N-1} \). In the \texttt{SCvx*} algorithm, the Lagrange multipliers and penalty weights are updated throughout the iterations to ensure convergence to a feasible and locally optimal solution.
+where \( \bm{\lambda} := \{\lambda_k\}_{k=0}^{N-1} \). In the \texttt{SCvx*} algorithm, $w$ and $\bm{\lambda}$ are updated throughout the iterations to ensure convergence to a feasible and locally optimal solution.
 
 The subproblem is then given by:
 \begin{equation} \label{eq:subproblem}
@@ -49,7 +47,7 @@ The algorithm then evaluates the following quantities to determine step acceptan
 	\mathcal{J}(\bm{z}, w, \bm{\lambda}) &:= J(\bm{z}) + P({\widetilde{\bm{\xi}}}(\bm{z}); w, \bm{\lambda}) \\
 	\Delta J^{(i)} &:= \mathcal{J}(\bar{\bm{z}}; w^{(i)}, \bm{\lambda}^{(i)}) - \mathcal{J}(\bm{z}^*; w^{(i)}, \bm{\lambda}^{(i)}) \label{eq:delta_J} \\
 	\Delta L^{(i)} &:= \mathcal{J}(\bar{\bm{z}}; w^{(i)}, \bm{\lambda}^{(i)}) - \mathcal{L}(\bm{z}^*, \bm{\xi}^*; w^{(i)}, \bm{\lambda}^{(i)}) \label{eq:delta_L} \\
-	\chi^{(i)} &:= \norm{\widetilde{\bm{\xi}}(\bm{z})}_2 \label{eq:chi}
+	\chi^{(i)} &:= \|\widetilde{\bm{\xi}}(\bm{z})\|_2 \label{eq:chi}
 \end{align}
 where the superscript $(i)$ denotes the SCP iteration number, and $^*$ denotes the solution obtained at the current iteration. Here, $\widetilde{\bm{\xi}}$ is the vector of infeasibility of the nonlinear square root covariance dynamics, $\mathcal{J}$ is the augmented cost penalizing the nonlinear infeasibility,  $\Delta J^{(i)}$ is the actual cost reduction, $\Delta L^{(i)}$ is the predicted cost reduction from the linearized subproblem, and $\chi^{(i)}$ measures the norm of nonlinear infeasibility. The step acceptance ratio $\rho^{(i)} = \Delta J^{(i)} / \Delta L^{(i)}$ is computed, where $\Delta L^{(i)} \geq 0$ is guaranteed by the convexity of the subproblem \cite{oguriSuccessiveConvexificationFeasibility2023a}. If $\Delta L = 0$, one can set $\rho^{(i)} = 1$. The step is accepted if $\rho^{(i)} \geq \rho_0$ for some $\rho_0 \in (0,1)$.
 
@@ -63,7 +61,7 @@ The algorithm terminates when both $|\Delta J^{(i)}| \leq \epsilon_{\mathrm{opt}
 \begin{algorithmic}[1]
 \Require Initial guess $\bar{\bm{L}}, \bar{\bm{S}}$
 \Require SCP parameters: $\epsilon_{\mathrm{feas}}$, $\epsilon_{\mathrm{opt}}$, $\rho_0$, $\rho_1$, $\rho_2$, $\alpha_1$, $\alpha_2$, $\beta$, $\gamma$, $r_{\mathrm{min}}$, $r_{\mathrm{max}}$, $r_{\mathrm{init}}$, $w_{\mathrm{init}}$
-\State Initialize: $i \gets 1$, $r^{(1)} \gets r_{\mathrm{init}}$, $w^{(1)} \gets w_{\mathrm{init}}$, $\delta^{(1)} \gets \infty$, $\bm{\lambda}^{(1)} \gets \bm{0}$
+\State $i {\gets} 1$, $r^{(1)} {\gets} r_{\mathrm{init}}$, $w^{(1)} {\gets} w_{\mathrm{init}}$, $\delta^{(1)} {\gets} \infty$, $\bm{\lambda}^{(1)} {\gets} \bm{0}$
 \State Compute reference QR matrices using \cref{eq:reference_update}
 \While{$|\Delta J^{(i)}| > \epsilon_{\mathrm{opt}}$ or $\chi^{(i)} > \epsilon_{\mathrm{feas}}$}
 	\State Solve convex subproblem: $(\bm{v}^*, \bm{L}^*, \bm{\mu}^*, \bm{S}^*, \bm{\xi}^*) \gets \arg\min$ \cref{eq:subproblem}

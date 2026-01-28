@@ -11,11 +11,11 @@ Taking the expectation, the mean dynamics are given by
 	\mu_{k+1} = A_k \mu_k + B_k v_k
 \end{equation}
 where $\mu_k := \E{x_k}$.
-By defining 
-\begin{equation} \label{eq:covariance_definition}
-	P_k := \E{(x_k - \E{x_k})(x_k - \E{x_k})^\top},
-\end{equation}
-the covariance propagation equation is given by:
+% By defining 
+% \begin{equation} \label{eq:covariance_definition}
+% 	P_k := \E{(x_k - \E{x_k})(x_k - \E{x_k})^\top},
+% \end{equation}
+The covariance dynamics are given by:
 \begin{equation} \label{eq:full_covariance_propagation}
 	P_{k+1} = (A_k + B_k K_k) P_k (A_k + B_k K_k)^\top + G_k G_k^\top.
 \end{equation}
@@ -31,10 +31,10 @@ Recalling that $S_k S_k^\top = P_k$, define the following matrix:
 	\end{equation}
 \end{lemma}
 \begin{lemma} \label{lemma:positive_definite_iff_rank_n}
-	A symmetric positive semidefinite matrix $P$ of size $n \times n$ is strictly positive definite if and only if $\rank(P) = n$.
+	A symmetric positive semidefinite matrix $P$ of size $n \times n$ is strictly PD if and only if $\rank(P) = n$.
 \end{lemma}
 \begin{lemma} \label{lemma:rank_X_n_iff_P_succ_0}
-	Let $P_{k+1}$, $X_{k+1}$ be defined as in \cref{eq:full_covariance_propagation} and \cref{eq:X_definition}, respectively. Then,
+	Let $P_{k+1}$, $X_{k+1}$ be given by \cref{eq:full_covariance_propagation}, \cref{eq:X_definition}. Then,
 	\begin{equation}
 		\rank(X_{k+1}) = n \Leftrightarrow P_{k+1} \succ 0.
 	\end{equation}
@@ -42,7 +42,7 @@ Recalling that $S_k S_k^\top = P_k$, define the following matrix:
 \begin{proof}
 	We use \cref{lemma:rank_M_M_top_rank_M,lemma:positive_definite_iff_rank_n} throughout the proof. \\
 	($\Rightarrow$) 
-	$\rank(X_{k+1}) = n \Rightarrow \rank(X_{k+1} X_{k+1}^\top) = n \Rightarrow P_{k+1} \succ 0$.\\
+	$\rank(X_{k+1}) {=} n \Rightarrow \rank(X_{k+1} X_{k+1}^\top) = n \Rightarrow P_{k+1} \succ 0$.\\
 	($\Leftarrow$)
 	Define $\widetilde{P}_{k+1} := (A_k + B_k K_k) P_k (A_k + B_k K_k)^\top$.
 	\begin{align*}
@@ -51,12 +51,12 @@ Recalling that $S_k S_k^\top = P_k$, define the following matrix:
 	&\Rightarrow \rank((A_k + B_k K_k) S_k) = n \lor \rank(G_k) = n \\
 	&\Rightarrow \rank(X_{k+1}) = n.
 	\end{align*}
-	The last implication is since the column space of $X_{k+1}$ includes the column space of the submatrices $(A_k + B_k K_k) S_k$ and $G_k$.
+	The last implication is since the column space of $X_{k+1}$ includes the column space of its submatrices.
 \end{proof}
 
 \begin{lemma}[Closed-Loop Square Root Covariance Propagation]
 	\label{lemma:sqrt_propagation}
-	The covariance propagation equation \cref{eq:full_covariance_propagation} is equivalently expressed in its Cholesky factor form using $S_k = P_k^{1/2} \in \mathbb{L}_+^n$ as:
+	The covariance propagation \cref{eq:full_covariance_propagation} is equivalently expressed in Cholesky factor form using $S_k = P_k^{1/2} \in \mathbb{L}_+^n$ as:
 	\begin{equation} \label{eq:square_root_covariance_propagation_nonlinear_feedback_control}
 		S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top
 	\end{equation}
@@ -66,15 +66,14 @@ Recalling that $S_k S_k^\top = P_k$, define the following matrix:
 \begin{proof}
 The covariance propagation can be expressed as:
 \begin{equation} \label{eq:covariance_propagation}
-	S_{k+1} S_{k+1}^\top = X_{k+1} X_{k+1}^\top
+	S_{k+1} S_{k+1}^\top = X_{k+1} X_{k+1}^\top.
 \end{equation}
-with \(X_{k+1}\) defined above.
 Note that we want $S_{k+1} \in \mathbb{L}_+^n$, while $X_{k+1} \in \mathbb{R}^{n \times (n+m)}$.
 For a matrix $Q_{k} \in \R^{(n+m) \times n}$ such that $Q_{k}^\top Q_k= I_n$,
 \begin{equation} \label{eq:Q_S_X_relation}
 \begin{split}
      X_{k+1}^\top &= Q_{k} S_{k+1}^\top \\
-	\implies X_{k+1} X_{k+1}^\top &= S_{k+1} Q_{k}^\top Q_{k} S_{k+1}^\top = S_{k+1} S_{k+1}^\top.
+	\Rightarrow X_{k+1} X_{k+1}^\top &= S_{k+1} Q_{k}^\top Q_{k} S_{k+1}^\top = S_{k+1} S_{k+1}^\top.
 \end{split}
 \end{equation}
 Since $S_{k+1} \in \mathbb{L}_+^n$, its transpose is upper triangular, so the first equality in \cref{eq:Q_S_X_relation} is a QR decomposition of $X_{k+1}^\top$. 
@@ -84,7 +83,7 @@ Then, this QR decomposition is unique.
 \end{proof}
 \cref{lemma:sqrt_propagation} ensures that $S_{k+1}$ obtained from \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control} provides a unique matrix in $\mathbb{L}_n^+$ such that \cref{eq:full_covariance_propagation} is satisfied.
 
-Observing \cref{eq:X_definition,eq:square_root_covariance_propagation_nonlinear_feedback_control}, since both $S_k$ and $K_k$ are unknowns, there is a bilinear term \( K_k S_k \); for the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is positive definite by \cref{assump:positive_definite_state}. Note that $L_k L_k^\top$ represents the covariance matrix of the input $u_k$. With this chance of variables, we get
+Since both $S_k$ and $K_k$ are unknowns, \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control} via \cref{eq:X_definition} has a bilinear term \( K_k S_k \); for the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is PD by \cref{assump:positive_definite_state}. Note that $L_k L_k^\top$ represents the covariance matrix of the input $u_k$. With this change of variables, we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
 	S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top, \ X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix}
 \end{equation}
@@ -110,7 +109,7 @@ The QoN cost is a convex upper bound based on the triangle inequality \cite{ogur
 \begin{remark} \label{remark:convexifying_term}
 	Although an approximation, the QoN cost is easily handled in the proposed method as a convex function of the variables (also by the block matrix methods \cite{ridderhofChanceConstrainedCovarianceControl2020,oguriChanceConstrainedControlSafe2024a}). The seminal work \cite{liuOptimalCovarianceSteering2025} relies on an assumption on the objective function for convexification, and we are not aware of a convex upper bound for this formulation. Depending on the problem, two differerent approaches can be taken.
 
-	In unconstrained scenarios, a reference matrix $Y_k = L_k L_k^\top$ can be provided for linearizing the square root term. In scenarios where an SCP approach is required due to other constraints (e.g. involving CCs or nonlinear dynamics \cite{kumagaiRobustCislunarLowThrust2025}), we can replace the square-root term with an auxiliary variable $t \geq 0$ and ensure that the nonconvex relationship $\lambda_{\max}(W_k^u Y_k (W_k^u)^\top) \leq t^2$ is imposed iteratively via successive linearization. In either case, such objective functions break the proof of lossless convexification in \cite{liuOptimalCovarianceSteering2025}. To retain the convexification results, i.e. to ensure that the partial of the Lagrangian with respect to \(Y_k\) is strictly positive definite, an extra regularization term \(\eta \trace(Y_k)\) with small \( \eta > 0 \), can be added, as we do in \cite{kumagaiRobustCislunarLowThrust2025}.
+	In unconstrained scenarios, a reference matrix $Y_k = L_k L_k^\top$ can be provided for linearizing the square root term. In scenarios where an SCP approach is required due to other constraints (e.g. involving CCs or nonlinear dynamics \cite{kumagaiRobustCislunarLowThrust2025}), we can replace the square-root term with an auxiliary variable $t \geq 0$ and ensure that the nonconvex relationship $\lambda_{\max}(W_k^u Y_k (W_k^u)^\top) \leq t^2$ is imposed iteratively via successive linearization. In either case, such objective functions break the proof of lossless convexification in \cite{liuOptimalCovarianceSteering2025}. To retain the convexification results, i.e. to ensure that the partial of the Lagrangian with respect to \(Y_k\) is strictly PD, an extra regularization term \(\eta \trace(Y_k)\) with small \( \eta > 0 \), can be added, as we do in \cite{kumagaiRobustCislunarLowThrust2025}.
 \end{remark}
 
 \subsection{Constraints}
@@ -126,20 +125,20 @@ The initial distributional constraint is imposed by
 \end{equation}
 The terminal distributional constraint is imposed by \cite{okamotoOptimalCovarianceControl2018}
 \begin{equation} \label{eq:terminal_distributional_constraint}
-	\mu_N = \mu_{\mathrm{fin}}, \quad \norm{P_{\mathrm{fin}}^{-1/2} S_N}_2 - 1 \leq 0.
+	\mu_N = \mu_{\mathrm{fin}}, \quad \|P_{\mathrm{fin}}^{-1/2} S_N\|_2 - 1 \leq 0.
 \end{equation}
 
 Since we are working with the square root form, CCs can be imposed in a convex manner.
 For the linear constraint form \cref{eq:linear_chance_constraint}, the CC can be exactly expressed as \cite{okamotoOptimalCovarianceControl2018}:
 \begin{equation} \label{eq:linear_chance_constraint_deterministic}
-	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \norm{S_k^\top \alpha_j}_2 - \beta_j \leq 0, \quad k \in [N]
+	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \|S_k^\top \alpha_j\|_2 - \beta_j \leq 0, \quad k \in [N]
 \end{equation}
 where \( \mathcal{Q}_{\mathcal{N}}(\cdot) \) is the inverse of the standard normal cumulative distribution function.
 For the norm constraint form \cref{eq:norm_chance_constraint}, similar to the QoN cost, the CC can be conservatively imposed as \cite{oguriChanceConstrainedControlSafe2024a}:
 \begin{equation} \label{eq:norm_chance_constraint_deterministic}
 	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0, \quad k \in [N]
 \end{equation}
-The control CCs can be imposed by replacing \( \mu_k \) with \( v_k \) and \( S_k \) with \( L_k \).
+To impose control CCs, replace \( \mu_k \) with \( v_k \) and \( S_k \) with \( L_k \).
 
 To summarize, \cref{eq:problem_statement} is converted into a nonconvex optimization problem as follows:
 \begin{equation} \label{eq:nonconvex_problem_statement}

@@ -3,10 +3,10 @@
 In this section, we connect the optimality of the solution obtained from \cref{alg:sqrt_qr_covariance_steering} (in the $\mathbb{L}_+^n$ coordinates) to that obtained from solving it defining the covariance matrix as variables, as in \cite{liuOptimalCovarianceSteering2025} (in the $\mathbb{S}_+^n$ coordinates).
 
  Consider two constrained optimization problems on manifolds $\mathcal{M}_A$ and $\mathcal{M}_B$ with variables $x \in \mathcal{M}_A$ and $y \in \mathcal{M}_B$:%
-\begin{align*}
-\text{(A)} \quad & \minimize_{x \in \mathcal{X}} \ f(x)\\
-\text{(B)} \quad & \minimize_{y \in \mathcal{Y}} \ f(T(y))
-\end{align*}
+\begin{equation*}
+\text{(A)} \\ \minimize_{x \in \mathcal{X}} \ f(x) \qquad
+\text{(B)} \\ \minimize_{y \in \mathcal{Y}} \ f(T(y))
+\end{equation*}
 where $T: \mathcal{M}_B \rightarrow \mathcal{M}_A$ is a diffeomorphism such that $T(\mathcal{M}_B) = \mathcal{M}_A$, with equality constraints $g_i, i \in \mathcal{I}$ and inequality constraints $h_j, j \in \mathcal{J}$:
 \begin{align}
 	\mathcal{X} &:= \{ x \in \mathcal{M}_A \ |\  g_i(x) = 0, i \in \mathcal{I}; \ h_j(x) \leq 0 \in \mathcal{J} \} \nonumber \\ 
@@ -34,17 +34,17 @@ Defining $\mathcal{S}_A := T(N) \cap \mathcal{X}$,
 = T(\mathcal{N} \cap \mathcal{Y}) 
 = T(\mathcal{S}_B)
 \end{equation}
-where the second equality follows from the fact that $T$ is in particular a bijection \cite[Theorem 12.4]{hammackBookProof2018}.
-Therefore, for any $x \in \mathcal{S}_A$, there exists a unique pre-image $y = T^{-1}(x) \in \mathcal{S}_B$. From \cref{eq:local_minimum}, we have:
-\begin{align}
-\quad f(T(y)) &\geq f(T(y^*)) \quad \forall y \in \mathcal{S}_B \nonumber \\
-\implies \quad f(x) &\geq f(x^*) \quad \forall x \in \mathcal{S}_A. \label{eq:local_optimality_x}
-\end{align}
+where the second equality holds since $T$ is in particular a bijection \cite[Theorem 12.4]{hammackBookProof2018}.
+Therefore, for any $x \in \mathcal{S}_A$, there exists a unique pre-image $y = T^{-1}(x) \in \mathcal{S}_B$. From \cref{eq:local_minimum},
+\begin{equation}
+f(T(y)) \geq f(T(y^*)),\ \forall y \in \mathcal{S}_B \nonumber
+\Rightarrow f(x) \geq f(x^*),\ \forall x \in \mathcal{S}_A. \label{eq:local_optimality_x}
+\end{equation}
 Hence, \(x^*\) is a local minimum of (A).
 \end{proof}
 
 \begin{remark}
-	Another method of proof is to show that the KKT conditions of (A) and (B) are equivalent. Readers are referred to Proposition 1 of \cite{fatkhullinGlobalSolutionsNonConvex2025}. The assumptions used in the proposition, 1. weak convexity of the objective and constraints and 2. differentiability of the coordinate transformation, are satisfied by the problem statement in \cref{eq:nonconvex_problem_statement}.
+	Another way to show \cref{prop:global_optimality_diffeomorphism} is to show that the KKT conditions of (A) and (B) are equivalent. Readers are referred to Proposition 1 of \cite{fatkhullinGlobalSolutionsNonConvex2025}. The assumptions used in the proposition, 1. weak convexity of the objective and constraints and 2. differentiability of the coordinate transformation, are satisfied by the problem statement in \cref{eq:nonconvex_problem_statement}.
 \end{remark}
 
 Next, we apply this result to our specific problem. The following proposition is used in the proof.
@@ -58,7 +58,7 @@ Next, we apply this result to our specific problem. The following proposition is
 \end{theorem}
 
 \begin{proof}
-	Let (A) from \cref{prop:global_optimality_diffeomorphism} be the determinisic formulation method in \cite{liuOptimalCovarianceSteering2025}. In this formulation, variable $x \in \mathcal{M}_A = \mathbb{S}_+^n \times \cdots \times \mathbb{S}_+^n \times \R^{n\times m} \times \cdots \times \R^{n \times m}$ where the first $N+1$ spaces are the positive definite matrices $P_k$ and the next $N$ spaces are the feedback gains $K_k$. 
+	Let (A) from \cref{prop:global_optimality_diffeomorphism} be the determinisic formulation method in \cite{liuOptimalCovarianceSteering2025}. In this formulation, variable $x \in \mathcal{M}_A = \mathbb{S}_+^n \times \cdots \times \mathbb{S}_+^n \times \R^{n\times m} \times \cdots \times \R^{n \times m}$ where the first $N+1$ spaces are the PD matrices $P_k$ and the next $N$ spaces are the feedback gains $K_k$. 
 	Let (B) from \cref{prop:global_optimality_diffeomorphism} be \cref{eq:nonconvex_problem_statement} before the change of variables $L_k = K_k S_k$. In this formulation, variable $y \in \mathcal{M}_B = \mathbb{L}_+^n \times \cdots \times \mathbb{L}_+^n \times \R^{n\times m} \times \cdots \times \R^{n \times m}$, where the first $N+1$ spaces are $S_k$ and the next $N$ spaces are the feedback gains $K_k$. (We can ignore the mean variables $\bm{v}, \bm{\mu}$ as they appear exactly in the same way in either problem.)
 	(B) is solved via \cref{alg:sqrt_qr_covariance_steering}, and the diffeomorphism $T: \mathcal{M}_B \rightarrow \mathcal{M}_A$ maps each of the matrices $\mathbb{S}_+^n$ to $\mathbb{L}_+^n$ via the inverse of the Cholesky map \(\mathcal{L} : \mathbb{S}^n_+ \rightarrow \mathbb{L}_+^n\) and does not modify the feedback gains $K_k$. The inverse of a diffeomorphism is also a diffeomorphism.
 	Then, the proof follows from the local optimality of the \texttt{SCvx*} algorithm \cite[Theorem 3]{oguriSuccessiveConvexificationFeasibility2023a} and \cref{prop:cholesky_diffeomorphism}. 
@@ -66,7 +66,7 @@ Next, we apply this result to our specific problem. The following proposition is
 
 
 \begin{theorem} \label{th:global_optimality}
-	When the CCs are not present and the objective takes the quadratic form of \cref{eq:objective_function}, the solution is globally optimal.
+	When the CCs are not present and the objective takes the quadratic form of \cref{eq:objective_function}, the solution obtained by \cref{alg:sqrt_qr_covariance_steering} is globally optimal.
 \end{theorem}
 \begin{proof}
 	The unconstrained CS problem with quadratic cost is shown to be a convex optimization problem \cite{liuOptimalCovarianceSteering2025}. Since a local optimum of a convex problem is also a global optimum, from \cref{th:local_optimality}, the locally optimal solution obtained from \cref{alg:sqrt_qr_covariance_steering} is also globally optimal.
