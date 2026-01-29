@@ -14,7 +14,7 @@ We address the finite-horizon discrete-time CS problem for a linear time-varying
 \begin{subequations}
 \label{eq:problem_statement}
 \begin{align}
-	& \mathrlap{\minimize_{\bm{v}, \bm{K}} \quad J = \sum\nolimits_{k=0}^{N-1} J_k (x_k, u_k) }\\
+	& \mathrlap{\minimize_{\bm{v}, \bm{K}} \quad J = \sum_{k=0}^{N-1} J_k (x_k, u_k) }\\
 	& \suchthat &&x_{k+1} = A_k x_k + B_k u_k + G_k w_k, \quad k \in [N{-}1] \\
 	& && u_k = v_k + K_k (x_k - \E{x_k}), \quad k \in [N{-}1] \label{eq:feedback_control_law}\\
 	& &&x_0 \sim \mathcal{N}(\mu_{\mathrm{init}}, P_{\mathrm{init}}) \\

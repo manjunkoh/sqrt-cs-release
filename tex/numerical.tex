@@ -64,7 +64,7 @@ for each node, where $p = [x, y]^\top$ is the position vector.
 The control is chance-constrained as $\P{u \leq 0.15} \geq 1 - 0.005$, $\P{u \geq -0.15} \geq 1 - 0.005$
 for each control component and node. The other parameters are $T = 30$, $ \mu_{\mathrm{init}} = [0, 0, 0, 0]^\top$, $ \mu_{\mathrm{fin}} = [10, 0, 0, 0]^\top$, $P_{\mathrm{init}} =\diag{0.1, 0.1, 0.01, 0.01}$, $P_{\mathrm{fin}} = \diag{0.04, 0.04, 0.01, 0.01}$.
 
-When using Liu's formulation \cite{liuOptimalCovarianceSteering2025}, affine CCs are nonconvex in the variables due to the square root term that appears. Two methods exist for handling this nonconvexity: 1) providing a constant reference covariance matrix for all nodes \cite{rapakouliasDiscreteTimeOptimalCovariance2023}, and 2) rewriting the constraint as a difference-of-convex constraint, solved using the convex-concave procedure (CCP)\cite{pilipovskyComputationallyEfficientChance2024}. We use the latter method, as the former method conservatively approximates the available solution space; this resulted in \textit{artificial infeasibility}. A naive CCP also encounters this issue. Hence, we apply the Penalty CCP method \cite{lippVariationsExtensionConvex2016} which introduces positive slack variables and augments a penalty term in the objective function. The implementation of the Penalty CCP method follows the algorithm of \cite{lippVariationsExtensionConvex2016}. The iterative procedure ends with similar criteria as the proposed method: 1) the nonconvex chance constraint violation and all slack varialbes are smaller than $\epsilon_{\mathrm{feas}}$ and 2) the difference of the augmented objective function with the previous step is smaller than $\epsilon_{\mathrm{opt}}$. The slack variables are multiplied a factor $\tau$ and added to the objective function. $\tau$ is initially 100 and increased by a factor of 2 at each iteration. For this formulation and the proposed method, we set $\epsilon_{\mathrm{opt}} = 10^{-2}$, $\epsilon_{\mathrm{feas}} = 10^{-4}$.
+When using Liu's formulation \cite{liuOptimalCovarianceSteering2025}, affine CCs are nonconvex in the variables due to the square root term that appears. Two methods exist for handling this nonconvexity: 1) providing a constant reference covariance matrix for all nodes \cite{rapakouliasDiscreteTimeOptimalCovariance2023}, and 2) rewriting the constraint as a difference-of-convex form, solved using the convex-concave procedure (CCP)\cite{pilipovskyComputationallyEfficientChance2024}. We use the latter method, as the former method conservatively approximates the available solution space; this resulted in \textit{artificial infeasibility}. A naive CCP also encounters this issue. Hence, we apply the Penalty CCP method \cite{lippVariationsExtensionConvex2016} which introduces positive slack variables and augments a penalty term in the objective function. The implementation of the Penalty CCP method follows the algorithm of \cite{lippVariationsExtensionConvex2016}. The iterative procedure ends with similar criteria as the proposed method: 1) the nonconvex CC violation and all slack varialbes are smaller than $\epsilon_{\mathrm{feas}}$ and 2) the difference of the augmented objective function with the previous step is smaller than $\epsilon_{\mathrm{opt}}$. The slack variables are multiplied a factor $\tau$ and added to the objective function. $\tau$ is initially 100 and increased by a factor of 2 at each iteration. For this formulation and the proposed method, we set $\epsilon_{\mathrm{opt}} = 10^{-2}$, $\epsilon_{\mathrm{feas}} = 10^{-4}$. 
 
 \begin{figure}[t]
 	\centering
@@ -76,9 +76,9 @@ When using Liu's formulation \cite{liuOptimalCovarianceSteering2025}, affine CCs
 		\centering
 		\includegraphics[width=\textwidth]{horizon_size_cost_comparison_single_obstacle.pdf}	
 	\end{subfigure}%
-	\caption{Comparisons for the obstacle-avoidance case. (\textbf{Left}) Average (in solid lines) and the min-max range (in shaded regions) of the solution times (\textbf{Right}) Objective function divided by the number of nodes $N$}
+	\caption{Comparisons for the obstacle-avoidance case. (\textbf{Left}) Average (in solid lines) and the min-max range (in shaded regions) of the solution times. (\textbf{Right}) Objective function divided by the horizon length $N$}
 	\label{fig:comparison_of_methods_obstacle}
-\end{figure}
+\end{figure} 
 
 \begin{figure}[t]
 	\centering
@@ -96,11 +96,12 @@ When using Liu's formulation \cite{liuOptimalCovarianceSteering2025}, affine CCs
 
 The comparison results are shown in \cref{fig:comparison_of_methods_obstacle}. 
 % The block-matrix method \cite{okamotoOptimalStochasticVehicle2019} is infeasible for all cases, which highlights the limited solution space using its specific feedback control policy. Nevertheless, we include the computation time, which still grows quickly as $N$ increases.
-For this constrained problem, the proposed method and CCP-based method have similar computational complexity. The proposed method achieves lower cost.
+For this constrained problem, the proposed method and CCP-based method have similar computational complexity. The proposed method achieves lower cost. \cite{okamotoOptimalStochasticVehicle2019} reported infeasibility for all cases; since MOSEK's interior-point solver required a typical number of iterations before terminating, we include it as a reference.
 \cref{fig:planning_with_obstacles_comparison} compares the trajectory and covariance ellipses for the case with $N=40$. The two methods converge to different solutions, with a difference in how large the position covariance is allowed to grow.
+
 %  The control profiles are shown in \cref{fig:planning_with_obstacles_comparison_control}. A notable difference is seen in the profile of the nominal control magnitude. While the CCP-based method shows a continuous control profile, the proposed method shows large changes in the nominal control magnitude, similar to the deterministic reference case.
 \begin{remark}
-	The proposed method handles affine/norm CCs with approximately the same computational effort as unconstrained CS problems.
+	The proposed method solves cc-CS with approximately the same computational effort as unconstrained CS.
 \end{remark}
 
 \subsection{Numerical Reliability}
@@ -116,6 +117,13 @@ The proposed method solves the problem in 42 iterations in 5.0 seconds (average 
 	\caption{Projection of trajectory onto the $x$-$y$ plane for the spacecraft rendezvous problem, with $3\sigma$ covariance ellipses around the mean trajectory}
 	\label{fig:example_cwh_trajectory}
 \end{figure}
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=0.75\linewidth]{example_cwh_covariance_propagation_loss.pdf}
+	\caption{Covariance propagation loss for the spacecraft rendezvous problem}
+	\label{fig:example_cwh_covariance_propagation_loss}
+\end{figure}
+
 
 For the approach of \cite{liuOptimalCovarianceSteering2025}, we use $\eta = 10^{-3}$ for the convexifying term (see \cref{remark:convexifying_term}).
 For this scenario, MOSEK returns status \texttt{UNKNOWN}; this indicates numerical issues, where the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. 
@@ -124,12 +132,5 @@ Here, the covariance dynamics are largely violated, according to a measure of lo
 	\text{Loss}_k = \norm{\phi(K_k, P_k) - P_{k+1}}_F / \norm{P_{k+1}}_F
 \end{equation}
 where \( K_k, P_k \) are the solution of the optimization, and $\phi(K_k, P_k)$ is the RHS of \cref{eq:full_covariance_propagation}. 
-\cref{fig:example_cwh_covariance_propagation_loss} shows the loss for the two methods, showing the superior accuracy of the proposed method's covariance propagation; using tighter convergence tolerance for the proposed method can further improve the accuracy if desired. We also tested with different values of $\eta$ and alternative objective functions for the full covariance approach, such as the EoQ form, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \eta \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), all either resulting in numerical issues and/or lossy covariance propagation.
+\cref{fig:example_cwh_covariance_propagation_loss} shows the loss for the two methods, showing the superior accuracy of the proposed method's covariance propagation; using tighter convergence tolerance for the proposed method can further improve the accuracy if desired. We also tested with different values of $\eta$ and alternative objective functions for the full-covariance approach, such as the EoQ form, \( \sum_k \norm{v_k}_2 + \lambda_{\max}(Y_k) + \eta \trace(Y_k)\), and \(\sum_k \norm{v_k}_2 + \trace(Y_k) \), all either resulting in numerical issues and/or lossy covariance propagation.
 These results support our hypothesis: by working with the square root of the covariance matrix, solvers can work with better-scaled problems and are less likely to encounter numerical issues.
-
-\begin{figure}[t]
-	\centering
-	\includegraphics[width=0.75\linewidth]{example_cwh_covariance_propagation_loss.pdf}
-	\caption{Covariance propagation loss for the spacecraft rendezvous problem}
-	\label{fig:example_cwh_covariance_propagation_loss}
-\end{figure}

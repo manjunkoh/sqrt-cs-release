@@ -26,7 +26,7 @@ Trust regions on \( \mu_k \) and \( v_k \) are not necessary, since they only ap
 
 The objective function is augmented with a penalty term using the augmented Lagrangian method. The penalty function for the constraint violations is defined as:
 \begin{equation} \label{eq:penalty_function}
-	P(\bm{\xi}; w, \bm{\lambda}) = \sum\nolimits_{k=0}^{N-1} \lambda_k^\top \xi_k + \frac{w}{2} \|\xi_k\|_2^2.
+	P(\bm{\xi}; w, \bm{\lambda}) = \sum_{k=0}^{N-1} \lambda_k^\top \xi_k + \frac{w}{2} \|\xi_k\|_2^2.
 \end{equation}
 $\bm{\lambda} := \{\lambda_k\}_{k=0}^{N-1}$ with \( \lambda_k \in \mathbb{R}^{n(n+1)/2} \) are Lagrange multipliers; \( w > 0\) is the penalty weight; \(\bm{\xi} := \{\xi_k\}_{k=0}^{N-1}\) are the slack variables from \cref{eq:linearized_dynamics}. Define \(\bm{z} := \{\bm{v}, \bm{L}, \bm{\mu}, \bm{S} \} \). The augmented objective function is then:
 \begin{equation} \label{eq:objective_augmented}

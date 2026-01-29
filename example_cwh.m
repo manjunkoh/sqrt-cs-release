@@ -381,11 +381,6 @@ if use_fc || use_qr
     xlabel('$x$ (km)', 'Interpreter', 'latex')
     ylabel('$y$ (km)', 'Interpreter', 'latex')
 
-    % if exist('x_mc', 'var') && use_qr
-    %     legend(legendUnq(), 'Location', 'south', 'NumColumns', 2, 'Box', 'off', 'IconColumnWidth', 20)
-    % else
-    %     legend(legendUnq(), 'Location', 'south', 'NumColumns', 1, 'Box', 'off', 'IconColumnWidth', 20)
-    % end
     legend(legendUnq(), 'Location', 'northoutside', 'Orientation', 'horizontal', 'Box', 'off', 'IconColumnWidth', 20)
 
     axis equal

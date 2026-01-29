@@ -1,6 +1,6 @@
 \section{Optimality of the Converged Solution}
 
-In this section, we connect the optimality of the solution obtained from \cref{alg:sqrt_qr_covariance_steering} (in the $\mathbb{L}_+^n$ coordinates) to that obtained from solving it defining the covariance matrix as variables, as in \cite{liuOptimalCovarianceSteering2025} (in the $\mathbb{S}_+^n$ coordinates).
+In this section, we connect the optimality of the solution obtained from \cref{alg:sqrt_qr_covariance_steering} (in the $\mathbb{L}_+^n$ coordinates) to that obtained from solving it defining the covariance matrix as variables, as in \cite{liuOptimalCovarianceSteering2025,pilipovskyComputationallyEfficientChance2024} (in the $\mathbb{S}_+^n$ coordinates).
 
  Consider two constrained optimization problems on manifolds $\mathcal{M}_A$ and $\mathcal{M}_B$ with variables $x \in \mathcal{M}_A$ and $y \in \mathcal{M}_B$:%
 \begin{equation*}
@@ -54,7 +54,7 @@ Next, we apply this result to our specific problem. The following proposition is
 \end{proposition}
 
 \begin{theorem} \label{th:local_optimality}
-	\cref{alg:sqrt_qr_covariance_steering} converges to a locally optimal solution of the cc-CS problem. The local optimality is invariant to whether the problem is represented with the full covariance matrix or its square root. 
+	\cref{alg:sqrt_qr_covariance_steering} converges to a locally optimal solution of the cc-CS problem. The local optimality is invariant to whether the problem is represented with the full covariance matrix or its Cholesky factor. 
 \end{theorem}
 
 \begin{proof}

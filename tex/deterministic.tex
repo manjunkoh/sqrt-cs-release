@@ -77,7 +77,7 @@ Thus, this QR decomposition is unique.
 \end{proof}
 \cref{lemma:sqrt_propagation} ensures that $S_{k+1}$ obtained from \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control} provides a unique matrix in $\mathbb{L}_n^+$ such that \cref{eq:full_covariance_propagation} is satisfied.
 
-Since both $S_k$ and $K_k$ are unknowns, \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control} via \cref{eq:X_definition} has a bilinear term \( K_k S_k \); for the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is PD by \cref{assump:positive_definite_state}. Note that $L_k L_k^\top$ represents the covariance matrix of the input $u_k$. With this change of variables, we get
+Since both $S_k$ and $K_k$ are unknowns, \cref{eq:square_root_covariance_propagation_nonlinear_feedback_control}, via \cref{eq:X_definition}, has a bilinear term \( K_k S_k \); for the sake of convexity, we perform a change of variables and define $L_k = K_k S_k \in \mathbb{R}^{m \times n}$. Then, $K_k$ can be uniquely recovered as $K_k = L_k S_k^{-1}$. The inverse exists since $S_k$ is the Cholesky factor of \( P_k \), which is PD by \cref{assump:positive_definite_state}. Note that $L_k L_k^\top = K_k S_k S_k^\top K_k^\top = K_k P_k K_k^\top = \cov{u_k}$. With this change of variables, we get
 \begin{equation} \label{eq:square_root_covariance_propagation}
 	S_{k+1} = \mathrm{qr}(X_{k+1}^\top)^\top, \ X_{k+1} = \begin{bmatrix} A_k S_k + B_k L_k & G_k \end{bmatrix}
 \end{equation}
