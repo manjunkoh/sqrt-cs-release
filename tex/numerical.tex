@@ -39,11 +39,11 @@ For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers f
 
 \begin{figure}[t]
 	\centering
-	\begin{subfigure}{0.333\linewidth}
+	\begin{subfigure}{0.4\linewidth}
 		\centering
 		\includegraphics[width=\textwidth]{horizon_size_scalability_small.pdf}	
 	\end{subfigure}%
-	\begin{subfigure}{0.333\linewidth}
+	\begin{subfigure}{0.4\linewidth}
 		\centering
 		\includegraphics[width=\textwidth]{horizon_size_cost_comparision_small.pdf}	
 	\end{subfigure}
@@ -57,27 +57,22 @@ For this unconstrained problem, \cite{liuOptimalCovarianceSteering2025} offers f
 % \end{remark}
 
 \subsection{Optimality and Scalability for the Constrained Case}
-Next, we perform a comparison of the same methods in \cref{sec:comparison_unconstrained} for path planning in an environment with circular obstacles which render the state space nonconvex. A common approach to handling circular obstacle avoidance is to conservatively approximate it as a hyperplane constraint which is tangent to the obstacle and has normal vector pointing in the direction of the obstacle center to the reference position \cite{dicairanoModelPredictiveControl2012}. We then apply the deterministic reformulation for affine CCs. 
-The setting is a 2D double integrator with $q = 0.005$ in \cref{eq:double_integrator_equations}. Between the boundary positions, there is a circular obstacle with its center at $[5, 0]$ and radius $1.2$. We define the nonconvex state CC
-\begin{equation} \label{eq:chance_constraint_obstacle}
-	\P{\norm{p - [5, 0]}_2 \geq 1.2} \geq 1 - 0.005
-\end{equation}
+Next, we perform a comparison of the same methods for path planning in an environment with a circular obstacle. We conservatively approximate the obstacle as a time-varying hyperplane \cite{dicairanoModelPredictiveControl2012}.
+These hyperplanes are obtained by solving the deterministic version of the problem to obtain position histories for the linearization reference.
+The setting is a 2D double integrator with $q = 0.005$ in \cref{eq:double_integrator_equations}. Between the boundary positions, there is a circular obstacle with its center at $[5, 0]$ and radius $1.2$. We define the nonconvex state CC: $\P{\norm{p - [5, 0]}_2 \geq 1.2} \geq 1 - 0.005$
 for each node, where $p = [x, y]^\top$ is the position vector.
-The control is chance-constrained as
-\begin{equation}
-	\P{|u| \leq 0.15} \geq 1 - 0.005
-\end{equation}
+The control is chance-constrained as $\P{u \leq 0.15} \geq 1 - 0.005$, $\P{u \geq -0.15} \geq 1 - 0.005$
 for each control component and node. The other parameters are $T = 30$, $ \mu_{\mathrm{init}} = [0, 0, 0, 0]^\top$, $ \mu_{\mathrm{fin}} = [10, 0, 0, 0]^\top$, $P_{\mathrm{init}} =\diag{0.1, 0.1, 0.01, 0.01}$, $P_{\mathrm{fin}} = \diag{0.04, 0.04, 0.01, 0.01}$.
 
-When using Liu's formulation \cite{liuOptimalCovarianceSteering2025}, affine CCs are nonconvex in the variables due to the square root term that appears. Two methods exist for handling this nonconvexity: 1) providing a constant reference covariance matrix for all nodes \cite{rapakouliasDiscreteTimeOptimalCovariance2023}, and 2) rewriting the constraint as a difference-of-convex constraint, solved using the convex-concave procedure (CCP)\cite{pilipovskyComputationallyEfficientChance2024}. We use the latter method, as the former method conservatively approximates the available solution space; this resulted in \textit{artificial infeasibility}. A naive CCP also encounters this issue. Hence, we apply the Penalty CCP method \cite{lippVariationsExtensionConvex2016} which introduces positive slack variables and augments a penalty term in the objective function. The implementation of the Penalty CCP method follows the algorithm of \cite{lippVariationsExtensionConvex2016}. The iterative procedure ends with similar criteria as the proposed method: 1. the nonconvex chance constraint violation is smaller than $\epsilon_{\mathrm{feas}}$, 2. the slack variables are all smaller than $\epsilon_{\mathrm{feas}}$, and 3. difference of the augmented objective function with the previous step is smaller than $\epsilon_{\mathrm{opt}}$. The last two criteria are taken directly from the Penalty CCP algorithm of \cite{lippVariationsExtensionConvex2016}, and the first criterion is for consistency with \cref{alg:sqrt_qr_covariance_steering}. The slack variables are multiplied a factor $\tau$ and added to the objective function. $\tau$ is initially 100 and increased by a factor of 2 at each iteration. For this formulation and the proposed method, we set $\epsilon_{\mathrm{opt}} = 10^{-2}$, $\epsilon_{\mathrm{feas}} = 10^{-4}$.
+When using Liu's formulation \cite{liuOptimalCovarianceSteering2025}, affine CCs are nonconvex in the variables due to the square root term that appears. Two methods exist for handling this nonconvexity: 1) providing a constant reference covariance matrix for all nodes \cite{rapakouliasDiscreteTimeOptimalCovariance2023}, and 2) rewriting the constraint as a difference-of-convex constraint, solved using the convex-concave procedure (CCP)\cite{pilipovskyComputationallyEfficientChance2024}. We use the latter method, as the former method conservatively approximates the available solution space; this resulted in \textit{artificial infeasibility}. A naive CCP also encounters this issue. Hence, we apply the Penalty CCP method \cite{lippVariationsExtensionConvex2016} which introduces positive slack variables and augments a penalty term in the objective function. The implementation of the Penalty CCP method follows the algorithm of \cite{lippVariationsExtensionConvex2016}. The iterative procedure ends with similar criteria as the proposed method: 1) the nonconvex chance constraint violation and all slack varialbes are smaller than $\epsilon_{\mathrm{feas}}$ and 2) the difference of the augmented objective function with the previous step is smaller than $\epsilon_{\mathrm{opt}}$. The slack variables are multiplied a factor $\tau$ and added to the objective function. $\tau$ is initially 100 and increased by a factor of 2 at each iteration. For this formulation and the proposed method, we set $\epsilon_{\mathrm{opt}} = 10^{-2}$, $\epsilon_{\mathrm{feas}} = 10^{-4}$.
 
 \begin{figure}[t]
 	\centering
-	\begin{subfigure}{0.333\linewidth}
+	\begin{subfigure}{0.4\linewidth}
 		\centering
 		\includegraphics[width=\textwidth]{horizon_size_scalability_single_obstacle.pdf}	
 	\end{subfigure}%
-	\begin{subfigure}{0.333\linewidth}
+	\begin{subfigure}{0.4\linewidth}
 		\centering
 		\includegraphics[width=\textwidth]{horizon_size_cost_comparison_single_obstacle.pdf}	
 	\end{subfigure}%
@@ -101,7 +96,7 @@ When using Liu's formulation \cite{liuOptimalCovarianceSteering2025}, affine CCs
 
 The comparison results are shown in \cref{fig:comparison_of_methods_obstacle}. 
 % The block-matrix method \cite{okamotoOptimalStochasticVehicle2019} is infeasible for all cases, which highlights the limited solution space using its specific feedback control policy. Nevertheless, we include the computation time, which still grows quickly as $N$ increases.
-For this constrained problem, the proposed method and CCP-based method have similar computational complexity. The proposed method achieves lower cost. The CCP requires less iterations until convergence.
+For this constrained problem, the proposed method and CCP-based method have similar computational complexity. The proposed method achieves lower cost.
 \cref{fig:planning_with_obstacles_comparison} compares the trajectory and covariance ellipses for the case with $N=40$. The two methods converge to different solutions, with a difference in how large the position covariance is allowed to grow.
 %  The control profiles are shown in \cref{fig:planning_with_obstacles_comparison_control}. A notable difference is seen in the profile of the nominal control magnitude. While the CCP-based method shows a continuous control profile, the proposed method shows large changes in the nominal control magnitude, similar to the deterministic reference case.
 \begin{remark}
@@ -109,35 +104,7 @@ For this constrained problem, the proposed method and CCP-based method have simi
 \end{remark}
 
 \subsection{Numerical Reliability}
-Here, we demonstrate the numerical reliability of the proposed method when the variance of some state components are small. We consider the problem from \cite{oguriChanceConstrainedControlSafe2024a} which uses CS for a spacecraft rendezvous setting. We greatly simplify the problem, using the same system dynamics and boundary condition; we also consider continuous control instead of impulsive control. The problem considers a QoN type objective function with $W_k^x = 0$ and $W_k^u = I$ for all $k$ \cref{eq:objective_function} which is common for optimizing the quantile of the spacecraft's necessary fuel. We emphasize that the parameters of uncertainty are rather realistic for a spacecraft rendezvous setting, and not artificial. The problem parameters are as follows: initial mean position...
-
-
-The problem parameters are summarized in \cref{tab:cwh_parameters}.
-
-\begin{table}[t]
-\centering
-\caption{Parameters for the spacecraft rendezvous problem}
-\label{tab:cwh_parameters}
-\begin{tabular}{llll}
-\toprule
-Parameter & Symbol & Value & Unit \\
-\midrule
-mean pos. at $t_0$ & $\bar{r}_0$ & $[-3.0, 0.126, 0]^\top$ & km \\
-mean vel. at $t_0$ & $\bar{v}_0$ & $0_{3 \times 1}$ & km/s \\
-pos. std. dev. at $t_0$ & $\sigma_{r_0}$ & $100$ & m \\
-vel. std. dev. at $t_0$ & $\sigma_{v_0}$ & $1.0$ & m/s \\
-mean pos. at $t_N$ & $\bar{r}_f$ & $[0.0, 0.05, 0]^\top$ & km \\
-mean vel. at $t_N$ & $\bar{v}_f$ & $0_{3 \times 1}$ & km/s \\
-pos. std. dev. at $t_N$ & $\sigma_{r_f}$ & $10.0$ & m \\
-vel. std. dev. at $t_N$ & $\sigma_{v_f}$ & $0.1$ & m/s \\
-stochastic acceleration & $\sigma_a$ & $1.0$ & mm/s$^{3/2}$ \\
-horizon length & $N$ & $14$ & - \\
-time step & $\Delta t$ & $30$ & s \\
-chief orbit radius & $r_0$ & $7228$ & km \\
-gravitational parameter & $\mu$ & $3.986004418 \times 10^{5}$ & km$^3$/s$^2$ \\
-\bottomrule
-\end{tabular}
-\end{table}
+Here, we demonstrate the numerical reliability of the proposed method when the variance of some state components are small. We consider a problem similar to \cite{oguriChanceConstrainedControlSafe2024a} which uses CS for a spacecraft rendezvous setting. The problem uses a QoN objective function with $W_k^x = 0$ and $W_k^u = I$ for all $k$ \cref{eq:objective_function} which is common for optimizing the quantile of the spacecraft's fuel consumption. We emphasize that the parameters of uncertainty are rather realistic for a spacecraft rendezvous setting, and not artificial: initial mean position (velocity) $[-3.0, 0.126, 0]^\top$ km ($0_{3 \times 1}$ km/s); initial position (velocity) standard deviation $100$ m ($1.0$ m/s); terminal mean position (velocity) $[0.0, 0.05, 0]^\top$ km ($0_{3 \times 1}$ km/s); terminal position(velocity) standard deviation $10.0$ m ($0.1$ m/s); stochastic acceleration $1.0$ mm/s$^{3/2}$; horizon length $N = 14$; time step $30$ s; chief orbit radius $7228$ km; gravitational parameter $3.986 \times 10^{5}$ km$^3$/s$^2$.
 
 The continuous-time Clohessy-Wiltshire-Hill equations \cite{schaubAnalyticalMechanicsSpace2003} are discretized using zero-order hold control, as described in \cite{oguriChanceConstrainedControlSafe2024a}. 
 We use $D_X = \mathrm{diag}(10, 10, 10, 10^3, 10^3, 10^3)$ for the trust region scaling, chosen to make the magnitude of $D_X S_k$ close to unity. We set \( \epsilon_{\mathrm{opt}} = \epsilon_{\mathrm{feas}} = 10^{-5}\).
@@ -145,12 +112,12 @@ The proposed method solves the problem in 42 iterations in 5.0 seconds (average 
 
 \begin{figure}[t]
 	\centering
-	\includegraphics[width=0.8\linewidth]{example_cwh_trajectory.pdf}
+	\includegraphics[width=\linewidth]{example_cwh_trajectory.pdf}
 	\caption{Projection of trajectory onto the $x$-$y$ plane for the spacecraft rendezvous problem, with $3\sigma$ covariance ellipses around the mean trajectory}
 	\label{fig:example_cwh_trajectory}
 \end{figure}
 
-For the full covariance approach \cite{liuOptimalCovarianceSteering2025}, we use $\eta = 10^{-3}$ for the convexifying term (see \cref{remark:convexifying_term}).
+For the approach of \cite{liuOptimalCovarianceSteering2025}, we use $\eta = 10^{-3}$ for the convexifying term (see \cref{remark:convexifying_term}).
 For this scenario, MOSEK returns status \texttt{UNKNOWN}; this indicates numerical issues, where the returned solution may or may not be close to a feasible and optimal solution \cite{mosekapsMOSEKOptimizationToolbox2025}. 
 Here, the covariance dynamics are largely violated, according to a measure of loss in covariance propagation defined as follows:
 \begin{equation}
@@ -162,8 +129,7 @@ These results support our hypothesis: by working with the square root of the cov
 
 \begin{figure}[t]
 	\centering
-	\includegraphics[width=0.8\linewidth]{example_cwh_covariance_propagation_loss.pdf}
+	\includegraphics[width=0.75\linewidth]{example_cwh_covariance_propagation_loss.pdf}
 	\caption{Covariance propagation loss for the spacecraft rendezvous problem}
 	\label{fig:example_cwh_covariance_propagation_loss}
 \end{figure}
-

@@ -4,8 +4,8 @@ In this section, we connect the optimality of the solution obtained from \cref{a
 
  Consider two constrained optimization problems on manifolds $\mathcal{M}_A$ and $\mathcal{M}_B$ with variables $x \in \mathcal{M}_A$ and $y \in \mathcal{M}_B$:%
 \begin{equation*}
-\text{(A)} \\ \minimize_{x \in \mathcal{X}} \ f(x) \qquad
-\text{(B)} \\ \minimize_{y \in \mathcal{Y}} \ f(T(y))
+\text{(A)} \ \minimize_{x \in \mathcal{X}} \ f(x) \qquad
+\text{(B)} \ \minimize_{y \in \mathcal{Y}} \ f(T(y))
 \end{equation*}
 where $T: \mathcal{M}_B \rightarrow \mathcal{M}_A$ is a diffeomorphism such that $T(\mathcal{M}_B) = \mathcal{M}_A$, with equality constraints $g_i, i \in \mathcal{I}$ and inequality constraints $h_j, j \in \mathcal{J}$:
 \begin{align}
@@ -48,7 +48,7 @@ Hence, \(x^*\) is a local minimum of (A).
 \end{remark}
 
 Next, we apply this result to our specific problem. The following proposition is used in the proof.
-\begin{proposition}[\cite{linRiemannianGeometrySymmetric2019}]
+\begin{proposition}[Proposition 2 of \cite{linRiemannianGeometrySymmetric2019}]
 	\label{prop:cholesky_diffeomorphism}
 	The Cholesky map \(\mathcal{L} : \mathbb{S}^n_+ \rightarrow \mathbb{L}_+^n\) is a diffeomorphism.
 \end{proposition}
@@ -66,8 +66,8 @@ Next, we apply this result to our specific problem. The following proposition is
 
 
 \begin{theorem} \label{th:global_optimality}
-	When the CCs are not present and the objective takes the quadratic form of \cref{eq:objective_function}, the solution obtained by \cref{alg:sqrt_qr_covariance_steering} is globally optimal.
+	When the CCs are not present and the objective takes the EoQ form of \cref{eq:objective_function}, the solution obtained by \cref{alg:sqrt_qr_covariance_steering} is globally optimal.
 \end{theorem}
 \begin{proof}
-	The unconstrained CS problem with quadratic cost is shown to be a convex optimization problem \cite{liuOptimalCovarianceSteering2025}. Since a local optimum of a convex problem is also a global optimum, from \cref{th:local_optimality}, the locally optimal solution obtained from \cref{alg:sqrt_qr_covariance_steering} is also globally optimal.
+	The unconstrained CS problem with EoQ cost is a convex optimization problem \cite{liuOptimalCovarianceSteering2025}. Since a local optimum of a convex problem is also a global optimum, from \cref{th:local_optimality}, the solution obtained from \cref{alg:sqrt_qr_covariance_steering} is globally optimal.
 \end{proof}

@@ -18,10 +18,10 @@ Letting $S_k := P_k^{1/2}$, define the following matrix:
 \end{equation}
 \cref{lemma:rank_M_M_top_rank_M,lemma:positive_definite_iff_rank_n} are used to show \cref{lemma:rank_X_n_iff_P_succ_0}. They are standard results so we omit the  proofs.
 \begin{lemma} \label{lemma:rank_M_M_top_rank_M}
-	For any matrix $M \in \mathbb{R}^{p \times q}$,
-	\begin{equation}
-		\rank(M M^\top) = \rank(M).
-	\end{equation}
+	For any $M \in \mathbb{R}^{p \times q}$, $\rank(M M^\top) = \rank(M).$
+	% \begin{equation}
+	% 	\rank(M M^\top) = \rank(M).
+	% \end{equation}
 \end{lemma}
 \begin{lemma} \label{lemma:positive_definite_iff_rank_n}
 	A symmetric positive semidefinite matrix $P$ of size $n \times n$ is strictly PD if and only if $\rank(P) = n$.
@@ -90,7 +90,13 @@ Define $\Delta X_{k} := X_k - \bar{X}_k$.
 
 \subsection{Objective Function}
 After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and performing some standard manipulations, the objective function can be expressed as deterministic convex functions of \( L_k \) and \( S_k \):
+
+{
+\setlength{\abovedisplayskip}{0pt} % Remove extra space above
+\setlength{\belowdisplayskip}{0pt} % Remove extra space below
+\small
 \begin{equation} \label{eq:objective_deterministic}
+	\hspace{-3pt}
 	J = \begin{cases}
 	\sum_{k=0}^{N-1} \mu_k^\top Q_k \mu_k + v_k^\top R_k v_k & \\
 	\quad + \mathrm{trace} (Q_k S_k S_k^\top + R_k L_k L_k^\top) & \text{(EoQ)} \\
@@ -98,14 +104,18 @@ After substituting \( u_k = K_k x_k = L_k S_k^{-1} x_k \), and performing some s
 	\quad + \norm{W_k^u v_k}_2 + \sqrt{\mathcal{Q}_{\chi^2_{w_u}}(p_J)} \ \norm{W_k^u L_k}_2 & \text{(QoN)}.
 	\end{cases}
 \end{equation}
-The QoN cost is a convex upper bound based on the triangle inequality \cite{oguriChanceConstrainedControlSafe2024a}; \( \mathcal{Q}_{\chi^2_d}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( d \) degrees of freedom.
+\setlength{\abovedisplayskip}{0pt} % Remove extra space above
+\setlength{\belowdisplayskip}{0pt} % Remove extra space below
+}
+
+The QoN expression is a convex upper bound based on the triangle inequality \cite{oguriChanceConstrainedControlSafe2024a}; \( \mathcal{Q}_{\chi^2_d}(\cdot) \) is the inverse of the chi-squared cumulative distribution function with \( d \) degrees of freedom.
 
 \begin{remark} \label{remark:convexifying_term}
-	Although an approximation, the QoN cost is easily handled in the proposed method as a convex function of the variables (also by the block matrix methods \cite{ridderhofChanceConstrainedCovarianceControl2020,oguriChanceConstrainedControlSafe2024a}). The seminal work \cite{liuOptimalCovarianceSteering2025} relies on an assumption on the objective function for convexification, and we are not aware of a convex upper bound for this formulation. Depending on the problem, two differerent approaches can be taken. In unconstrained scenarios, a reference matrix $Y_k = L_k L_k^\top$ can be provided for linearizing the square root term. In scenarios where an SCP approach is required due to other constraints (e.g. involving CCs or nonlinear dynamics \cite{kumagaiRobustCislunarLowThrust2025}), we can replace the square-root term with an auxiliary variable $t \geq 0$ and ensure that the nonconvex relationship $\lambda_{\max}(W_k^u Y_k (W_k^u)^\top) \leq t^2$ is imposed iteratively via successive linearization. In either case, such objective functions break the proof of lossless convexification in \cite{liuOptimalCovarianceSteering2025}. To retain the convexification results, i.e. to ensure that the partial of the Lagrangian w.r.t. \(Y_k\) is strictly PD, an extra regularization term \(\eta \trace(Y_k)\) with small \( \eta > 0 \), can be added, as we do in \cite{kumagaiRobustCislunarLowThrust2025}.
+	Although an approximation, the QoN cost is easily handled in the proposed method as a convex function of the variables (also by the block matrix methods \cite{ridderhofChanceConstrainedCovarianceControl2020,oguriChanceConstrainedControlSafe2024a}). The seminal work \cite{liuOptimalCovarianceSteering2025} relies on an assumption on the objective function for convexification, and we are not aware of a convex upper bound for this formulation. Workarounds such as linearizarion break the proof of lossless convexification in \cite{liuOptimalCovarianceSteering2025}. To retain the proof, an extra regularization term \(\eta \trace(Y_k)\) with small \( \eta > 0 \) can be added, as we do in \cite{kumagaiRobustCislunarLowThrust2025} ($Y_k := \cov{u_k}$).
 \end{remark}
 
 \subsection{Constraints}
-Thanks to the square root representation, we can also rewrite the constraints as convex functions of the variables.
+The square root representation allows all other constraints to be rewritten as convex functions of the variables.
 
 The structure of \(S_k\) is imposed by
 \begin{equation} \label{eq:S_structure_constraint}
@@ -119,14 +129,12 @@ The terminal distributional constraint is imposed by \cite{okamotoOptimalCovaria
 \begin{equation} \label{eq:terminal_distributional_constraint}
 	\mu_N = \mu_{\mathrm{fin}}, \quad \|P_{\mathrm{fin}}^{-1/2} S_N\|_2 - 1 \leq 0.
 \end{equation}
-
-Since we are working with the square root form, CCs can be imposed in a convex manner.
-For the linear constraint form \cref{eq:linear_chance_constraint}, the CC can be exactly expressed as \cite{okamotoOptimalCovarianceControl2018}:
+The affine CC in \cref{eq:linear_chance_constraint} can be exactly expressed as \cite{okamotoOptimalCovarianceControl2018}:
 \begin{equation} \label{eq:linear_chance_constraint_deterministic}
 	\alpha_j^\top \mu_k + \mathcal{Q}_{\mathcal{N}}(1 - p_j) \|S_k^\top \alpha_j\|_2 - \beta_j \leq 0, \quad k \in [N]
 \end{equation}
 where \( \mathcal{Q}_{\mathcal{N}}(\cdot) \) is the inverse of the standard normal cumulative distribution function.
-For the norm constraint form \cref{eq:norm_chance_constraint}, similar to the QoN cost, the CC can be conservatively imposed as \cite{oguriChanceConstrainedControlSafe2024a}:
+For the norm CC, similar to the QoN cost, the CC can be conservatively imposed as \cite{oguriChanceConstrainedControlSafe2024a}:
 \begin{equation} \label{eq:norm_chance_constraint_deterministic}
 	\norm{\mu_k}_2 + \sqrt{Q_{\chi^2_n}(1 - p_\gamma)} \ \norm{S_k}_2 - \gamma \leq 0, \quad k \in [N]
 \end{equation}

@@ -331,7 +331,7 @@ use_qr = exist('prob_qr', 'var') && flag_solved_qr && ~isempty(prob_qr);
 %%
 if use_fc || use_qr
     
-    figure(Position=[0, 0, 20, 10])
+    figure(Position=[0, 0, 24, 12])
     hold on
     
     % Plot FullCovarianceSteering results
@@ -381,16 +381,23 @@ if use_fc || use_qr
     xlabel('$x$ (km)', 'Interpreter', 'latex')
     ylabel('$y$ (km)', 'Interpreter', 'latex')
 
-    if exist('x_mc', 'var') && use_qr
-        legend(legendUnq(), 'Location', 'south', 'NumColumns', 2, 'EdgeColor', 'white', 'IconColumnWidth', 20)
-    else
-        legend(legendUnq(), 'Location', 'south', 'NumColumns', 1, 'EdgeColor', 'white', 'IconColumnWidth', 20)
-    end
-    grid on
-    axis equal
+    % if exist('x_mc', 'var') && use_qr
+    %     legend(legendUnq(), 'Location', 'south', 'NumColumns', 2, 'Box', 'off', 'IconColumnWidth', 20)
+    % else
+    %     legend(legendUnq(), 'Location', 'south', 'NumColumns', 1, 'Box', 'off', 'IconColumnWidth', 20)
+    % end
+    legend(legendUnq(), 'Location', 'northoutside', 'Orientation', 'horizontal', 'Box', 'off', 'IconColumnWidth', 20)
 
-    add_zoomed_axis(gca, [-0.05, 0.05, 0, 0.10], [-0.6, 0.4, 0.52, 0.52])
-    
+    axis equal
+    grid on
+
+    xlim([-3.3, 0.8])
+    ylim([-0.2, 0.6])
+
+    za = zoomed_axes(gca, [0, 0, 1, 1]);
+    za.Position = [0.8, 0.38, 0.1, 0.2];
+    za.ZoomRegion = [-0.05, 0, 0.05, 0.1];
+
     exportgraphics(gcf, 'figures/example_cwh_trajectory.png', Resolution=300)
     exportgraphics(gcf, 'figures/example_cwh_trajectory.pdf', ContentType='vector')
     

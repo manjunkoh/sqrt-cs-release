@@ -2,12 +2,12 @@
 \section{Preliminaries}
 
 \subsection{Notation and Preliminaries}
-$\mathbb{L}^n$ ($\mathbb{L}_+^n$) denotes the space of $n \times n$ lower triangular (LT) matrices (with positive diagonal entries). $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric PD  matrices. The Cholesky factor of a matrix \( P \in \mathbb{S}_+^{n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \), and $\mathrm{diag}(a,b, \cdots)$ denotes the diagonal matrix with $a,b, \cdots$ on the diagonals. $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \([N] := \{0, 1, \cdots, N\}\) for $N \in \N$.
+$\mathbb{L}^n$ ($\mathbb{L}_+^n$) denotes the space of $n \times n$ LT matrices (with positive diagonal entries). $\mathbb{S}^n_+$ denotes the space of $n \times n$ symmetric PD  matrices. The Cholesky factor of a matrix \( P \in \mathbb{S}_+^{n} \) is defined as the unique matrix \( S \in \mathbb{L}_+^n \) such that \( P = S S^\top \) \cite[Theorem 4.2.7]{golubMatrixComputations2013}; we write \(S = P^{1/2}\). $\mathrm{diag}(M)$ denotes the vector of diagonal elements of matrix \( M \), and $\mathrm{diag}(a,b, \cdots)$ denotes the diagonal matrix with $a,b, \cdots$ on the diagonals. $A \succ (\succeq) B$ denotes that $A - B $ is positive (semi)definite. \([N] := \{0, 1, \cdots, N\}\) for $N \in \N$.
 We refer to the ``square root" of the covariance matrix \(P\) to refer to (not necessarily square) matrices \(L\) that satisfy \(P = L L^\top\). 
 $\mathrm{tril}(\cdot)$ sets all but the LT part of a matrix to zero.
 $\mathrm{vec}(\cdot)$ vectorizes a matrix.
 $\mathrm{vectril}(\cdot)$ vectorizes the LT part of a matrix.
-$\lambda_{\max}(\cdot)$ denotes the maximum eigenvalue of a matrix.
+$\cov{\cdot}$ denotes the covariance matrix of a random variable.
 
 \subsection{Problem Formulation}
 We address the finite-horizon discrete-time CS problem for a linear time-varying system with additive Gaussian noise. The goal is to find a state feedback controller that steers the state mean and covariance from their initial values to desired terminal values while minimizing a cost function and obeying CCs. Mathematically, the problem is formulated as follows.
@@ -31,8 +31,8 @@ We consider two types of cost functions:
 \begin{equation} \label{eq:objective_function}
 	J_k (x_k, u_k) = \begin{cases}
 	\E{x_k^\top Q_k x_k + u_k^\top R_k u_k} \\
-	\mathcal{Q}_{\norm{W_{k}^x x_k}_2}(p_J) +
-	\mathcal{Q}_{\norm{W_{k}^u u_k}_2}(p_J)
+	\mathcal{Q}_{\|W_{k}^x x_k\|_2}(p_J) +
+	\mathcal{Q}_{\|W_{k}^u u_k\|_2}(p_J)
 	\end{cases}
 \end{equation}
 The former is a standard \textbf{expectation-of-quadratic} (EoQ) cost with \( Q_k \succeq 0 \) and \( R_k \succ 0 \).
@@ -49,8 +49,8 @@ The sets \( \mathcal{X} \) and \( \mathcal{U} \) represent state and control fea
 \end{align}
 with \( \alpha_j \in \mathbb{R}^n \), \( \beta_j \in \mathbb{R} \), \(\gamma\in \mathbb{R}\), \( \gamma > 0 \) and violation probabilities  \( p_j \), \( p_\gamma \). The same forms apply to the input \( u_k \).
 
-Let $P_k$ denote the state covariance matrix.
-We make the following assumption which is reasonable in practical applications and also required in \cite{liuOptimalCovarianceSteering2025}:
+Let $P_k := \cov{x_k}$.
+We make the following assumption, reasonable in practical applications and also made in \cite{liuOptimalCovarianceSteering2025}:
 \begin{assumption} \label{assump:positive_definite_state}
 	$P_k \succ 0,\quad \forall k \in [N].$
 \end{assumption}
