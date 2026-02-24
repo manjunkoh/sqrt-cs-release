@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sqrt-cs"
+version = "0.1.0"
+description = "Square Root-Factorized Covariance Steering (linear + nonlinear extension)"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.12",
+    "cvxpy>=1.4",
+    "matplotlib>=3.8",
+    "clarabel>=0.7",      # open-source SOCP/SDP solver (no license needed)
+]
+
+[project.optional-dependencies]
+mosek = ["mosek>=10.1"]   # faster; needs academic license
+dev   = ["pytest>=8", "pytest-cov", "ruff"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sqrt_cs*"]
+
+[tool.ruff]
+line-length = 100
