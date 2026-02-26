@@ -105,8 +105,15 @@ class SqrtQRCovarianceSteering(SCPProblem):
         self.obstacles  = obstacles or []
 
         # Initial guesses
-        S0_chol = cholesky_pos_diag(self.P0)
-        self.init_S  = init_S  if init_S  is not None else np.tile(S0_chol,  (N + 1, 1, 1))
+        if init_S is not None:
+            self.init_S = init_S
+        else:
+            # Linearly interpolate from S0 to Sf to satisfy the terminal constraint
+            S_interp = np.zeros((N + 1, nx, nx))
+            for k in range(N + 1):
+                alpha = k / N
+                S_interp[k] = (1 - alpha) * self.S0 + alpha * self.Sf
+            self.init_S = S_interp
         self.init_L  = init_L  if init_L  is not None else np.zeros((N, nu, nx))
         self.init_mu = init_mu if init_mu is not None else np.tile(self.mu0, (N + 1, 1))
         self.init_v  = init_v  if init_v  is not None else np.zeros((N, nu))
@@ -138,10 +145,11 @@ class SqrtQRCovarianceSteering(SCPProblem):
 
     def objective(self, vars: dict) -> cp.Expression:
         """
-        LQG cost:
+        LQG cost (matches MATLAB 'LQG'/'LQR'/'LQ' objective):
           J = sum_{k=0}^{N-1} [ trace(Q P[k]) + trace(R P_u[k]) ]
-            + trace(Q P[N])
         where  P[k] = S[k] S[k]'  and  P_u[k] = L[k] L[k]' + (mean contribution).
+
+        No terminal cost on S[N] — matches MATLAB SqrtQRCovarianceSteering.
 
         In CVXPY we use the identity  trace(Q S S') = ||chol(Q) S||_F^2.
         """
@@ -156,9 +164,6 @@ class SqrtQRCovarianceSteering(SCPProblem):
 
         for k in range(N):
             cost = cost + cp.sum_squares(Lq @ S[k]) + cp.sum_squares(Lr @ L[k])
-
-        # Terminal state cost
-        cost = cost + cp.sum_squares(Lq @ S[N])
 
         # Mean cost (if tracking means)
         if self.use_mean:
@@ -206,7 +211,8 @@ class SqrtQRCovarianceSteering(SCPProblem):
         """
         Always-convex inequality constraints:
           - Positive diagonal on S[k]  (ensures positive definiteness)
-          - Terminal covariance:  S[N] S[N]' == Pf  (imposed as LMI or exact)
+          - Terminal covariance: ||chol(Pf)^{-1} S[N]||_2 <= 1  (PSD upper bound P[N] <= Pf)
+            Matches MATLAB: norm(chol(P_f,'lower') \\ S[:,N], 2) <= 1
           - Chance constraints on state and control (convex in S, mu)
           - Terminal mean (if use_mean)
         """
@@ -219,8 +225,11 @@ class SqrtQRCovarianceSteering(SCPProblem):
             for i in range(nx):
                 constraints.append(S[k][i, i] >= 1e-8)
 
-        # Terminal covariance (exact equality via Cholesky factor)
-        constraints.append(S[N] == self.Sf)
+        # Terminal covariance: spectral norm inequality ||Sf^{-1} S[N]||_2 <= 1
+        # Equivalent to P[N] = S[N]S[N]' <= Pf  (PSD inequality)
+        # Sf = chol(Pf, 'lower') is stored as self.Sf
+        Sf_inv = np.linalg.inv(self.Sf)
+        constraints.append(cp.norm(Sf_inv @ S[N], 2) <= 1)
 
         # Terminal mean
         if self.use_mean:
@@ -263,18 +272,21 @@ class SqrtQRCovarianceSteering(SCPProblem):
 
     def noncvx_eq_relaxed(
         self, vars: dict, ref: dict[str, np.ndarray]
-    ) -> list[cp.Constraint]:
+    ) -> list[cp.Expression]:
         """
-        Linearized QR dynamics:  S[k+1]  ==  R_ref[k].T + dR[k].T
+        Linearized QR dynamics residuals:  S[k+1] - (R_ref[k].T + dR[k].T)
 
         where  dR[k]  is the differential of the QR map evaluated at
         (M_ref[k], dM[k])  with  dM[k] = (A[k] dS[k] + B[k] dL[k]).
+
+        Returns a list of (nx, nx) CVXPY expressions, one per time step.
+        Each expression equals zero when the linearized constraint is satisfied.
         """
         S_var, L_var = vars["S"], vars["L"]
         S_ref = ref["S"]    # (N+1, nx, nx)
         L_ref = ref["L"]    # (N, nu, nx)
 
-        constraints = []
+        exprs = []
         for k in range(self.N):
             M_ref = self._build_M(S_ref[k], L_ref[k], k)
             Q_ref, R_ref = economy_qr_pos_diag(M_ref)
@@ -289,11 +301,13 @@ class SqrtQRCovarianceSteering(SCPProblem):
             # The differential is linear in dM, so we can apply it element-wise.
             dR_expr = self._dR_cvxpy(dM, Q_ref, R_ref)
 
-            S_next_lin = R_ref.T + cp.reshape(dR_expr, (self.nx, self.nx)).T
+            S_next_lin = R_ref.T + cp.reshape(dR_expr, (self.nx, self.nx), order='F').T
 
-            constraints.append(S_var[k + 1] == S_next_lin)
+            # Return residual expression: S[k+1] - linearized_prediction
+            residual = S_var[k + 1] - S_next_lin
+            exprs.append(residual)
 
-        return constraints
+        return exprs
 
     def convexified_inexact_ineq(
         self, vars: dict, ref: dict[str, np.ndarray]
@@ -465,9 +479,9 @@ class SqrtQRCovarianceSteering(SCPProblem):
         #   dR.ravel() = T @ dM.ravel()
         # then express as  T @ cp.vec(dM).
 
-        T = self._dR_linear_operator(Q_ref, R_ref)    # (n*n, m*n) numpy array
-        dM_vec = cp.vec(dM)                            # (m*n,) CVXPY
-        return T @ dM_vec                              # (n*n,) CVXPY
+        T = self._dR_linear_operator(Q_ref, R_ref)       # (n*n, m*n) numpy, F-order
+        dM_vec = cp.vec(dM, order='F')                  # (m*n,) CVXPY, F-order
+        return T @ dM_vec                               # (n*n,) CVXPY
 
     def _dR_linear_operator(self, Q: np.ndarray, R: np.ndarray) -> np.ndarray:
         """
@@ -481,9 +495,9 @@ class SqrtQRCovarianceSteering(SCPProblem):
         for col in range(m * n):
             e = np.zeros(m * n)
             e[col] = 1.0
-            dM_basis = e.reshape(m, n)
+            dM_basis = e.reshape(m, n, order='F')       # F-order: matches cp.vec(dM, order='F')
             _, dR = d_QR(None, dM_basis, Q=Q, R=R)
-            T[:, col] = dR.ravel()
+            T[:, col] = dR.ravel(order='F')             # F-order: matches cp.reshape(..., order='F')
         return T
 
     # ================================================================== #

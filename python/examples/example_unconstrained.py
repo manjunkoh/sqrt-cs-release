@@ -14,7 +14,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-from sqrt_cs.systems.double_integrator import build_double_integrator, default_boundary_conditions
+from sqrt_cs.systems.double_integrator import build_double_integrator
 from sqrt_cs.problems.sqrt_qr_cs import SqrtQRCovarianceSteering
 from sqrt_cs.core.scp_params import SCPParams
 from sqrt_cs.core.scvx_star import SCvxStar
@@ -23,6 +23,13 @@ from sqrt_cs.core.scvx_star import SCvxStar
 def run(N: int = 20, verbose: bool = True):
     """
     Solve unconstrained CS for a 3-D double integrator with horizon N.
+
+    Matches MATLAB horizon_size_scalability.m benchmark (Section IV-A of paper):
+      - T_total = 3.0 s, dt = T_total / N
+      - nw = nx = 6  (noise injected into all states)
+      - G = sqrt(q * dt) * I_6  with q = 0.05
+      - P0 = I_6,  Pf = 0.5 * I_6
+      - Q = 0.1 * I_6,  R = I_3
 
     Parameters
     ----------
@@ -34,13 +41,25 @@ def run(N: int = 20, verbose: bool = True):
     problem : solved SqrtQRCovarianceSteering instance
     solver  : SCvxStar instance (contains iteration history)
     """
-    # ---- System ----
-    A, B, G = build_double_integrator(dt=1.0, d=3)
-    P0, Pf, mu0, muf = default_boundary_conditions(d=3, sigma0=0.1, sigmaf=0.01)
+    # ---- System (MATLAB-matching parameters) ----
+    d = 3
+    T_total = 3.0
+    dt = T_total / N
+    q = 0.05   # process noise spectral density
+
+    A, B, _ = build_double_integrator(dt=dt, d=d)
     nx, nu = A.shape[0], B.shape[1]
 
-    # Cost matrices (identity — matches paper)
-    Q = np.eye(nx)
+    # Process noise: G = sqrt(q*dt) * I_{nx}  (nw = nx = 6, all-state noise)
+    nw = nx
+    G = np.sqrt(q * dt) * np.eye(nw)
+
+    # Boundary conditions
+    P0 = np.eye(nx)           # Sigma0 = I_6
+    Pf = 0.5 * np.eye(nx)    # SigmaN = 0.5 * I_6
+
+    # Cost matrices
+    Q = 0.1 * np.eye(nx)
     R = np.eye(nu)
 
     # ---- Problem ----
@@ -55,6 +74,7 @@ def run(N: int = 20, verbose: bool = True):
     # ---- Solver params ----
     params = SCPParams(
         r_init=0.1,
+        r_max=1.0,
         w_init=100.0,
         tol_opt=1e-5,
         tol_feas=1e-5,

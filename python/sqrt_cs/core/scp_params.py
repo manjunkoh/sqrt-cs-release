@@ -17,9 +17,9 @@ class SCPParams:
     # ------------------------------------------------------------------ #
     # Trust region
     # ------------------------------------------------------------------ #
-    r_init: float = 0.1          # initial radius
+    r_init: float = 0.1          # initial radius  (matches MATLAB default)
     r_min:  float = 1e-6         # minimum radius
-    r_max:  float = 1.0          # maximum radius
+    r_max:  float = 1.0          # maximum radius  (matches MATLAB default)
     trust_region_norm: float = np.inf  # norm order: np.inf or 2
 
     # ------------------------------------------------------------------ #

@@ -36,7 +36,7 @@ class SCPProblem(ABC):
     convex_eq(vars)           → list of CVXPY constraints  (always convex, affine)
     convex_ineq(vars)         → list of CVXPY constraints  (always convex)
     noncvx_eq(vals)           → np.ndarray  of residuals  g(z) = 0
-    noncvx_eq_relaxed(vars, ref) → list of CVXPY constraints  (linearized g ≈ 0)
+    noncvx_eq_relaxed(vars, ref) → list of CVXPY expressions  (linearized residuals)
 
     Optionally override
     -------------------
@@ -86,10 +86,11 @@ class SCPProblem(ABC):
     @abstractmethod
     def noncvx_eq_relaxed(
         self, vars: dict, ref: dict[str, np.ndarray]
-    ) -> list[cp.Constraint]:
+    ) -> list[cp.Expression]:
         """
-        First-order Taylor expansion of  g(z) ≈ 0  around  ref.
-        Returns CVXPY constraints used inside the convex subproblem.
+        Return linearized nonconvex equality residuals as CVXPY expressions.
+        Each expression evaluates to zero when the linearized constraint is satisfied.
+        The solver will add these as soft constraints: expr == slack (with AL penalty).
         """
 
     # ------------------------------------------------------------------ #

@@ -127,12 +127,23 @@ class SCvxStar:
                 J0_ref      = J0_k
                 ref_updated = True
 
-                # Multiplier update criterion (Eq. 15 in SCvx*)
-                if abs(delta_J) < min(it.delta, chi_k):
+                # Multiplier update criterion (Eq. 15 in SCvx*).
+                # MATLAB uses min(delta, eta*chi) with eta=Inf (non-superlinear),
+                # so the condition reduces to abs(delJ) < delta, which is
+                # always true on the first iteration (delta = Inf).
+                if abs(delta_J) < it.delta:
                     it.lam   = it.lam   + it.w * g_k
                     it.mu_al = np.maximum(it.mu_al + it.w * h_k, 0.0)
                     it.w     = min(p.beta * it.w, p.w_max)
-                    it.delta = max(p.gamma_al * it.delta, p.tol_opt)
+                    # First multiplier update: set delta to abs(delta_J).
+                    # Subsequent updates: reduce by gamma_al (matches MATLAB).
+                    if np.isinf(it.delta):
+                        it.delta = max(abs(delta_J), p.tol_opt)
+                    else:
+                        it.delta = max(p.gamma_al * it.delta, p.tol_opt)
+                    # Reset trust region after multiplier update so solver
+                    # can explore under the new penalty landscape.
+                    it.r = max(it.r, p.r_init)
                     mul_updated = True
 
             # ---- Trust region update ----
@@ -196,7 +207,6 @@ class SCvxStar:
         n_eq   = it.n_eq
         n_ineq = it.n_ineq
 
-        sl_eq     = cp.Variable(n_eq,   name="slack_eq")
         sl_ineq   = cp.Variable(n_ineq, name="slack_ineq", nonneg=True) if n_ineq > 0 else None
         sl_inexact = None   # sized dynamically from convexified_inexact_ineq
 
@@ -209,18 +219,16 @@ class SCvxStar:
         # Always-convex inequality constraints
         constraints += pr.convex_ineq(cvx_vars)
 
-        # Linearized nonconvex equalities  g(z) ≈ 0  →  g_lin(z) = slack_eq
-        noncvx_eq_lin = pr.noncvx_eq_relaxed(cvx_vars, ref)
-        if noncvx_eq_lin and n_eq > 0:
-            # The relaxed constraints should equal the slack
-            # We implement as:  g_linearized == sl_eq
-            # Each element of noncvx_eq_lin is already "S[k+1] == rhs_lin"
-            # so sl_eq captures the violation from the perspective of penalty
-            # We instead formulate: impose the linear equality, track violation
-            # via the penalty on the *nonlinear* residual g_k.
-            # (The AL penalty acts on g_k evaluated at the solution, not on a slack.)
-            # → Just add the linearized equalities as hard constraints.
-            constraints += noncvx_eq_lin
+        # Linearized nonconvex equalities as soft constraints with AL penalty
+        # noncvx_eq_relaxed now returns residual expressions (not hard constraints)
+        noncvx_eq_exprs = pr.noncvx_eq_relaxed(cvx_vars, ref)
+        slack_vars_eq: list[cp.Variable] = []
+        all_slack_exprs: list[cp.Expression] = []
+        for expr in noncvx_eq_exprs:
+            slack_k = cp.Variable(expr.shape, name=f"xi_{len(slack_vars_eq)}")
+            constraints.append(expr == slack_k)   # S[k+1] - linearized = slack (soft)
+            slack_vars_eq.append(slack_k)
+            all_slack_exprs.append(cp.vec(slack_k, order='F'))
 
         # Linearized nonconvex inequalities
         noncvx_ineq_lin = pr.noncvx_ineq_relaxed(cvx_vars, ref)
@@ -236,12 +244,15 @@ class SCvxStar:
         # ---- Objective  =  J0  +  AL penalty (acts on *predicted* slack) ----
         J0_expr = pr.objective(cvx_vars)
 
-        # AL penalty on nonconvex equality residuals (predicted at linear model)
-        penalty_expr = cp.Constant(0)
-        # We use penalty on the actual residuals post-solve; the subproblem
-        # minimises J0 subject to linearized constraints (exact AL update outside).
+        # AL penalty on linearized equality residuals (predicted slack)
+        if all_slack_exprs:
+            xi = cp.hstack(all_slack_exprs)   # (n_eq,) CVXPY vector
+            # AL penalty: lambda' xi + (w/2)||xi||^2
+            penalty_expr = it.lam @ xi + (it.w / 2) * cp.sum_squares(xi)
+            objective = cp.Minimize(J0_expr + penalty_expr)
+        else:
+            objective = cp.Minimize(J0_expr)
 
-        objective = cp.Minimize(J0_expr)
         prob_cvx  = cp.Problem(objective, constraints)
 
         # ---- Solve ----
@@ -250,8 +261,9 @@ class SCvxStar:
             "verbose": p.solver_verbose,
         }
         if p.solver == "CLARABEL":
-            solver_kwargs["eps_abs"] = p.solver_eps_abs
-            solver_kwargs["eps_rel"] = p.solver_eps_rel
+            solver_kwargs["tol_gap_abs"] = p.solver_eps_abs
+            solver_kwargs["tol_gap_rel"] = p.solver_eps_rel
+            solver_kwargs["tol_feas"]    = p.solver_eps_abs
         elif p.solver == "MOSEK":
             solver_kwargs["mosek_params"] = {
                 "MSK_DPAR_INTPNT_CO_TOL_PFEAS": p.solver_eps_abs,
@@ -270,15 +282,23 @@ class SCvxStar:
         J0_val = float(J0_expr.value)
         vals   = pr.extract_vals(cvx_vars)
 
-        # Evaluate actual nonconvex residuals at the new solution
-        g_vals = pr.noncvx_eq(vals)
+        # Extract predicted slack values (linearized residuals at the new point)
+        if slack_vars_eq:
+            xi_vals = np.concatenate([
+                slack_k.value.ravel(order='F')
+                for slack_k in slack_vars_eq
+            ])
+        else:
+            xi_vals = np.zeros(n_eq)
+
+        # Evaluate actual nonconvex residuals at the new solution (used for acceptance test)
         h_vals = pr.noncvx_ineq(vals)
 
         return (
             status,
             vals,
             J0_val,
-            g_vals,                          # "slack_eq"    (actual residuals)
+            xi_vals,                         # "slack_eq"    (predicted linearized residuals)
             h_vals,                          # "slack_ineq"  (actual residuals)
             np.array([]),                    # slack_inexact (not separately tracked)
         )
@@ -324,8 +344,8 @@ class SCvxStar:
             dL = L_var[k] - L_ref[k]
             # Scaled perturbation in propagation space
             delta_prop = pr.A[k] @ dS + pr.B[k] @ dL    # (nx, nx) CVXPY
-            if p.trust_region_norm == np.inf:
-                constraints.append(cp.norm_inf(cp.vec(delta_prop)) <= r)
+            if self.params.trust_region_norm == np.inf:
+                constraints.append(cp.norm_inf(cp.vec(delta_prop, order='F')) <= r)
             else:
                 constraints.append(cp.norm(delta_prop, "fro") <= r)
 
@@ -382,7 +402,12 @@ class SCvxStar:
     # ================================================================== #
 
     def _eval_objective_at_ref(self, ref: dict[str, np.ndarray]) -> float:
-        """Evaluate the objective numerically at the reference point."""
+        """Evaluate the objective numerically at the reference point.
+
+        Matches MATLAB SqrtQRCovarianceSteering objective:
+          J = sum_{k=0}^{N-1} [tr(Q P[k]) + tr(R P_u[k])]
+        No terminal cost on S[N].
+        """
         pr = self.prob
         if not isinstance(pr, SqrtQRCovarianceSteering):
             return 0.0
@@ -394,9 +419,6 @@ class SCvxStar:
             if pr.use_mean and "mu" in ref:
                 J += float(ref["mu"][k] @ pr.Q @ ref["mu"][k])
                 J += float(ref["v"][k]  @ pr.R @ ref["v"][k])
-        J += np.trace(pr.Q @ S[pr.N] @ S[pr.N].T)
-        if pr.use_mean and "mu" in ref:
-            J += float(ref["mu"][pr.N] @ pr.Q @ ref["mu"][pr.N])
         return J
 
     def _variable_change_norm(
