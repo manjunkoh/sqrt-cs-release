@@ -334,15 +334,16 @@ class SqrtQRCovarianceSteering(SCPProblem):
                 for i, idx in enumerate(obs.pos_idx):
                     E[i, idx] = 1.0
 
-                # Constraint:  a' E mu[k] + z * ||S[k]' E' a||_2  >=  radius
-                # i.e.  radius  <=  a' E mu[k] + z * ||E' a) ' S[k]||_2... wait
-                # More carefully (from paper Sec III-C):
-                #   a' mu[k][pos] + z * ||S[k][pos_idx,:] ' a||  >= radius + a'center
-                # We reformulate as SOCP:
-                Ea = E.T @ a   # (nx,) — direction in full state space
+                # Linearized obstacle avoidance chance constraint (Sec III-C):
+                #   P(a'x_pos >= a'center + radius) >= 1-p
+                #   ↔  a'mu - z * ||S' a_full||_2 >= a'center + radius
+                #   DCP form: z * norm(S' a_full) <= a'mu - a'center - radius
+                # (norm <= affine is DCP; opposite of state upper-bound constraints)
+                Ea = E.T @ a              # (nx,) unit normal in full-state space
+                center_offset = float(a @ obs.center)  # a' center (constant)
                 lhs_mean = Ea @ mu_var[k]
                 lhs_cov  = cp.norm(S_var[k].T @ Ea, 2) * obs.z
-                constraints.append(lhs_mean + lhs_cov >= obs.radius)
+                constraints.append(lhs_cov <= lhs_mean - obs.radius - center_offset)
 
         return constraints
 
